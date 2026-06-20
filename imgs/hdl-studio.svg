@@ -1,0 +1,29 @@
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <g fill="none" stroke="#000000" stroke-width="22" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M96.0 70 V20 a16 16 0 0 1 32 0 V70"/>
+    <path d="M168.0 70 V20 a16 16 0 0 1 32 0 V70"/>
+    <path d="M240.0 70 V20 a16 16 0 0 1 32 0 V70"/>
+    <path d="M312.0 70 V20 a16 16 0 0 1 32 0 V70"/>
+    <path d="M384.0 70 V20 a16 16 0 0 1 32 0 V70"/>
+    <path d="M96.0 442 V492 a16 16 0 0 0 32 0 V442"/>
+    <path d="M168.0 442 V492 a16 16 0 0 0 32 0 V442"/>
+    <path d="M240.0 442 V492 a16 16 0 0 0 32 0 V442"/>
+    <path d="M312.0 442 V492 a16 16 0 0 0 32 0 V442"/>
+    <path d="M384.0 442 V492 a16 16 0 0 0 32 0 V442"/>
+    <path d="M70 96.0 H20 a16 16 0 0 0 0 32 H70"/>
+    <path d="M70 168.0 H20 a16 16 0 0 0 0 32 H70"/>
+    <path d="M70 240.0 H20 a16 16 0 0 0 0 32 H70"/>
+    <path d="M70 312.0 H20 a16 16 0 0 0 0 32 H70"/>
+    <path d="M70 384.0 H20 a16 16 0 0 0 0 32 H70"/>
+    <path d="M442 96.0 H492 a16 16 0 0 1 0 32 H442"/>
+    <path d="M442 168.0 H492 a16 16 0 0 1 0 32 H442"/>
+    <path d="M442 240.0 H492 a16 16 0 0 1 0 32 H442"/>
+    <path d="M442 312.0 H492 a16 16 0 0 1 0 32 H442"/>
+    <path d="M442 384.0 H492 a16 16 0 0 1 0 32 H442"/>
+  </g>
+  <rect x="70" y="70" width="372" height="372" rx="16"
+        fill="none" stroke="#000000" stroke-width="30" stroke-linejoin="round"/>
+  <rect x="120" y="120" width="272" height="272" rx="6"
+        fill="none" stroke="#000000" stroke-width="18"/>
+  <circle cx="160" cy="160" r="16" fill="#000000"/>
+</svg>

@@ -1,18 +1,18 @@
 {
-    "name": "digitaljs",
-    "displayName": "DigitalJS",
-    "description": "DigitalJS integration for VS Code",
-    "version": "0.7.3",
-    "license": "SEE LICENSE IN LICENSE",
-    "publisher": "yuyichao",
+    "name": "hdl-studio",
+    "displayName": "HDL Studio",
+    "description": "HDL Studio is a vscode extension for digitaljs, a digital circuit simulator.",
+    "version": "0.0.1",
+    "license": "See LICENSE",
+    "publisher": "TwinT",
     "repository": {
         "type": "git",
-        "url": "https://github.com/yuyichao/digitaljs_code.git"
+        "url": "https://github.com/TwinT/hdl-studio.git"
     },
     "engines": {
         "vscode": "^1.62.0"
     },
-    "icon": "imgs/digitaljs.png",
+    "icon": "imgs/hdl-studio.png",
     "categories": [
         "Debuggers",
         "Education",
@@ -25,115 +25,115 @@
         "simulation"
     ],
     "activationEvents": [
-        "onCustomEditor:digitaljs.circuitView",
-        "onCommand:digitaljs.openView",
-        "onCommand:digitaljs.openViewJSON",
-        "onCommand:digitaljs.addToViewSource",
-        "onCommand:digitaljs.newViewSource",
-        "onCommand:digitaljs.newJSON",
-        "onCommand:digitaljs.addFiles",
-        "onCommand:digitaljs.exportImage",
-        "onCommand:digitaljs.removeSource"
+        "onCustomEditor:hdl-studio.circuitView",
+        "onCommand:hdl-studio.openView",
+        "onCommand:hdl-studio.openViewJSON",
+        "onCommand:hdl-studio.addToViewSource",
+        "onCommand:hdl-studio.newViewSource",
+        "onCommand:hdl-studio.newJSON",
+        "onCommand:hdl-studio.addFiles",
+        "onCommand:hdl-studio.exportImage",
+        "onCommand:hdl-studio.removeSource"
     ],
     "main": "./dist/local-extension.js",
     "browser": "./dist/web-extension.js",
     "contributes": {
         "commands": [
             {
-                "command": "digitaljs.openView",
-                "title": "Open DigitalJS",
-                "icon": "imgs/digitaljs.svg",
-                "category": "DigitalJS"
+                "command": "hdl-studio.openView",
+                "title": "Open HDL Studio",
+                "icon": "imgs/hdl-studio.svg",
+                "category": "HDL Studio"
             },
             {
-                "command": "digitaljs.showPanel",
-                "title": "Show DigitalJS Panel",
-                "icon": "imgs/digitaljs.svg",
-                "category": "DigitalJS"
+                "command": "hdl-studio.showPanel",
+                "title": "Show HDL Studio Panel",
+                "icon": "imgs/hdl-studio.svg",
+                "category": "HDL Studio"
             },
             {
-                "command": "digitaljs.openViewJSON",
-                "title": "Open as circuit in DigitalJS",
-                "icon": "imgs/digitaljs.svg",
-                "category": "DigitalJS"
+                "command": "hdl-studio.openViewJSON",
+                "title": "Open as circuit in HDL Studio",
+                "icon": "imgs/hdl-studio.svg",
+                "category": "HDL Studio"
             },
             {
-                "command": "digitaljs.addToViewSource",
-                "title": "Add to DigitalJS",
-                "icon": "imgs/digitaljs.svg",
-                "category": "DigitalJS"
+                "command": "hdl-studio.addToViewSource",
+                "title": "Add to HDL Studio",
+                "icon": "imgs/hdl-studio.svg",
+                "category": "HDL Studio"
             },
             {
-                "command": "digitaljs.newViewSource",
-                "title": "Create circuit in DigitalJS",
-                "icon": "imgs/digitaljs.svg",
-                "category": "DigitalJS"
+                "command": "hdl-studio.newViewSource",
+                "title": "Create circuit in HDL Studio",
+                "icon": "imgs/hdl-studio.svg",
+                "category": "HDL Studio"
             },
             {
-                "command": "digitaljs.revealCircuit",
+                "command": "hdl-studio.revealCircuit",
                 "title": "Show active circuit",
                 "icon": "$(output-view-icon)",
-                "category": "DigitalJS"
+                "category": "HDL Studio"
             },
             {
-                "command": "digitaljs.pause",
+                "command": "hdl-studio.pause",
                 "title": "Pause",
                 "icon": "$(debug-pause)",
-                "category": "DigitalJS"
+                "category": "HDL Studio"
             },
             {
-                "command": "digitaljs.start",
+                "command": "hdl-studio.start",
                 "title": "Start",
                 "icon": "$(debug-start)",
-                "category": "DigitalJS"
+                "category": "HDL Studio"
             },
             {
-                "command": "digitaljs.newJSON",
+                "command": "hdl-studio.newJSON",
                 "title": "New Circuit",
                 "icon": "$(new-file)",
-                "category": "DigitalJS"
+                "category": "HDL Studio"
             },
             {
-                "command": "digitaljs.addFiles",
+                "command": "hdl-studio.addFiles",
                 "title": "Add Files",
                 "icon": "$(add)",
-                "category": "DigitalJS"
+                "category": "HDL Studio"
             },
             {
-                "command": "digitaljs.exportImage",
+                "command": "hdl-studio.exportImage",
                 "title": "Export Circuit As Image",
                 "icon": "$(file-media)",
-                "category": "DigitalJS"
+                "category": "HDL Studio"
             },
             {
-                "command": "digitaljs.showLuaTerminal",
+                "command": "hdl-studio.showLuaTerminal",
                 "title": "Show Lua Terminal",
                 "icon": "$(terminal)",
-                "category": "DigitalJS"
+                "category": "HDL Studio"
             },
             {
-                "command": "digitaljs.removeSource",
+                "command": "hdl-studio.removeSource",
                 "title": "Remove",
                 "icon": "$(dash)",
-                "category": "DigitalJS"
+                "category": "HDL Studio"
             },
             {
-                "command": "digitaljs.stopScript",
+                "command": "hdl-studio.stopScript",
                 "title": "Stop script",
                 "icon": "$(debug-stop)",
-                "category": "DigitalJS"
+                "category": "HDL Studio"
             },
             {
-                "command": "digitaljs.startScript",
+                "command": "hdl-studio.startScript",
                 "title": "Start script",
                 "icon": "$(debug-start)",
-                "category": "DigitalJS"
+                "category": "HDL Studio"
             }
         ],
         "customEditors": [
             {
-                "viewType": "digitaljs.circuitView",
-                "displayName": "DigitalJS",
+                "viewType": "hdl-studio.circuitView",
+                "displayName": "HDL Studio",
                 "selector": [
                     {
                         "filenamePattern": "*.digitaljs"
@@ -142,8 +142,8 @@
                 "priority": "default"
             },
             {
-                "viewType": "digitaljs.circuitView_json",
-                "displayName": "DigitalJS",
+                "viewType": "hdl-studio.circuitView_json",
+                "displayName": "HDL Studio",
                 "selector": [
                     {
                         "filenamePattern": "*.json"
@@ -155,137 +155,137 @@
         "menus": {
             "commandPalette": [
                 {
-                    "command": "digitaljs.openView",
+                    "command": "hdl-studio.openView",
                     "when": "false"
                 },
                 {
-                    "command": "digitaljs.showPanel",
+                    "command": "hdl-studio.showPanel",
                     "when": "false"
                 },
                 {
-                    "command": "digitaljs.openViewJSON",
+                    "command": "hdl-studio.openViewJSON",
                     "when": "false"
                 },
                 {
-                    "command": "digitaljs.addToViewSource",
+                    "command": "hdl-studio.addToViewSource",
                     "when": "false"
                 },
                 {
-                    "command": "digitaljs.newViewSource",
+                    "command": "hdl-studio.newViewSource",
                     "when": "false"
                 },
                 {
-                    "command": "digitaljs.revealCircuit",
+                    "command": "hdl-studio.revealCircuit",
                     "when": "false"
                 },
                 {
-                    "command": "digitaljs.pause",
+                    "command": "hdl-studio.pause",
                     "when": "false"
                 },
                 {
-                    "command": "digitaljs.start",
+                    "command": "hdl-studio.start",
                     "when": "false"
                 },
                 {
-                    "command": "digitaljs.addFiles",
+                    "command": "hdl-studio.addFiles",
                     "when": "false"
                 },
                 {
-                    "command": "digitaljs.exportImage",
+                    "command": "hdl-studio.exportImage",
                     "when": "false"
                 },
                 {
-                    "command": "digitaljs.showLuaTerminal",
+                    "command": "hdl-studio.showLuaTerminal",
                     "when": "false"
                 },
                 {
-                    "command": "digitaljs.removeSource",
+                    "command": "hdl-studio.removeSource",
                     "when": "false"
                 },
                 {
-                    "command": "digitaljs.stopScript",
+                    "command": "hdl-studio.stopScript",
                     "when": "false"
                 },
                 {
-                    "command": "digitaljs.startScript",
+                    "command": "hdl-studio.startScript",
                     "when": "false"
                 }
             ],
             "view/title": [
                 {
-                    "command": "digitaljs.newJSON",
-                    "when": "view == digitaljs-proj-files",
+                    "command": "hdl-studio.newJSON",
+                    "when": "view == hdl-studio-proj-files",
                     "group": "navigation@0"
                 },
                 {
-                    "command": "digitaljs.addFiles",
-                    "when": "view == digitaljs-proj-files",
+                    "command": "hdl-studio.addFiles",
+                    "when": "view == hdl-studio-proj-files",
                     "group": "navigation@1"
                 },
                 {
-                    "command": "digitaljs.exportImage",
-                    "when": "view == digitaljs-proj-files",
+                    "command": "hdl-studio.exportImage",
+                    "when": "view == hdl-studio-proj-files",
                     "group": "navigation@2"
                 },
                 {
-                    "command": "digitaljs.showLuaTerminal",
-                    "when": "view == digitaljs-proj-files",
+                    "command": "hdl-studio.showLuaTerminal",
+                    "when": "view == hdl-studio-proj-files",
                     "group": "navigation@3"
                 }
             ],
             "editor/title": [
                 {
-                    "command": "digitaljs.openView",
-                    "when": "!digitaljs.view_isfocus",
+                    "command": "hdl-studio.openView",
+                    "when": "!hdl-studio.view_isfocus",
                     "group": "navigation"
                 },
                 {
-                    "command": "digitaljs.showPanel",
-                    "when": "digitaljs.view_isfocus",
+                    "command": "hdl-studio.showPanel",
+                    "when": "hdl-studio.view_isfocus",
                     "group": "navigation@0"
                 },
                 {
-                    "command": "digitaljs.pause",
-                    "when": "digitaljs.view_isfocus && digitaljs.view_hascircuit && digitaljs.view_running",
+                    "command": "hdl-studio.pause",
+                    "when": "hdl-studio.view_isfocus && hdl-studio.view_hascircuit && hdl-studio.view_running",
                     "group": "navigation@1"
                 },
                 {
-                    "command": "digitaljs.start",
-                    "when": "digitaljs.view_isfocus && digitaljs.view_hascircuit && !digitaljs.view_running",
+                    "command": "hdl-studio.start",
+                    "when": "hdl-studio.view_isfocus && hdl-studio.view_hascircuit && !hdl-studio.view_running",
                     "group": "navigation@1"
                 }
             ],
             "explorer/context": [
                 {
-                    "command": "digitaljs.openViewJSON",
+                    "command": "hdl-studio.openViewJSON",
                     "when": "resourceExtname == .json || resourceExtname == .digitaljs",
                     "group": "navigation@99999"
                 },
                 {
-                    "command": "digitaljs.addToViewSource",
-                    "when": "digitaljs.view_isactive && resourceExtname =~ /^\\.sv$|^\\.v$|^\\.vh$|^\\.lua$/",
+                    "command": "hdl-studio.addToViewSource",
+                    "when": "hdl-studio.view_isactive && resourceExtname =~ /^\\.sv$|^\\.v$|^\\.vh$|^\\.lua$/",
                     "group": "navigation@99999"
                 },
                 {
-                    "command": "digitaljs.newViewSource",
+                    "command": "hdl-studio.newViewSource",
                     "when": "resourceExtname =~ /^\\.sv$|^\\.v$|^\\.vh$|^\\.lua$/",
                     "group": "navigation@100000"
                 }
             ],
             "view/item/context": [
                 {
-                    "command": "digitaljs.removeSource",
-                    "when": "view == digitaljs-proj-files && viewItem != root-circuit",
+                    "command": "hdl-studio.removeSource",
+                    "when": "view == hdl-studio-proj-files && viewItem != root-circuit",
                     "group": "inline"
                 },
                 {
-                    "command": "digitaljs.startScript",
-                    "when": "view == digitaljs-proj-files && viewItem in digitaljs.script_not_running",
+                    "command": "hdl-studio.startScript",
+                    "when": "view == hdl-studio-proj-files && viewItem in hdl-studio.script_not_running",
                     "group": "inline"
                 },
                 {
-                    "command": "digitaljs.stopScript",
-                    "when": "view == digitaljs-proj-files && viewItem in digitaljs.script_running",
+                    "command": "hdl-studio.stopScript",
+                    "when": "view == hdl-studio-proj-files && viewItem in hdl-studio.script_running",
                     "group": "inline"
                 }
             ]
@@ -293,36 +293,36 @@
         "viewsContainers": {
             "activitybar": [
                 {
-                    "id": "digitaljs-container",
-                    "title": "DigitalJS",
-                    "icon": "imgs/digitaljs_mono.svg"
+                    "id": "hdl-studio-container",
+                    "title": "HDL Studio",
+                    "icon": "imgs/hdl-studio_mono.svg"
                 }
             ]
         },
         "views": {
-            "digitaljs-container": [
+            "hdl-studio-container": [
                 {
-                    "id": "digitaljs-proj-files",
+                    "id": "hdl-studio-proj-files",
                     "name": "Files",
                     "icon": "$(files)",
-                    "when": "digitaljs.view_isactive",
-                    "contextualTitle": "DigitalJS Files"
+                    "when": "hdl-studio.view_isactive",
+                    "contextualTitle": "HDL Studio Files"
                 },
                 {
-                    "id": "digitaljs-proj-synth",
+                    "id": "hdl-studio-proj-synth",
                     "type": "webview",
                     "name": "Synthesis",
                     "icon": "$(gear)",
-                    "when": "digitaljs.view_isactive",
-                    "contextualTitle": "DigitalJS Synthesis"
+                    "when": "hdl-studio.view_isactive",
+                    "contextualTitle": "HDL Studio Synthesis"
                 },
                 {
-                    "id": "digitaljs-proj-status",
+                    "id": "hdl-studio-proj-status",
                     "type": "webview",
                     "name": "Control",
                     "icon": "$(info)",
-                    "when": "digitaljs.view_isactive",
-                    "contextualTitle": "DigitalJS Control"
+                    "when": "hdl-studio.view_isactive",
+                    "contextualTitle": "HDL Studio Control"
                 }
             ]
         }
@@ -371,8 +371,8 @@
         "backbone": "^1.4.1",
         "base64-arraybuffer": "^1.0.2",
         "crypto-browserify": "^3.12.0",
-        "digitaljs": "github:yuyichao/digitaljs#dev",
-        "digitaljs_lua": "github:yuyichao/digitaljs_lua#dev",
+        "digitaljs": "^0.14.2",
+        "digitaljs_lua": "^0.0.9",
         "hammerjs": "^2.0.8",
         "lodash": "^4.17.21",
         "luaparse": "^0.3.1",
@@ -380,10 +380,9 @@
         "resize-observer-polyfill": "^1.5.1",
         "split-grid": "^1.0.11",
         "stream-browserify": "^3.0.0",
-        "svg-pan-zoom": "github:yuyichao/svg-pan-zoom",
+        "svg-pan-zoom": "^3.6.2",
         "util": "^0.12.4",
         "wavecanvas": "^1.1.0",
-        "yosys2digitaljs": "^0.6.0",
-        "yosysjs": "github:yuyichao/yosysjs"
+        "yosys2digitaljs": "^0.10.3"
     }
 }
