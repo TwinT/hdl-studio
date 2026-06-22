@@ -1,12 +1,15 @@
 //
-
 'use strict';
-
 import * as vscode from 'vscode';
 import * as path from 'path';
-import yosys from 'yosysjs';
-import yosys2digitaljs from 'yosys2digitaljs';
+import * as child_process from 'child_process';
+import * as fs from 'fs';
+import * as os from 'os';
+import { promisify } from 'util';
+import { yosys2digitaljs, io_ui } from 'yosys2digitaljs';
 import * as digitaljs_transform from '../node_modules/digitaljs/src/transform.mjs';
+
+const execFile = promisify(child_process.execFile);
 
 const rand_prefix = 'djs-IxU5De4QZDxUgn43Zwj1-_';
 const rand_suffix = '_-hbtdHFLoSvFPbPLnGSp8';
@@ -24,80 +27,85 @@ class FileMap {
     }
 }
 
-let yosysWasmURI;
+// set_yosys_wasm_uri se mantiene como no-op para no romper extension.mjs
+// que puede seguir llamándola; simplemente ya no hace nada.
+export function set_yosys_wasm_uri(_uri) {}
 
-export function set_yosys_wasm_uri(uri) {
-    yosysWasmURI = uri;
-}
+function build_yosys_script(files, opts = {}) {
+    const cmds = ['design -reset'];
 
-class Yosys {
-    static #wasmBinary
-    static async #getWasmBinary() {
-        if (!Yosys.#wasmBinary)
-            Yosys.#wasmBinary = await vscode.workspace.fs.readFile(yosysWasmURI);
-        return Yosys.#wasmBinary;
-    }
-    #FS
-    #ccall
-    #file_map = new FileMap();
-    async init() {
-        const M = {
-            wasmBinary: await Yosys.#getWasmBinary(),
-        };
-        await yosys(M);
-        this.#FS = M.FS;
-        this.#ccall = M.ccall;
-        // Yosys::yosys_setup()
-        M.ccall('_ZN5Yosys11yosys_setupEv', '', []);
-    }
-    #run(cmd) {
-        this.#ccall('run', '', ['string'], [cmd]);
-    }
-    process_files(files, opts = {}) {
-        try {
-            this.#run('design -reset');
-            for (const name in files) {
-                const ext = path.extname(name);
-                const pre_ext = name.substring(0, name.length - ext.length);
-                const escaped_name = this.#file_map.map_name(pre_ext) + ext;
-                this.#FS.writeFile(escaped_name, files[name]);
-                if (ext == '.sv') {
-                    this.#run(`read_verilog -sv ${escaped_name}`);
-                }
-                else {
-                    this.#run(`read_verilog ${escaped_name}`);
-                }
-            }
-            this.#run('hierarchy -auto-top');
-            this.#run('proc');
-            this.#run(opts.optimize ? 'opt' : 'opt_clean');
-            if (opts.fsm && opts.fsm != 'no') {
-                const fsmexpand = opts.fsmexpand ? " -expand" : "";
-                this.#run(opts.fsm == "nomap" ? "fsm -nomap" + fsmexpand : "fsm" + fsmexpand);
-            }
-            this.#run('memory -nomap');
-            this.#run('wreduce -memx');
-            this.#run(opts.optimize ? 'opt -full' : 'opt_clean');
-            this.#run('json -o /output.json');
+    for (const [name, _] of Object.entries(files)) {
+        const ext = path.extname(name);
+        if (ext === '.sv') {
+            cmds.push(`read_verilog -sv ${name}`);
+        } else {
+            cmds.push(`read_verilog ${name}`);
         }
-        catch (e) {
-            console.error(e);
-            const error = this.#file_map.unmap_string(this.#ccall('errmsg', 'string', [], []));
-            throw { error };
-        }
-        const output = JSON.parse(this.#file_map.unmap_string(
-            new TextDecoder().decode(this.#FS.readFile('/output.json'))));
-        return output;
     }
+
+    cmds.push('hierarchy -auto-top');
+    cmds.push('proc');
+    cmds.push(opts.optimize ? 'opt' : 'opt_clean');
+
+    if (opts.fsm && opts.fsm !== 'no') {
+        const fsmexpand = opts.fsmexpand ? ' -expand' : '';
+        cmds.push(opts.fsm === 'nomap' ? `fsm -nomap${fsmexpand}` : `fsm${fsmexpand}`);
+    }
+
+    cmds.push('memory -nomap');
+    cmds.push('wreduce -memx');
+    cmds.push(opts.optimize ? 'opt -full' : 'opt_clean');
+
+    return cmds.join('\n');
 }
 
 export async function run_yosys(files, options) {
-    const yosys = new Yosys();
-    await yosys.init();
-    const obj = yosys.process_files(files, options);
-    let output = yosys2digitaljs.yosys2digitaljs(obj, options);
-    yosys2digitaljs.io_ui(output);
-    if (options.transform)
-        output = digitaljs_transform.transformCircuit(output);
-    return { output };
+    // Resolve yosys binary: use setting if defined, otherwise rely on PATH
+    const config = vscode.workspace.getConfiguration('hdl-studio');
+    const yosysBin = config.get('yosysPath') || 'yosys';
+
+    // Write source files to a temp directory
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'hdl-studio-'));
+    const outputJson = path.join(tmpDir, 'output.json');
+    const file_map = new FileMap();
+
+    try {
+        // Write each source file with a mapped name to avoid path issues
+        const mappedFiles = {};
+        for (const [name, content] of Object.entries(files)) {
+            const ext = path.extname(name);
+            const pre_ext = name.substring(0, name.length - ext.length);
+            const mappedName = file_map.map_name(pre_ext) + ext;
+            const fullPath = path.join(tmpDir, mappedName);
+            fs.writeFileSync(fullPath, content);
+            mappedFiles[fullPath] = content;
+        }
+
+        const script = build_yosys_script(mappedFiles, options) + `\njson -o ${outputJson}`;
+        const scriptPath = path.join(tmpDir, 'synth.ys');
+        fs.writeFileSync(scriptPath, script);
+
+        try {
+            await execFile(yosysBin, ['-s', scriptPath]);
+        } catch (e) {
+            const errMsg = file_map.unmap_string(e.stderr || e.message || String(e));
+            throw { error: errMsg };
+        }
+
+        const raw = JSON.parse(
+            file_map.unmap_string(fs.readFileSync(outputJson, 'utf8'))
+        );
+
+        let output = yosys2digitaljs(raw, options);
+        io_ui(output);
+
+        if (options.transform)
+            output = digitaljs_transform.transformCircuit(output);
+
+        return { output };
+
+    } finally {
+        // Clean up temp dir
+        fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
 }

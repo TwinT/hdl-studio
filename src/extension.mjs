@@ -89,7 +89,7 @@ class DigitalJS {
         this.#global_state = context.globalState;
         // Paths
         const ext_uri = context.extensionUri;
-        this.iconPath = vscode.Uri.joinPath(ext_uri, 'imgs', 'digitaljs.svg');
+        this.iconPath = vscode.Uri.joinPath(ext_uri, 'imgs', 'hdl-studio.svg');
         this.mainJSPath = vscode.Uri.joinPath(ext_uri, 'dist', 'view-bundle.js');
         this.synthJSPath = vscode.Uri.joinPath(ext_uri, 'dist', 'synth_view.js');
         this.statusJSPath = vscode.Uri.joinPath(ext_uri, 'dist', 'status_view.js');
@@ -123,65 +123,65 @@ class DigitalJS {
         context.subscriptions.push(this.highlightDecoType);
 
         context.subscriptions.push(
-            vscode.commands.registerCommand('digitaljs.openView',
+            vscode.commands.registerCommand('hdl-studio.openView',
                                             () => this.#openView()));
         context.subscriptions.push(
-            vscode.commands.registerCommand('digitaljs.showPanel',
+            vscode.commands.registerCommand('hdl-studio.showPanel',
                                             () => vscode.commands.executeCommand(
-                                                'digitaljs-proj-files.focus')));
+                                                'hdl-studio-proj-files.focus')));
         context.subscriptions.push(
-            vscode.commands.registerCommand('digitaljs.openViewJSON',
+            vscode.commands.registerCommand('hdl-studio.openViewJSON',
                                             (item) => this.#openViewJSON(item)));
         context.subscriptions.push(
-            vscode.commands.registerCommand('digitaljs.addToViewSource',
+            vscode.commands.registerCommand('hdl-studio.addToViewSource',
                                             (item) => this.#openViewSource(item)));
         context.subscriptions.push(
-            vscode.commands.registerCommand('digitaljs.newViewSource',
+            vscode.commands.registerCommand('hdl-studio.newViewSource',
                                             (item) => this.#openViewSource(item, true)));
         context.subscriptions.push(
-            vscode.commands.registerCommand('digitaljs.revealCircuit',
+            vscode.commands.registerCommand('hdl-studio.revealCircuit',
                                             () => this.#revealCircuit()));
         context.subscriptions.push(
-            vscode.commands.registerCommand('digitaljs.pause',
+            vscode.commands.registerCommand('hdl-studio.pause',
                                             () => this.postPanelMessage({
                                                 command: 'pausesim' })));
         context.subscriptions.push(
-            vscode.commands.registerCommand('digitaljs.start',
+            vscode.commands.registerCommand('hdl-studio.start',
                                             () => this.postPanelMessage({
                                                 command: 'startsim' })));
         context.subscriptions.push(
-            vscode.commands.registerCommand('digitaljs.newJSON',
+            vscode.commands.registerCommand('hdl-studio.newJSON',
                                             () => this.#newJSON(this.doc_uri, false)));
         context.subscriptions.push(
-            vscode.commands.registerCommand('digitaljs.addFiles',
+            vscode.commands.registerCommand('hdl-studio.addFiles',
                                             () => this.#addFiles()));
         context.subscriptions.push(
-            vscode.commands.registerCommand('digitaljs.exportImage',
+            vscode.commands.registerCommand('hdl-studio.exportImage',
                                             () => this.#exportImage()));
         context.subscriptions.push(
-            vscode.commands.registerCommand('digitaljs.showLuaTerminal',
+            vscode.commands.registerCommand('hdl-studio.showLuaTerminal',
                                             () => this.#showLuaTerminal()));
         context.subscriptions.push(
-            vscode.commands.registerCommand('digitaljs.removeSource',
+            vscode.commands.registerCommand('hdl-studio.removeSource',
                                             (item) => this.#removeSource(item)));
         context.subscriptions.push(
-            vscode.commands.registerCommand('digitaljs.startScript',
+            vscode.commands.registerCommand('hdl-studio.startScript',
                                             (item) => this.#startScript(item)));
         context.subscriptions.push(
-            vscode.commands.registerCommand('digitaljs.stopScript',
+            vscode.commands.registerCommand('hdl-studio.stopScript',
                                             (item) => this.#stopScript(item)));
 
         context.subscriptions.push(
-            vscode.window.registerWebviewViewProvider('digitaljs-proj-synth',
+            vscode.window.registerWebviewViewProvider('hdl-studio-proj-synth',
                                                       new SynthProvider(this), {}));
         context.subscriptions.push(
-            vscode.window.registerWebviewViewProvider('digitaljs-proj-status',
+            vscode.window.registerWebviewViewProvider('hdl-studio-proj-status',
                                                       new StatusProvider(this),
                                                       { webviewOptions: {
                                                           retainContextWhenHidden: true }}));
         this.#filesView = new FilesView(this);
         context.subscriptions.push(
-            vscode.window.registerTreeDataProvider('digitaljs-proj-files', this.#filesView));
+            vscode.window.registerTreeDataProvider('hdl-studio-proj-files', this.#filesView));
 
         context.subscriptions.push(
             vscode.window.registerCustomEditorProvider(
@@ -206,14 +206,14 @@ class DigitalJS {
         context.subscriptions.push(this);
 
         this.runStatesUpdated((states) => {
-            vscode.commands.executeCommand('setContext', 'digitaljs.view_hascircuit',
+            vscode.commands.executeCommand('setContext', 'hdl-studio.view_hascircuit',
                                            states.hascircuit);
-            vscode.commands.executeCommand('setContext', 'digitaljs.view_running',
+            vscode.commands.executeCommand('setContext', 'hdl-studio.view_running',
                                            states.running);
         });
 
-        vscode.commands.executeCommand('setContext', 'digitaljs.view_hascircuit', false);
-        vscode.commands.executeCommand('setContext', 'digitaljs.view_running', false);
+        vscode.commands.executeCommand('setContext', 'hdl-studio.view_hascircuit', false);
+        vscode.commands.executeCommand('setContext', 'hdl-studio.view_running', false);
     }
     dispose() {
         this.#document.dispose();
@@ -334,7 +334,7 @@ class DigitalJS {
         }
     }
     registerDocument(document, circuit_view) {
-        vscode.commands.executeCommand('setContext', 'digitaljs.view_isactive', true);
+        vscode.commands.executeCommand('setContext', 'hdl-studio.view_isactive', true);
 
         const listeners = [];
         listeners.push(document.sourcesUpdated(() => {
@@ -438,13 +438,13 @@ class DigitalJS {
                 // Therefore, we focus on our side panel on first show of the editor
                 // to cover this case...
                 if (!was_shown)
-                    vscode.commands.executeCommand('digitaljs-proj-files.focus');
+                    vscode.commands.executeCommand('hdl-studio-proj-files.focus');
                 was_shown = true;
-                vscode.commands.executeCommand('setContext', 'digitaljs.view_isfocus', true);
+                vscode.commands.executeCommand('setContext', 'hdl-studio.view_isfocus', true);
             }
             else if (this.#document === document) {
                 // Keep the last active document active in the side bars.
-                vscode.commands.executeCommand('setContext', 'digitaljs.view_isfocus', false);
+                vscode.commands.executeCommand('setContext', 'hdl-studio.view_isfocus', false);
             }
         };
         circuit_view.onDidChangeViewState(on_view_state);
@@ -469,9 +469,9 @@ class DigitalJS {
             unlink_view(circuit_view);
             if (was_active) {
                 post_switch();
-                vscode.commands.executeCommand('setContext', 'digitaljs.view_isfocus', false);
+                vscode.commands.executeCommand('setContext', 'hdl-studio.view_isfocus', false);
             }
-            vscode.commands.executeCommand('setContext', 'digitaljs.view_isactive',
+            vscode.commands.executeCommand('setContext', 'hdl-studio.view_isactive',
                                            !!this.#circuitView);
         });
         if (this.#pendingSources.length > 0) {
@@ -676,7 +676,7 @@ class DigitalJS {
     async #openViewSource(uri, force_new) {
         if (this.#circuitView && !force_new) {
             this.#circuitView.reveal();
-            vscode.commands.executeCommand('digitaljs-proj-files.focus');
+            vscode.commands.executeCommand('hdl-studio-proj-files.focus');
             this.#document.addSources([uri]);
         }
         else {
@@ -698,7 +698,7 @@ class DigitalJS {
         const uri = active_editor_uri();
         const new_or_active = () => {
             if (this.#circuitView) {
-                vscode.commands.executeCommand('digitaljs-proj-files.focus');
+                vscode.commands.executeCommand('hdl-studio-proj-files.focus');
                 return this.#circuitView.reveal();
             }
             this.#newJSON(uri, true);
@@ -710,7 +710,7 @@ class DigitalJS {
         // If we have this open as circuit already, switch to it.
         const exist_view = this.#findViewByURI(uri);
         if (exist_view) {
-            vscode.commands.executeCommand('digitaljs-proj-files.focus');
+            vscode.commands.executeCommand('hdl-studio-proj-files.focus');
             return exist_view.reveal();
         }
         const ext = path.extname(uri.path);
@@ -729,7 +729,7 @@ class DigitalJS {
                 return this.#openViewJSON(uri);
             // Check circuitView again in case it was just closed
             if (new_circuit && this.#circuitView) {
-                vscode.commands.executeCommand('digitaljs-proj-files.focus');
+                vscode.commands.executeCommand('hdl-studio-proj-files.focus');
                 return this.#circuitView.reveal();
             }
             return this.#newJSON(uri, false);
@@ -737,7 +737,7 @@ class DigitalJS {
         else if (['.sv', '.v', '.vh', '.lua'].includes(ext)) {
             // Source file already in current document.
             if (this.#document && this.#document.sources.findByURI(uri)) {
-                vscode.commands.executeCommand('digitaljs-proj-files.focus');
+                vscode.commands.executeCommand('hdl-studio-proj-files.focus');
                 return this.#circuitView.reveal();
             }
             if (this.#circuitView) {
