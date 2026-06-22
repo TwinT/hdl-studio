@@ -133,6 +133,8 @@ function web_ext_config(env, argv) {
                 fs: false,
                 assert: require.resolve("assert"),
                 util: require.resolve("util"),
+                vm: false,
+                os: false,
             }
         },
         module: {

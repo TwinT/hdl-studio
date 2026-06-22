@@ -39,7 +39,7 @@ function try_parse_with_return(str) {
     return Math.min(res, try_parse(str));
 }
 
-const history_key = 'digitaljs.lua.repl_history';
+const history_key = 'hdl-studio.lua.repl_history';
 const history_limit = 131072;
 
 class LuaHistoryProvider {

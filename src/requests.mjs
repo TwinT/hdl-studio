@@ -6,7 +6,7 @@ import * as child_process from 'child_process';
 import * as fs from 'fs';
 import * as os from 'os';
 import { promisify } from 'util';
-import { yosys2digitaljs, io_ui } from 'yosys2digitaljs';
+import { yosys2digitaljs, io_ui } from 'yosys2digitaljs/core';
 import * as digitaljs_transform from '../node_modules/digitaljs/src/transform.mjs';
 
 const execFile = promisify(child_process.execFile);
@@ -88,6 +88,9 @@ export async function run_yosys(files, options) {
         try {
             await execFile(yosysBin, ['-s', scriptPath]);
         } catch (e) {
+            if (e.code === 'ENOENT') {
+                throw { error: `Yosys binary not found ("${yosysBin}"). Please make sure Yosys is installed and available in your PATH, or configure the "hdl-studio.yosysPath" setting.` };
+            }
             const errMsg = file_map.unmap_string(e.stderr || e.message || String(e));
             throw { error: errMsg };
         }

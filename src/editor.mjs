@@ -8,8 +8,8 @@ import { Document } from './document.mjs';
 import { read_txt_file } from './utils.mjs';
 
 export class EditorProvider {
-    static viewType = 'digitaljs.circuitView'
-    static viewType_json = 'digitaljs.circuitView_json'
+    static viewType = 'hdl-studio.circuitView'
+    static viewType_json = 'hdl-studio.circuitView_json'
     #djs
     onDidChangeCustomDocument
     #onDidChangeCustomDocument

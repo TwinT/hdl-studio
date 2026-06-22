@@ -33,7 +33,10 @@
         "onCommand:hdl-studio.newJSON",
         "onCommand:hdl-studio.addFiles",
         "onCommand:hdl-studio.exportImage",
-        "onCommand:hdl-studio.removeSource"
+        "onCommand:hdl-studio.removeSource",
+        "onView:hdl-studio-proj-files",
+        "onView:hdl-studio-proj-synth",
+        "onView:hdl-studio-proj-status"
     ],
     "main": "./dist/local-extension.js",
     "browser": "./dist/web-extension.js",
@@ -305,7 +308,6 @@
                     "id": "hdl-studio-proj-files",
                     "name": "Files",
                     "icon": "$(files)",
-                    "when": "hdl-studio.view_isactive",
                     "contextualTitle": "HDL Studio Files"
                 },
                 {
@@ -313,7 +315,6 @@
                     "type": "webview",
                     "name": "Synthesis",
                     "icon": "$(gear)",
-                    "when": "hdl-studio.view_isactive",
                     "contextualTitle": "HDL Studio Synthesis"
                 },
                 {
@@ -321,10 +322,19 @@
                     "type": "webview",
                     "name": "Control",
                     "icon": "$(info)",
-                    "when": "hdl-studio.view_isactive",
                     "contextualTitle": "HDL Studio Control"
                 }
             ]
+        },
+        "configuration": {
+            "title": "HDL Studio",
+            "properties": {
+                "hdl-studio.yosysPath": {
+                    "type": "string",
+                    "default": "",
+                    "description": "Path to the yosys executable. If empty, yosys from the PATH will be used."
+                }
+            }
         }
     },
     "scripts": {

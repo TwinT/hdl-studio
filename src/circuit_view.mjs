@@ -94,7 +94,7 @@ export class CircuitView {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <script>
     window.getImageSupport = ${!djs.image_exts_set};
-    window.simWorkerUri = URL.createObjectURL(new Blob([${JSON.stringify(worker_script)}], {type: 'test/javascript'}));
+    window.simWorkerUri = URL.createObjectURL(new Blob([${JSON.stringify(worker_script)}], {type: 'text/javascript'}));
   </script>
   <script type="module" src="${js_uri}"></script>
   <script type="module" src="${ui_uri}"></script>

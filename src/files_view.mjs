@@ -25,7 +25,7 @@ class CircuitFile extends vscode.TreeItem {
         this.id = 'root-circuit';
         this.contextValue = 'root-circuit';
         this.resourceUri = uri;
-        this.command = { title: 'Show', command: 'digitaljs.revealCircuit' };
+        this.command = { title: 'Show', command: 'hdl-studio.revealCircuit' };
     }
 }
 
@@ -57,12 +57,12 @@ export class FilesView {
         this.#djs = djs;
         this.#onDidChangeTreeData = new vscode.EventEmitter();
         this.onDidChangeTreeData = this.#onDidChangeTreeData.event;
-        vscode.commands.executeCommand('setContext', 'digitaljs.script_running', []);
-        vscode.commands.executeCommand('setContext', 'digitaljs.script_not_running', []);
+        vscode.commands.executeCommand('setContext', 'hdl-studio.script_running', []);
+        vscode.commands.executeCommand('setContext', 'hdl-studio.script_not_running', []);
         this.#sourcesUpdateListener = djs.sourcesUpdated(() => {
-            vscode.commands.executeCommand('setContext', 'digitaljs.script_running',
+            vscode.commands.executeCommand('setContext', 'hdl-studio.script_running',
                                            djs.scriptRunning);
-            vscode.commands.executeCommand('setContext', 'digitaljs.script_not_running',
+            vscode.commands.executeCommand('setContext', 'hdl-studio.script_not_running',
                                            djs.scriptNotRunning);
             this.#onDidChangeTreeData.fire();
         });
