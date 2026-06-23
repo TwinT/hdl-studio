@@ -98,9 +98,7 @@ class DigitalJS {
         this.codIconsPath = vscode.Uri.joinPath(ext_uri, "node_modules", "@vscode",
                                                 "codicons", "dist", "codicon.css");
         this.simWorker = read_txt_file(vscode.Uri.joinPath(ext_uri, 'dist',
-                                                           'digitaljs-sym-worker.js'));
-        set_yosys_wasm_uri(vscode.Uri.joinPath(ext_uri, "node_modules", "yosysjs",
-                                               "dist", "yosys.wasm"));
+            'digitaljs-sym-worker.js'));
 
         this.#tickUpdated = new vscode.EventEmitter();
         this.tickUpdated = this.#tickUpdated.event;
