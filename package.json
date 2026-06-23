@@ -355,7 +355,7 @@
         "@types/node": "26.x",
         "@types/vscode": "^1.125.0",
         "@vscode/test-electron": "^3.0.0",
-        "@vscode/test-web": "^0.0.80",
+        "@vscode/test-web": "^0.0.81",
         "css-loader": "^7.1.4",
         "eslint": "^10.5.0",
         "expose-loader": "^5.0.1",
