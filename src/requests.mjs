@@ -78,7 +78,7 @@ export async function run_yosys(files, options) {
             const mappedName = file_map.map_name(pre_ext) + ext;
             const fullPath = path.join(tmpDir, mappedName);
             fs.writeFileSync(fullPath, content);
-            mappedFiles[fullPath] = content;
+            mappedFiles[mappedName] = content;
         }
 
         const script = build_yosys_script(mappedFiles, options) + `\njson -o ${outputJson}`;
@@ -86,7 +86,7 @@ export async function run_yosys(files, options) {
         fs.writeFileSync(scriptPath, script);
 
         try {
-            await execFile(yosysBin, ['-s', scriptPath]);
+            await execFile(yosysBin, ['-s', scriptPath], { cwd: tmpDir });
         } catch (e) {
             if (e.code === 'ENOENT') {
                 throw { error: `Yosys binary not found ("${yosysBin}"). Please make sure Yosys is installed and available in your PATH, or configure the "hdl-studio.yosysPath" setting.` };

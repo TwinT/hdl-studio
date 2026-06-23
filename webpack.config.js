@@ -42,7 +42,6 @@ function main_view_config(env, argv) {
         resolve: {
             alias: {
                 [path.resolve(__dirname, './node_modules/digitaljs/src/engines/worker-worker.mjs')]: false,
-                [path.resolve(__dirname, './node_modules/digitaljs/src/style.css')]: false,
                 [path.resolve(__dirname, './node_modules/jquery-ui/themes/base/all.css')]: false,
             }
         },
