@@ -15,4 +15,3 @@ imgs/screenshots/
 node_modules/
 !node_modules/@vscode/webview-ui-toolkit/dist/toolkit.min.js
 !node_modules/@vscode/codicons/dist/
-!node_modules/yosysjs/dist/yosys.wasm

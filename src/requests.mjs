@@ -27,10 +27,6 @@ class FileMap {
     }
 }
 
-// set_yosys_wasm_uri se mantiene como no-op para no romper extension.mjs
-// que puede seguir llamándola; simplemente ya no hace nada.
-export function set_yosys_wasm_uri(_uri) {}
-
 function build_yosys_script(files, opts = {}) {
     const cmds = ['design -reset'];
 

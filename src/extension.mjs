@@ -4,7 +4,6 @@
 
 import * as vscode from 'vscode';
 import * as path from 'path';
-import { set_yosys_wasm_uri } from './requests.mjs';
 import { EditorProvider } from './editor.mjs';
 import { FilesView } from './files_view.mjs';
 import { LuaTerminal } from './lua_terminal.mjs';

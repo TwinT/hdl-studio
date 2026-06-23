@@ -4,7 +4,7 @@
 
 import * as vscode from 'vscode';
 import * as path from 'path';
-import _ from 'lodash';
+import { dequal } from 'dequal';
 import { run_yosys } from './requests.mjs';
 import { Sources } from './sources.mjs';
 import { write_txt_file } from './utils.mjs';
@@ -218,7 +218,7 @@ export class Document {
 
     // Edits
     #createEdit(before, after, label, cb) {
-        if (_.isEqual(before, after))
+        if (dequal(before, after))
             return false;
         // We must not copy `after` here since the caller (in particular #circuitEdit)
         // may mutate the object to merge in changes later.

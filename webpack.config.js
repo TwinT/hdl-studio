@@ -134,6 +134,7 @@ function web_ext_config(env, argv) {
                 util: require.resolve("util"),
                 vm: false,
                 os: false,
+                buffer: require.resolve("buffer/")
             }
         },
         module: {
@@ -142,7 +143,8 @@ function web_ext_config(env, argv) {
         },
         plugins: [
             new webpack.ProvidePlugin({
-                process: 'process/browser.js' // provide a shim for the global `process` variable
+                process: 'process/browser.js', // provide a shim for the global `process` variable
+                Buffer: ['buffer', 'Buffer']
             })
         ],
         externals: {
