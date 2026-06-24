@@ -106,7 +106,6 @@ function clone_node(node, parent, in_foreign, opts = {}) {
 
 function clone_css_style(node, cloned, in_foreign) {
     const source = window.getComputedStyle(node);
-    const target_origin = window.getComputedStyle(cloned);
     const target = cloned.style
 
     if (!target)
@@ -119,12 +118,7 @@ function clone_css_style(node, cloned, in_foreign) {
             continue;
         if (name == 'cursor')
             continue; // doesn't matter for rendering
-        const src_val = source.getPropertyValue(name);
-        // For valinput, the default when rendering seems to be different
-        // from when it is in the document so we'll set all the properties for it.
-        if (!in_foreign && src_val == target_origin.getPropertyValue(name))
-            continue;
-        target.setProperty(name, src_val, source.getPropertyPriority(name));
+        target.setProperty(name, source.getPropertyValue(name), source.getPropertyPriority(name));
     }
 }
 
