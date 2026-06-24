@@ -10,7 +10,7 @@
         "url": "https://github.com/TwinT/hdl-studio.git"
     },
     "engines": {
-        "vscode": "^1.62.0"
+        "vscode": "^1.125.0"
     },
     "icon": "imgs/hdl-studio.png",
     "categories": [
