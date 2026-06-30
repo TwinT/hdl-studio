@@ -171,6 +171,21 @@ digitaljs.cells.Memory.prototype.createEditor = function () {
     }};
 };
 
+// TEMP DEBUG: dump positions of a subcircuit graph to distinguish layout timing (A)
+// vs zero-measurement (B). Remove once the subcircuit layout bug is fixed.
+function dbg_dump_positions(tag, graph) {
+    if (!graph || !graph.getCells)
+        return;
+    const rows = graph.getCells()
+        .filter(c => !(c.isLink && c.isLink()))
+        .map(c => {
+            const p = c.position ? c.position() : {};
+            const s = c.size ? c.size() : {};
+            return `${c.get && c.get('type')}#${c.id}  x=${Math.round(p.x)} y=${Math.round(p.y)} w=${Math.round(s.width)} h=${Math.round(s.height)}`;
+        });
+    console.log(`[SUBLAYOUT ${tag}] ${rows.length} cells\n  ` + rows.join('\n  '));
+}
+
 function circuit_empty(circuit) {
     if (!circuit)
         return true;
@@ -1034,7 +1049,17 @@ class DigitalJS {
             engineOptions: { workerURL: window.simWorkerUri,
                              signals: opts.keep ? old_states.signals : undefined,
                              initTick: opts.keep ? old_states.tick : undefined },
-            windowCallback: (type, div, close_cb, { model }) => {
+            windowCallback: (type, div, close_cb, opts) => {
+                // digitaljs 0.14.2 does not pass the model object here for
+                // subcircuits, so opts may be undefined. Derive what we need
+                // from the paper attached to the dialog div instead.
+                let model = opts && opts.model;
+                let sub_graph = model && model.get('graph');
+                if (!sub_graph && type === 'Subcircuit') {
+                    const paper_el = $(div).find('div.joint-paper')[0];
+                    const p = paper_el && this.#paper_in_flight.get(paper_el);
+                    sub_graph = p && p.model;
+                }
                 const dialog = this.#openDialog(++this.#dialog_key_count, type,
                                                 div, close_cb, model);
                 // For subcircuit, since the layout is done asynchronously
@@ -1043,6 +1068,7 @@ class DigitalJS {
                 // and if the user hasn't moved the dialog yet,
                 // we can recenter the dialog based when the layout is done.
                 if (type === 'Subcircuit') {
+                    dbg_dump_positions('dialog-open', sub_graph);
                     const init_pos = dialog.widget().position();
                     this.#latest_dialog = {
                         init_pos,
@@ -1156,6 +1182,8 @@ class DigitalJS {
             this.circuit.listenTo(graph, 'batch:stop', (data) => {
                 const batch_name = data.batchName;
                 if (batch_name === 'layout') {
+                    if (model)
+                        dbg_dump_positions('layout-done', graph);
                     vscode.postMessage({ command: "autolayout",
                                          circuit: this.circuit.toJSON() });
                     in_layout = false;
