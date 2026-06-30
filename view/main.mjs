@@ -171,21 +171,6 @@ digitaljs.cells.Memory.prototype.createEditor = function () {
     }};
 };
 
-// TEMP DEBUG: dump positions of a subcircuit graph to distinguish layout timing (A)
-// vs zero-measurement (B). Remove once the subcircuit layout bug is fixed.
-function dbg_dump_positions(tag, graph) {
-    if (!graph || !graph.getCells)
-        return;
-    const rows = graph.getCells()
-        .filter(c => !(c.isLink && c.isLink()))
-        .map(c => {
-            const p = c.position ? c.position() : {};
-            const s = c.size ? c.size() : {};
-            return `${c.get && c.get('type')}#${c.id}  x=${Math.round(p.x)} y=${Math.round(p.y)} w=${Math.round(s.width)} h=${Math.round(s.height)}`;
-        });
-    console.log(`[SUBLAYOUT ${tag}] ${rows.length} cells\n  ` + rows.join('\n  '));
-}
-
 function circuit_empty(circuit) {
     if (!circuit)
         return true;
@@ -994,8 +979,8 @@ class DigitalJS {
             close_cb();
         }, context);
     }
-    #updateDialogInitPosition(model) {
-        if (!this.#latest_dialog || !model || this.#latest_dialog.model !== model)
+    #updateDialogInitPosition(graph) {
+        if (!this.#latest_dialog || !graph || this.#latest_dialog.graph !== graph)
             return;
         const latest = this.#latest_dialog;
         if (!latest.dialog.context.paper)
@@ -1009,9 +994,14 @@ class DigitalJS {
                 return; // dialog closed
             const pos = widget.position();
             // Make sure the user hasn't moved the widget
-            if (pos.top == latest.init_pos.top && pos.left == latest.init_pos.left) {
+            const moved = pos.top != latest.init_pos.top || pos.left != latest.init_pos.left;
+            // The dialog was sized around the not-yet-laid-out (stacked at 0,0)
+            // content because the elkjs layout runs asynchronously after the
+            // dialog opens. Now that the layout is applied and the paper has
+            // refitted, let the dialog re-measure its content and re-center.
+            latest.dialog.option({ width: 'auto', height: 'auto' });
+            if (!moved)
                 widget.position({ my: "center", at: "center", of: window });
-            }
         });
     }
     async #mkCircuit(data, opts) {
@@ -1068,18 +1058,17 @@ class DigitalJS {
                 // and if the user hasn't moved the dialog yet,
                 // we can recenter the dialog based when the layout is done.
                 if (type === 'Subcircuit') {
-                    dbg_dump_positions('dialog-open', sub_graph);
                     const init_pos = dialog.widget().position();
                     this.#latest_dialog = {
                         init_pos,
                         dialog,
-                        model
+                        graph: sub_graph
                     };
                     setTimeout(() => {
                         if (!this.#latest_dialog)
                             return;
                         if (this.#latest_dialog.dialog === dialog &&
-                            this.#latest_dialog.model === model) {
+                            this.#latest_dialog.graph === sub_graph) {
                             this.#latest_dialog = undefined;
                         }
                     }, 1000);
@@ -1182,12 +1171,10 @@ class DigitalJS {
             this.circuit.listenTo(graph, 'batch:stop', (data) => {
                 const batch_name = data.batchName;
                 if (batch_name === 'layout') {
-                    if (model)
-                        dbg_dump_positions('layout-done', graph);
                     vscode.postMessage({ command: "autolayout",
                                          circuit: this.circuit.toJSON() });
                     in_layout = false;
-                    this.#updateDialogInitPosition(model);
+                    this.#updateDialogInitPosition(graph);
                     return;
                 }
                 if (in_layout)
