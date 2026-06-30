@@ -347,7 +347,9 @@
         "watch-prod:webpack": "webpack --watch --mode production",
         "lint": "eslint .",
         "pretest": "npm run lint",
-        "test": "node ./test/runTest.js",
+        "test": "npm-run-all test:pipeline test:vscode",
+        "test:pipeline": "mocha test/pipeline.spec.mjs",
+        "test:vscode": "node ./test/runTest.js",
         "open-in-browser": "vscode-test-web --extensionDevelopmentPath=. ."
     },
     "devDependencies": {

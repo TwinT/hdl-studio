@@ -8,6 +8,7 @@ import * as os from 'os';
 import { promisify } from 'util';
 import { yosys2digitaljs, io_ui } from 'yosys2digitaljs/core';
 import * as digitaljs_transform from '../node_modules/digitaljs/src/transform.mjs';
+import { build_yosys_script } from './yosys_script.mjs';
 
 const execFile = promisify(child_process.execFile);
 
@@ -32,34 +33,6 @@ class FileMap {
     unmap_string(str) {
         return str.replaceAll(match_regex, (match, p1) => this.#names[parseInt(p1)]);
     }
-}
-
-function build_yosys_script(files, opts = {}) {
-    const cmds = ['design -reset'];
-
-    for (const [name, _] of Object.entries(files)) {
-        const ext = path.extname(name);
-        if (ext === '.sv') {
-            cmds.push(`read_verilog -sv ${name}`);
-        } else {
-            cmds.push(`read_verilog ${name}`);
-        }
-    }
-
-    cmds.push('hierarchy -auto-top');
-    cmds.push('proc');
-    cmds.push(opts.optimize ? 'opt' : 'opt_clean');
-
-    if (opts.fsm && opts.fsm !== 'no') {
-        const fsmexpand = opts.fsmexpand ? ' -expand' : '';
-        cmds.push(opts.fsm === 'nomap' ? `fsm -nomap${fsmexpand}` : `fsm${fsmexpand}`);
-    }
-
-    cmds.push('memory -nomap');
-    cmds.push('wreduce -memx');
-    cmds.push(opts.optimize ? 'opt -full' : 'opt_clean');
-
-    return cmds.join('\n');
 }
 
 export async function run_yosys(files, options) {
