@@ -11,6 +11,13 @@ import * as digitaljs_transform from '../node_modules/digitaljs/src/transform.mj
 
 const execFile = promisify(child_process.execFile);
 
+let _outputChannel;
+function yosysLog() {
+    if (!_outputChannel)
+        _outputChannel = vscode.window.createOutputChannel('HDL Studio (Yosys)');
+    return _outputChannel;
+}
+
 const rand_prefix = 'djs-IxU5De4QZDxUgn43Zwj1-_';
 const rand_suffix = '_-hbtdHFLoSvFPbPLnGSp8';
 const match_regex = new RegExp(`${rand_prefix}(\\d+)${rand_suffix}`, 'g');
@@ -81,27 +88,44 @@ export async function run_yosys(files, options) {
         const scriptPath = path.join(tmpDir, 'synth.ys');
         fs.writeFileSync(scriptPath, script);
 
+        const log = yosysLog();
+        log.clear();
+        log.appendLine(file_map.unmap_string(script));
+        log.appendLine('\n--- yosys output ---');
+
         try {
-            await execFile(yosysBin, ['-s', scriptPath], { cwd: tmpDir });
+            const { stdout, stderr } = await execFile(yosysBin, ['-s', scriptPath], { cwd: tmpDir });
+            log.append(file_map.unmap_string((stdout || '') + (stderr || '')));
         } catch (e) {
             if (e.code === 'ENOENT') {
                 throw { error: `Yosys binary not found ("${yosysBin}"). Please make sure Yosys is installed and available in your PATH, or configure the "hdl-studio.yosysPath" setting.` };
             }
+            log.append(file_map.unmap_string((e.stdout || '') + (e.stderr || '')));
+            log.show(true);
             const errMsg = file_map.unmap_string(e.stderr || e.message || String(e));
             throw { error: errMsg };
         }
 
-        const raw = JSON.parse(
-            file_map.unmap_string(fs.readFileSync(outputJson, 'utf8'))
-        );
+        try {
+            const raw = JSON.parse(
+                file_map.unmap_string(fs.readFileSync(outputJson, 'utf8'))
+            );
 
-        let output = yosys2digitaljs(raw, options);
-        io_ui(output);
+            let output = yosys2digitaljs(raw, options);
+            io_ui(output);
 
-        if (options.transform)
-            output = digitaljs_transform.transformCircuit(output);
+            if (options.transform)
+                output = digitaljs_transform.transformCircuit(output);
 
-        return { output };
+            return { output };
+        } catch (e) {
+            // Yosys ran fine but the netlist couldn't be converted (e.g. a testbench
+            // with no synthesizable top, $display, delays, etc.). Surface the real error.
+            log.appendLine('\n--- yosys2digitaljs error ---');
+            log.appendLine(e.stack || String(e));
+            log.show(true);
+            throw { error: `${e.message || e}. See the "HDL Studio (Yosys)" output panel for the full log.` };
+        }
 
     } finally {
         // Clean up temp dir
