@@ -28,6 +28,26 @@ digitaljs.cells.Box.prototype.markupZoom[0].children[0].children[0].className +=
 digitaljs.cells.Box.prototype.markupZoom[0].children[0].children[0].style.color = 'black';
 digitaljs.cells.Box.prototype.markupZoom[0].children[0].children[0].style.textAlign = 'left';
 
+// digitaljs 0.14.2 builds Memory/FSM editor windows inside the cell view's
+// `_displayEditor` and only hands the resulting div to windowCallback (no model).
+// We wrap it once so the model is available while the editor is being opened,
+// which lets us record its path and restore the editor across a reload.
+let g_active_editor_model;
+for (const View of [digitaljs.cells.MemoryView, digitaljs.cells.FSMView]) {
+    if (!View || View.prototype._djs_editor_patched)
+        continue;
+    const orig = View.prototype._displayEditor;
+    View.prototype._displayEditor = function(evt) {
+        g_active_editor_model = this.model;
+        try {
+            return orig.call(this, evt);
+        } finally {
+            g_active_editor_model = undefined;
+        }
+    };
+    View.prototype._djs_editor_patched = true;
+}
+
 function baseSelectMarkupHTML(display3vl, bits, base) {
     const markup = display3vl.usableDisplays('read', bits)
                              .map(n => '<option value="' + n + '"' + (n == base ? ' selected="selected"' : '') +'>' + n + '</option>');
@@ -511,10 +531,12 @@ class DigitalJS {
     #change_tracker
     #subcircuit_tracker
     #model_paths
+    #graph_to_model
     #paper_in_flight
     #dialog_mgr
     #dialog_key_count = 0
     #latest_dialog
+    #restoreDialogKey
     constructor() {
         this.circuit = undefined;
         this.#lua = new LuaRunner(this);
@@ -892,6 +914,25 @@ class DigitalJS {
 
         return states;
     }
+    // Build the content (div + paper) for a subcircuit dialog, mirroring what
+    // digitaljs 0.14.2 does in its internal `open:subcircuit` handler. Used to
+    // re-open subcircuit dialogs on reload, since the library no longer exposes
+    // an imperative `createSubcircuit`. `_makePaper` fires 'new:paper', so the
+    // paper is registered (and gets its pan/zoom) before this returns.
+    #openSubcircuitContent(model) {
+        const div = $('<div>', {
+            title: model.get('celltype') + ' ' + model.get('label')
+        }).appendTo('html > body');
+        const pdiv = $('<div>').appendTo(div);
+        const graph = model.get('graph');
+        const paper = this.circuit._makePaper(pdiv, graph);
+        model.set('zoomLevel', 0);
+        return { div, paper, close: () => {
+            this.circuit._engine.unobserveGraph(graph);
+            paper.remove();
+            div.remove();
+        }};
+    }
     #restoreStates(states, keep) {
         if (!keep)
             return;
@@ -900,7 +941,11 @@ class DigitalJS {
             this.#paper._djs_panAndZoom.pan(states.main_transform.pan);
         }
         const find_model = (graph, path) => {
+            if (!path)
+                return;
             const cell = graph.getCell(path[0]);
+            if (!cell)
+                return;
             if (path.length == 1)
                 return cell;
             if (cell.get('type') !== 'Subcircuit')
@@ -910,35 +955,45 @@ class DigitalJS {
         for (const [key, dialog] of this.#dialog_mgr.dialogs.entries()) {
             const context = dialog.context;
             const model = find_model(this.circuit._graph, context.model_path);
+            if (!model)
+                continue; // the cell no longer exists after re-synthesis
             const model_type = model.get('type');
             if (model_type !== context.type)
                 continue;
             if (model_type === 'Subcircuit') {
-                const sub = this.circuit.createSubcircuit(model);
+                const sub = this.#openSubcircuitContent(model);
                 if (context.transform) {
                     sub.paper._djs_panAndZoom.zoom(context.transform.zoom);
                     sub.paper._djs_panAndZoom.pan(context.transform.pan);
                 }
                 this.#openDialog(key, model_type, sub.div, sub.close, model);
             }
-            else if (model_type === 'FSM') {
-                const sub = model.createEditor();
-                this.#openDialog(key, model_type, sub.div, sub.close, model);
-            }
-            else if (model_type === 'Memory') {
-                const sub = model.createEditor();
-                this.#openDialog(key, model_type, sub.div, sub.close, model);
+            else if (model_type === 'Memory' || model_type === 'FSM') {
+                // digitaljs 0.14.2 no longer exposes an imperative editor
+                // builder; the editor is created by the cell view. Drive that
+                // path and route it back into the saved dialog via its key.
+                const view = this.#paper && this.#paper.findViewByModel(model);
+                if (!view || typeof view._displayEditor !== 'function')
+                    continue; // editor for a nested cell: parent isn't open, skip
+                this.#restoreDialogKey = key;
+                try {
+                    view._displayEditor({ stopPropagation() {} });
+                } finally {
+                    this.#restoreDialogKey = undefined;
+                }
             }
         }
     }
     #collectModels(graph) {
         this.#model_paths = new Map();
+        this.#graph_to_model = new Map();
         const collect_models = (graph, path) => {
             for (const gate of graph.getElements()) {
                 const gate_type = gate.get('type');
                 if (gate_type === 'Subcircuit') {
                     const subpath = [ ...path, gate.id ];
                     this.#model_paths.set(gate, subpath);
+                    this.#graph_to_model.set(gate.get('graph'), gate);
                     collect_models(gate.get('graph'), subpath);
                 }
                 else if (gate_type === 'Memory' || gate_type === 'FSM') {
@@ -1040,18 +1095,27 @@ class DigitalJS {
                              signals: opts.keep ? old_states.signals : undefined,
                              initTick: opts.keep ? old_states.tick : undefined },
             windowCallback: (type, div, close_cb, opts) => {
-                // digitaljs 0.14.2 does not pass the model object here for
-                // subcircuits, so opts may be undefined. Derive what we need
-                // from the paper attached to the dialog div instead.
-                let model = opts && opts.model;
-                let sub_graph = model && model.get('graph');
+                // digitaljs 0.14.2 does not pass the model object here, so opts
+                // may be undefined. Derive what we need from the paper attached
+                // to the dialog div (subcircuit) or from the editor model
+                // captured while the Memory/FSM editor view opened.
+                let model = (opts && opts.model) || g_active_editor_model;
+                let sub_graph = model && type === 'Subcircuit' && model.get('graph');
                 if (!sub_graph && type === 'Subcircuit') {
                     const paper_el = $(div).find('div.joint-paper')[0];
                     const p = paper_el && this.#paper_in_flight.get(paper_el);
                     sub_graph = p && p.model;
                 }
-                const dialog = this.#openDialog(++this.#dialog_key_count, type,
-                                                div, close_cb, model);
+                // For subcircuits the library no longer hands us the model, so
+                // recover it from its graph. Without it we cannot record the
+                // model path and the dialog would not survive an undo/redo.
+                if (!model && sub_graph)
+                    model = this.#graph_to_model.get(sub_graph);
+                // When restoring a Memory/FSM editor across a reload, reuse the
+                // saved dialog key so it lands back in the same dialog.
+                const key = this.#restoreDialogKey !== undefined ?
+                            this.#restoreDialogKey : ++this.#dialog_key_count;
+                const dialog = this.#openDialog(key, type, div, close_cb, model);
                 // For subcircuit, since the layout is done asynchronously
                 // the dialog could resize after we show it.
                 // If it happens quickly (hard-coded 1 second timeout)
