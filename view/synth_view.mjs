@@ -21,7 +21,7 @@ class Synth {
     }
     #initialize() {
         this.#widgets = {};
-        for (const opt of ['opt', 'transform', /* 'lint', */ 'fsmexpand']) {
+        for (const opt of ['opt', 'transform', /* 'lint', */ 'fsmexpand', 'defaultcomb']) {
             const ele = document.getElementById(opt);
             this.#widgets[opt] = ele;
             ele.checked = this.#options[opt];
@@ -51,7 +51,7 @@ class Synth {
         this.#block_update = true;
         this.#options = options;
         try {
-            for (const opt of ['opt', 'transform', /* 'lint', */ 'fsmexpand'])
+            for (const opt of ['opt', 'transform', /* 'lint', */ 'fsmexpand', 'defaultcomb'])
                 this.#widgets[opt].checked = this.#options[opt];
             this.#widgets.fsm.value = this.#options.fsm
         }

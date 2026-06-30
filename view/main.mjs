@@ -1139,6 +1139,10 @@ class DigitalJS {
                 }
             }
         };
+        // Zero combinational propagation delay: make combinational gates settle
+        // within a single tick instead of one tick per gate.
+        if (opts.defaultcomb)
+            circuit_opts.defaultCombinationalPropagation = 0;
         // The layout actually uses display information (i.e. the text widths of the labels)
         // so we can't really do it well on the host side
         // (it also means that we can't really guarantee portability)

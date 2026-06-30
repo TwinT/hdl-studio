@@ -14,7 +14,8 @@ const default_synth_options = {
     transform: true,
     // lint: true,
     fsm: 'no', // (no)/yes/nomap
-    fsmexpand: false
+    fsmexpand: false,
+    defaultcomb: false // zero combinational propagation delay (digitaljs sim option)
 };
 
 let doc_id = 1;
