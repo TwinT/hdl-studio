@@ -24,20 +24,6 @@
         "verilog",
         "simulation"
     ],
-    "activationEvents": [
-        "onCustomEditor:hdl-studio.circuitView",
-        "onCommand:hdl-studio.openView",
-        "onCommand:hdl-studio.openViewJSON",
-        "onCommand:hdl-studio.addToViewSource",
-        "onCommand:hdl-studio.newViewSource",
-        "onCommand:hdl-studio.newJSON",
-        "onCommand:hdl-studio.addFiles",
-        "onCommand:hdl-studio.exportImage",
-        "onCommand:hdl-studio.removeSource",
-        "onView:hdl-studio-proj-files",
-        "onView:hdl-studio-proj-synth",
-        "onView:hdl-studio-proj-status"
-    ],
     "main": "./dist/local-extension.js",
     "browser": "./dist/web-extension.js",
     "contributes": {
