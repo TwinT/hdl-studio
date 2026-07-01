@@ -2,7 +2,7 @@
     "name": "hdl-studio",
     "displayName": "HDL Studio",
     "description": "HDL Studio is a vscode extension for digitaljs, a digital circuit simulator.",
-    "version": "0.1.0",
+    "version": "0.2.0",
     "license": "See LICENSE",
     "publisher": "TwinT",
     "repository": {
