@@ -32,5 +32,19 @@ export function build_yosys_script(files, opts = {}) {
     cmds.push('wreduce -memx');
     cmds.push(opts.optimize ? 'opt -full' : 'opt_clean');
 
+    if (opts.techmap) {
+        // Decompose complex cells into basic logic gates, then clean up.
+        // Exclude flip-flops, latches and memories: techmap would lower them to
+        // gate-level primitives ($_DFF_P_, $_DLATCH_P_, ...) that yosys2digitaljs
+        // cannot render. Keeping them coarse leaves them as Dff/Dlatch/Memory.
+        cmds.push('select *');
+        cmds.push('select -del t:$dff t:$dffe t:$adff t:$adffe t:$aldff t:$aldffe ' +
+                  't:$sdff t:$sdffe t:$sdffce t:$dffsr t:$dffsre ' +
+                  't:$dlatch t:$adlatch t:$dlatchsr t:$sr t:$mem t:$mem_v2');
+        cmds.push('techmap');
+        cmds.push('select -clear');
+        cmds.push(opts.optimize ? 'opt -full' : 'opt_clean');
+    }
+
     return cmds.join('\n');
 }
