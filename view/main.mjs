@@ -1089,7 +1089,7 @@ class DigitalJS {
             return;
         }
         const circuit_opts = {
-            layoutEngine: 'elkjs',
+            layoutEngine: opts.layout === 'dagre' ? 'dagre' : 'elkjs',
             engine: Engine,
             engineOptions: { workerURL: window.simWorkerUri,
                              signals: opts.keep ? old_states.signals : undefined,

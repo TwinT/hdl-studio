@@ -79,9 +79,12 @@ export class CircuitView {
         this.post({
             command: 'showcircuit',
             circuit: this.#document.circuit,
-            // defaultcomb is a digitaljs simulation option applied when the
-            // circuit is (re)built, so it travels with the circuit, not yosys.
-            opts: { ...opts, defaultcomb: this.#document.synth_options.defaultcomb }
+            // defaultcomb and layout are digitaljs display/simulation options
+            // applied when the circuit is (re)built, so they travel with the
+            // circuit, not yosys.
+            opts: { ...opts,
+                    defaultcomb: this.#document.synth_options.defaultcomb,
+                    layout: this.#document.synth_options.layout }
         });
     }
     async #getViewContent(djs, webview) {

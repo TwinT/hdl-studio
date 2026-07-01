@@ -24,6 +24,8 @@ class Synth {
         for (const opt of ['opt', 'transform', /* 'lint', */ 'fsmexpand', 'techmap', 'defaultcomb']) {
             const ele = document.getElementById(opt);
             this.#widgets[opt] = ele;
+            if (!ele) // element missing (e.g. stale panel HTML): stay resilient
+                continue;
             ele.checked = this.#options[opt];
             ele.addEventListener('change', () => {
                 this.#options[opt] = ele.checked;
@@ -31,13 +33,17 @@ class Synth {
             });
         }
 
-        const fsm = document.getElementById("fsm");
-        this.#widgets.fsm = fsm;
-        fsm.value = this.#options.fsm;
-        fsm.addEventListener('change', () => {
-            this.#options.fsm = fsm.value;
-            this.#notifyOption();
-        });
+        for (const opt of ['fsm', 'layout']) {
+            const ele = document.getElementById(opt);
+            this.#widgets[opt] = ele;
+            if (!ele)
+                continue;
+            ele.value = this.#options[opt];
+            ele.addEventListener('change', () => {
+                this.#options[opt] = ele.value;
+                this.#notifyOption();
+            });
+        }
 
         const synth = document.getElementById("do-synth");
         synth.addEventListener("click", () => {
@@ -52,8 +58,9 @@ class Synth {
         this.#options = options;
         try {
             for (const opt of ['opt', 'transform', /* 'lint', */ 'fsmexpand', 'techmap', 'defaultcomb'])
-                this.#widgets[opt].checked = this.#options[opt];
-            this.#widgets.fsm.value = this.#options.fsm
+                if (this.#widgets[opt]) this.#widgets[opt].checked = this.#options[opt];
+            for (const opt of ['fsm', 'layout'])
+                if (this.#widgets[opt]) this.#widgets[opt].value = this.#options[opt];
         }
         finally {
             this.#block_update = false;

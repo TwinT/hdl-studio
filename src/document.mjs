@@ -16,7 +16,8 @@ const default_synth_options = {
     fsm: 'no', // (no)/yes/nomap
     fsmexpand: false,
     techmap: false, // decompose complex cells into basic logic gates (yosys 'techmap')
-    defaultcomb: false // zero combinational propagation delay (digitaljs sim option)
+    defaultcomb: false, // zero combinational propagation delay (digitaljs sim option)
+    layout: 'elkjs' // auto-layout engine: elkjs/dagre (digitaljs display option)
 };
 
 let doc_id = 1;
