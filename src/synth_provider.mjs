@@ -84,6 +84,11 @@ export class SynthProvider {
   <vscode-checkbox title="This corresponds to the 'fsm_expand' Yosys command." id="fsmexpand">Merge more logic into FSM</vscode-checkbox>
   <vscode-checkbox title="Decomposes complex cells (adders, comparators, muxes, ...) into basic logic gates. This corresponds to the 'techmap' Yosys command." id="techmap">Decompose to basic gates</vscode-checkbox>
   <vscode-checkbox title="Makes combinational gates propagate with zero delay, so a combinational path settles within a single tick instead of one tick per gate. Applies when the circuit is (re)built." id="defaultcomb">Zero combinational propagation delay</vscode-checkbox>
+  <label for="layout" style="display:block;margin-top:6px">Layout</label>
+  <vscode-dropdown title="Auto-layout engine for the diagram. Applies to a freshly synthesized circuit (existing layouts keep their saved positions)." id="layout">
+    <vscode-option value="elkjs" selected>ELK</vscode-option>
+    <vscode-option value="dagre">Dagre</vscode-option>
+  </vscode-dropdown>
   <vscode-button id="do-synth"><i slot="start" class="codicon codicon-run"></i> Synthesize</vscode-button>
 </body>
 </html>`;
