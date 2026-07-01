@@ -71,24 +71,62 @@ export class SynthProvider {
   <script type="module" src="${ui_uri}"></script>
   <script type="module" src="${synth_uri}"></script>
   <link href="${icon_uri}" rel="stylesheet"/>
+  <style>
+    body { padding: 8px 10px 12px; }
+    .group { margin-bottom: 12px; }
+    .group > summary {
+      cursor: pointer;
+      margin-bottom: 8px;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      opacity: 0.6;
+    }
+    /* No flex around the checkboxes: a vscode-checkbox inside a flex container
+       blockifies and stacks its own label. Each checkbox sits in a plain block
+       wrapper so the rows stack while the checkbox keeps box + label on one line. */
+    .opt { margin: 5px 0; }
+    .field { margin: 8px 0; }
+    .field > label { display: block; font-size: 12px; opacity: 0.9; margin-bottom: 3px; }
+    vscode-dropdown { width: 100%; }
+    #do-synth { width: 100%; margin-top: 2px; }
+  </style>
 </head>
 <body>
-  <vscode-checkbox title="Enables Yosys optimizations of the synthesized circuit. This might make the circuit differ significantly to its HDL specification. This corresponds to the 'opt -full' Yosys command." id="opt">Optimize in Yosys</vscode-checkbox>
-  <vscode-checkbox title="Enables post-processing of Yosys output to reduce the number of components and improve readability." id="transform" checked>Simplify diagram</vscode-checkbox>
-  <!-- <vscode-checkbox title="Enables checking for common problems using the Verilator compiler." id="lint" checked>Lint source code</vscode-checkbox> -->
-  <vscode-dropdown title="Enables finite state machine processing in Yosys. This corresponds to the 'fsm' and 'fsm -nomap' Yosys commands." id="fsm">
-    <vscode-option value="no">No FSM transform</vscode-option>
-    <vscode-option value="yes">FSM transform</vscode-option>
-    <vscode-option value="nomap">FSM as circuit element</vscode-option>
-  </vscode-dropdown>
-  <vscode-checkbox title="This corresponds to the 'fsm_expand' Yosys command." id="fsmexpand">Merge more logic into FSM</vscode-checkbox>
-  <vscode-checkbox title="Decomposes complex cells (adders, comparators, muxes, ...) into basic logic gates. This corresponds to the 'techmap' Yosys command." id="techmap">Decompose to basic gates</vscode-checkbox>
-  <vscode-checkbox title="Makes combinational gates propagate with zero delay, so a combinational path settles within a single tick instead of one tick per gate. Applies when the circuit is (re)built." id="defaultcomb">Zero combinational propagation delay</vscode-checkbox>
-  <label for="layout" style="display:block;margin-top:6px">Layout</label>
-  <vscode-dropdown title="Auto-layout engine for the diagram. Applies to a freshly synthesized circuit (existing layouts keep their saved positions)." id="layout">
-    <vscode-option value="elkjs" selected>ELK</vscode-option>
-    <vscode-option value="dagre">Dagre</vscode-option>
-  </vscode-dropdown>
+  <details class="group" open>
+    <summary>Synthesis</summary>
+    <div class="group-body">
+      <div class="opt"><vscode-checkbox id="opt" title="Enables Yosys optimizations of the synthesized circuit. This might make the circuit differ significantly to its HDL specification. This corresponds to the 'opt -full' Yosys command.">Optimize in Yosys</vscode-checkbox></div>
+      <div class="opt"><vscode-checkbox id="techmap" title="Decomposes complex cells (adders, comparators, muxes, ...) into basic logic gates. This corresponds to the 'techmap' Yosys command.">Decompose to basic gates</vscode-checkbox></div>
+      <div class="field">
+        <label for="fsm">FSM</label>
+        <vscode-dropdown title="Enables finite state machine processing in Yosys. This corresponds to the 'fsm' and 'fsm -nomap' Yosys commands." id="fsm">
+          <vscode-option value="no">No FSM transform</vscode-option>
+          <vscode-option value="yes">FSM transform</vscode-option>
+          <vscode-option value="nomap">FSM as circuit element</vscode-option>
+        </vscode-dropdown>
+      </div>
+      <div class="opt"><vscode-checkbox id="fsmexpand" title="This corresponds to the 'fsm_expand' Yosys command.">Merge more logic into FSM</vscode-checkbox></div>
+    </div>
+  </details>
+
+  <details class="group" open>
+    <summary>Diagram</summary>
+    <div class="group-body">
+      <div class="opt"><vscode-checkbox id="transform" checked title="Enables post-processing of Yosys output to reduce the number of components and improve readability.">Simplify diagram</vscode-checkbox></div>
+      <div class="opt"><vscode-checkbox id="defaultcomb" title="Makes combinational gates propagate with zero delay, so a combinational path settles within a single tick instead of one tick per gate. Applies when the circuit is (re)built.">Zero combinational propagation delay</vscode-checkbox></div>
+      <div class="field">
+        <label for="layout">Layout</label>
+        <vscode-dropdown title="Auto-layout engine for the diagram. Applies to a freshly synthesized circuit (existing layouts keep their saved positions)." id="layout">
+          <vscode-option value="elkjs" selected>ELK</vscode-option>
+          <vscode-option value="dagre">Dagre</vscode-option>
+        </vscode-dropdown>
+      </div>
+    </div>
+  </details>
+
+  <vscode-divider></vscode-divider>
   <vscode-button id="do-synth"><i slot="start" class="codicon codicon-run"></i> Synthesize</vscode-button>
 </body>
 </html>`;
