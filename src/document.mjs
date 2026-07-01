@@ -15,6 +15,7 @@ const default_synth_options = {
     // lint: true,
     fsm: 'no', // (no)/yes/nomap
     fsmexpand: false,
+    techmap: false, // decompose complex cells into basic logic gates (yosys 'techmap')
     defaultcomb: false // zero combinational propagation delay (digitaljs sim option)
 };
 
@@ -279,6 +280,7 @@ export class Document {
             optimize: this.#synth_options.opt,
             fsm: this.#synth_options.fsm == "no" ? "" : this.#synth_options.fsm,
             fsmexpand: this.#synth_options.fsmexpand,
+            techmap: this.#synth_options.techmap,
             lint: false,
             transform: this.#synth_options.transform,
         });

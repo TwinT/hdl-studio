@@ -20,14 +20,14 @@ import { build_yosys_script } from '../src/yosys_script.mjs';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const verilogDir = path.resolve(__dirname, 'verilog');
 
-function synth(svPath) {
+function synth(svPath, opts = {}) {
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'hdl-test-'));
     try {
         const file = path.basename(svPath);
         fs.copyFileSync(svPath, path.join(tmp, file));
         const outJson = path.join(tmp, 'out.json');
         // Reuse the extension's own script builder so the test can't drift.
-        const script = build_yosys_script({ [file]: '' }, {}) + `\njson -o ${outJson}`;
+        const script = build_yosys_script({ [file]: '' }, opts) + `\njson -o ${outJson}`;
         fs.writeFileSync(path.join(tmp, 'synth.ys'), script);
         execFileSync('yosys', ['-q', '-s', 'synth.ys'], { cwd: tmp, stdio: 'pipe' });
         const raw = JSON.parse(fs.readFileSync(outJson, 'utf8'));
@@ -65,6 +65,16 @@ describe('Synthesis pipeline (yosys -> yosys2digitaljs)', function () {
         it(`synthesizes and converts ${f}`, function () {
             const output = synth(path.join(verilogDir, f));
             assert.ok(output && output.devices, `${f}: no output produced`);
+            assert.ok(Object.keys(output.devices).length > 0, `${f}: no devices produced`);
+        });
+    }
+
+    // techmap decomposes combinational logic to gates; it must keep flip-flops,
+    // latches and memories coarse (a bare `techmap` lowers them to $_DFF_P_ etc.
+    // which yosys2digitaljs cannot convert).
+    for (const f of files) {
+        it(`synthesizes and converts ${f} with techmap`, function () {
+            const output = synth(path.join(verilogDir, f), { techmap: true });
             assert.ok(Object.keys(output.devices).length > 0, `${f}: no devices produced`);
         });
     }
