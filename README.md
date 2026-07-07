@@ -54,7 +54,7 @@ Contributions are welcome!
 
 ## Requirements
 
-This extension is designed to run inside the provided dev-container, which includes a native [Yosys](https://yosyshq.net/yosys/) binary. Synthesis will not work without it.
+This extension is designed to run inside the provided dev-container [sd](https://hub.docker.com/r/twint/sd), which includes a native [Yosys](https://yosyshq.net/yosys/) binary. Synthesis will not work without it. Check the [hdl_studio_test](https://github.com/TwinT/hdl_studio_test) repo for a working example of the dev-container setup.
 
 ## Basic workflow
 
