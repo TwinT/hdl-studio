@@ -13,9 +13,9 @@ export function build_yosys_script(files, opts = {}) {
     for (const [name, _] of Object.entries(files)) {
         const ext = path.extname(name);
         if (ext === '.sv') {
-            cmds.push(`read_verilog -sv ${name}`);
+            cmds.push(`read_verilog -sv -defer ${name}`);
         } else {
-            cmds.push(`read_verilog ${name}`);
+            cmds.push(`read_verilog -defer ${name}`);
         }
     }
 

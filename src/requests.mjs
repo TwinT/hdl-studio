@@ -19,6 +19,16 @@ function yosysLog() {
     return _outputChannel;
 }
 
+export function convert_yosys_json(raw, options = {}) {
+    let output = yosys2digitaljs(raw, options);
+    io_ui(output);
+
+    if (options.transform)
+        output = digitaljs_transform.transformCircuit(output);
+
+    return output;
+}
+
 const rand_prefix = 'djs-IxU5De4QZDxUgn43Zwj1-_';
 const rand_suffix = '_-hbtdHFLoSvFPbPLnGSp8';
 const match_regex = new RegExp(`${rand_prefix}(\\d+)${rand_suffix}`, 'g');
@@ -84,13 +94,7 @@ export async function run_yosys(files, options) {
                 file_map.unmap_string(fs.readFileSync(outputJson, 'utf8'))
             );
 
-            let output = yosys2digitaljs(raw, options);
-            io_ui(output);
-
-            if (options.transform)
-                output = digitaljs_transform.transformCircuit(output);
-
-            return { output };
+            return { output: convert_yosys_json(raw, options) };
         } catch (e) {
             // Yosys ran fine but the netlist couldn't be converted (e.g. a testbench
             // with no synthesizable top, $display, delays, etc.). Surface the real error.

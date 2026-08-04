@@ -5,7 +5,7 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import { dequal } from 'dequal';
-import { run_yosys } from './requests.mjs';
+import { run_yosys, convert_yosys_json } from './requests.mjs';
 import { Sources } from './sources.mjs';
 import { write_txt_file } from './utils.mjs';
 
@@ -149,6 +149,12 @@ export class Document {
         if (data.options)
             this.#synth_options = { ...default_synth_options, ...data.options };
         delete data.options;
+
+        // Raw yosys netlist JSON (e.g. from `json -o` in an external build),
+        // as opposed to an already-saved digitaljs circuit: convert it here so
+        // "Open as circuit in HDL Studio" works on either.
+        if (data.modules && !data.devices && !data.connectors && !data.subcircuits)
+            data = convert_yosys_json(data, { transform: this.#synth_options.transform });
 
         this.#circuit = { devices: {}, connectors: [], subcircuits: {} };
         for (const fld of ['devices', 'connectors', 'subcircuits']) {
