@@ -16,6 +16,7 @@ const default_synth_options = {
     fsm: 'no', // (no)/yes/nomap
     fsmexpand: false,
     techmap: false, // decompose complex cells into basic logic gates (yosys 'techmap')
+    top: '', // top module name override; empty = auto-detect
     defaultcomb: false, // zero combinational propagation delay (digitaljs sim option)
     layout: 'elkjs' // auto-layout engine: elkjs/dagre (digitaljs display option)
 };
@@ -288,6 +289,7 @@ export class Document {
             fsm: this.#synth_options.fsm == "no" ? "" : this.#synth_options.fsm,
             fsmexpand: this.#synth_options.fsmexpand,
             techmap: this.#synth_options.techmap,
+            top: this.#synth_options.top || undefined,
             lint: false,
             transform: this.#synth_options.transform,
         });

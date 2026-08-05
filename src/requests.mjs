@@ -29,6 +29,15 @@ export function convert_yosys_json(raw, options = {}) {
     return output;
 }
 
+async function slang_available(yosysBin) {
+    try {
+        const { stdout } = await execFile(yosysBin, ['-p', 'help read_slang']);
+        return !stdout.includes('No such command');
+    } catch {
+        return false;
+    }
+}
+
 const rand_prefix = 'djs-IxU5De4QZDxUgn43Zwj1-_';
 const rand_suffix = '_-hbtdHFLoSvFPbPLnGSp8';
 const match_regex = new RegExp(`${rand_prefix}(\\d+)${rand_suffix}`, 'g');
@@ -49,6 +58,7 @@ export async function run_yosys(files, options) {
     // Resolve yosys binary: use setting if defined, otherwise rely on PATH
     const config = vscode.workspace.getConfiguration('hdl-studio');
     const yosysBin = config.get('yosysPath') || 'yosys';
+    const useSlang = await slang_available(yosysBin);
 
     // Write source files to a temp directory
     const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'hdl-studio-'));
@@ -67,7 +77,7 @@ export async function run_yosys(files, options) {
             mappedFiles[mappedName] = content;
         }
 
-        const script = build_yosys_script(mappedFiles, options) + `\njson -o ${outputJson}`;
+        const script = build_yosys_script(mappedFiles, { ...options, useSlang }) + `\njson -o ${outputJson}`;
         const scriptPath = path.join(tmpDir, 'synth.ys');
         fs.writeFileSync(scriptPath, script);
 

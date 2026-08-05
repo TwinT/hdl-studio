@@ -27,7 +27,11 @@ export class SynthProvider {
     #extendedOptions() {
         return { ...this.#djs.synth_options, _doc_id: this.#djs.doc_id };
     }
-    resolveWebviewView(view, context, _token) {
+    async #extendedState() {
+        return { options: this.#extendedOptions(),
+                topModules: await this.#djs.sources.topModuleCandidates() };
+    }
+    async resolveWebviewView(view, context, _token) {
         const ui_uri = view.webview.asWebviewUri(this.#djs.uiToolkitPath);
         const synth_uri = view.webview.asWebviewUri(this.#djs.synthJSPath);
         const icon_uri = view.webview.asWebviewUri(this.#djs.codIconsPath);
@@ -35,8 +39,8 @@ export class SynthProvider {
             enableScripts: true
         };
         const queue = new WebviewMsgQueue(view.webview);
-        const refresh_options = () => {
-            queue.post({ command: "update-options", options: this.#extendedOptions() });
+        const refresh_options = async () => {
+            queue.post({ command: "update-options", ...await this.#extendedState() });
         };
         let first_init = true;
         view.webview.onDidReceiveMessage((msg) => {
@@ -57,16 +61,19 @@ export class SynthProvider {
             this.#processCommand(msg, view.webview, context);
         });
         const option_listener = this.#djs.synthOptionUpdated(refresh_options);
+        const sources_listener = this.#djs.sourcesUpdated(refresh_options);
         view.onDidDispose(() => {
             option_listener.dispose();
+            sources_listener.dispose();
         });
+        const init_state = await this.#extendedState();
         view.webview.html = `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <script>
     window.view_id = ${view_id++}
-    window.init_options = ${JSON.stringify(this.#extendedOptions())};
+    window.init_state = ${JSON.stringify(init_state)};
   </script>
   <script type="module" src="${ui_uri}"></script>
   <script type="module" src="${synth_uri}"></script>
@@ -97,6 +104,12 @@ export class SynthProvider {
   <details class="group" open>
     <summary>Synthesis</summary>
     <div class="group-body">
+      <div class="field">
+        <label for="top">Top module</label>
+        <vscode-dropdown title="Module to treat as the top of the design. 'Auto' lets Yosys figure it out (or, when the slang frontend is used, lets it auto-detect the same way)." id="top">
+          <vscode-option value="">Auto</vscode-option>
+        </vscode-dropdown>
+      </div>
       <div class="opt"><vscode-checkbox id="opt" title="Enables Yosys optimizations of the synthesized circuit. This might make the circuit differ significantly to its HDL specification. This corresponds to the 'opt -full' Yosys command.">Optimize in Yosys</vscode-checkbox></div>
       <div class="opt"><vscode-checkbox id="techmap" title="Decomposes complex cells (adders, comparators, muxes, ...) into basic logic gates. This corresponds to the 'techmap' Yosys command.">Decompose to basic gates</vscode-checkbox></div>
       <div class="field">

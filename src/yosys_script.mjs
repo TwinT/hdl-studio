@@ -10,16 +10,24 @@ import * as path from 'path';
 export function build_yosys_script(files, opts = {}) {
     const cmds = ['design -reset'];
 
-    for (const [name, _] of Object.entries(files)) {
-        const ext = path.extname(name);
-        if (ext === '.sv') {
-            cmds.push(`read_verilog -sv -defer ${name}`);
-        } else {
-            cmds.push(`read_verilog -defer ${name}`);
+    if (opts.useSlang) {
+        // slang elaborates the whole design as a unit, so unlike read_verilog it
+        // doesn't care what order the files are given in (packages/interfaces
+        // used by another file don't need to be read first).
+        const topArg = opts.top ? ` --top ${opts.top}` : '';
+        cmds.push(`read_slang --best-effort-hierarchy ${Object.keys(files).join(' ')}${topArg}`);
+    } else {
+        for (const [name, _] of Object.entries(files)) {
+            const ext = path.extname(name);
+            if (ext === '.sv') {
+                cmds.push(`read_verilog -sv -defer ${name}`);
+            } else {
+                cmds.push(`read_verilog -defer ${name}`);
+            }
         }
+        cmds.push(opts.top ? `hierarchy -top ${opts.top}` : 'hierarchy -auto-top');
     }
 
-    cmds.push('hierarchy -auto-top');
     cmds.push('proc');
     cmds.push(opts.optimize ? 'opt' : 'opt_clean');
 

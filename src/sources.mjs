@@ -305,6 +305,26 @@ export class Sources {
         }
         return data;
     }
+    async topModuleCandidates() {
+        const docs = {};
+        for (const doc of vscode.workspace.textDocuments)
+            docs[doc.uri.toString()] = doc;
+        const names = new Set();
+        for (const [uri_str, info] of this.entries()) {
+            if (info.deleted || path.extname(info.uri.path) == '.lua')
+                continue;
+            const doc = docs[uri_str];
+            let content;
+            try {
+                content = doc ? doc.getText() : await read_txt_file(info.uri);
+            } catch {
+                continue;
+            }
+            for (const m of content.matchAll(/^\s*module\s+(\w+)/gm))
+                names.add(m[1]);
+        }
+        return Array.from(names);
+    }
     async doSynth(opts) {
         const basenames_map = this.#basenamesMap();
         if (!basenames_map)

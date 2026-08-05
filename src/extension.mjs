@@ -131,10 +131,12 @@ class DigitalJS {
                                             (item) => this.#openViewJSON(item)));
         context.subscriptions.push(
             vscode.commands.registerCommand('hdl-studio.addToViewSource',
-                                            (item) => this.#openViewSource(item)));
+                                            (item, items) => this.#openViewSource(
+                                                items?.length ? items : [item])));
         context.subscriptions.push(
             vscode.commands.registerCommand('hdl-studio.newViewSource',
-                                            (item) => this.#openViewSource(item, true)));
+                                            (item, items) => this.#openViewSource(
+                                                items?.length ? items : [item], true)));
         context.subscriptions.push(
             vscode.commands.registerCommand('hdl-studio.revealCircuit',
                                             () => this.#revealCircuit()));
@@ -670,16 +672,16 @@ class DigitalJS {
             vscode.commands.executeCommand("workbench.action.closeActiveEditor");
         vscode.commands.executeCommand("vscode.openWith", uri, EditorProvider.viewType);
     }
-    async #openViewSource(uri, force_new) {
+    async #openViewSource(uris, force_new) {
         if (this.#circuitView && !force_new) {
             this.#circuitView.reveal();
             vscode.commands.executeCommand('hdl-studio-proj-files.focus');
-            this.#document.addSources([uri]);
+            this.#document.addSources(uris);
         }
         else {
             // If we are creating a new document, we won't have the handle to the document
             // right after `#newJSON` returns.
-            // Add the uri to an pending list and we'll add it
+            // Add the uris to an pending list and we'll add them
             // when the new document get registered.
             // Since the new untitled document creation isn't very reliable right now
             // and it's possible that we don't actually create a new document
@@ -688,7 +690,9 @@ class DigitalJS {
             // This way we can at least avoid action-at-a-distance kind of issues
             // where the sources that failed to be added get added later to
             // an unrelated document.
-            this.#pendingSources.push({ uri, doc_uri: await this.#newJSON(uri, false, true) });
+            const doc_uri = await this.#newJSON(uris[0], false, true);
+            for (const uri of uris)
+                this.#pendingSources.push({ uri, doc_uri });
         }
     }
     async #openView() {
@@ -742,7 +746,7 @@ class DigitalJS {
                     `Add ${uri.path} to?`, 'Current Circuit', 'New Circuit');
                 if (!res) // Cancelled
                     return;
-                this.#openViewSource(uri, res !== 'Add');
+                this.#openViewSource([uri], res !== 'Add');
             }
             else {
                 const res = await vscode.window.showInformationMessage(
@@ -757,7 +761,7 @@ class DigitalJS {
                 }
                 else {
                     // Force adding to new circuit since that's what the user has confirmed.
-                    this.#openViewSource(uri, true);
+                    this.#openViewSource([uri], true);
                 }
             }
         }
