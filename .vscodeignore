@@ -1,7 +1,10 @@
 .vscode*/**
+.claude/**
 test/**
 .gitignore
 .yarnrc
+CLAUDE.md
+TODO.md
 vsc-extension-quickstart.md
 **/jsconfig.json
 **/*.map
