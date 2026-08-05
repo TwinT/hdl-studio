@@ -5,7 +5,7 @@
 - [ ] 
 
 ## Improvements and Refactorization 🛠️
-- [ ] "Show HDL Studio Panel" button should not display when the file is not supported.
+- [X] "Show HDL Studio Panel" button should not display when the file is not supported.
 - [ ] 
 
 ## Known Bugs 🐛
