@@ -362,8 +362,10 @@ class DigitalJS {
         if (script === undefined)
             script = await read_txt_file(uri);
         const view = item.circuitView || this.#circuitView;
-        if (!view)
+        const document = item.document || this.#document;
+        if (!view || !document)
             return;
+        this.#ensureLuaTerminal(document, view).show();
         view.post({
             command: 'runlua',
             name: item.resourceUri.toString(),
@@ -725,12 +727,9 @@ class DigitalJS {
         }
         this.postPanelMessage(cmd);
     }
-    #showLuaTerminal() {
-        const doc = this.#document;
-        if (!doc)
-            return;
+    #ensureLuaTerminal(doc, view) {
         if (!doc.luaTerminal) {
-            const pty = new LuaTerminal(this.#circuitView, this.#global_state);
+            const pty = new LuaTerminal(view, this.#global_state);
             const term = vscode.window.createTerminal({
                 iconPath: this.iconPath,
                 name: `Lua ${path.basename(doc.uri.path)}`,
@@ -739,7 +738,13 @@ class DigitalJS {
             doc.luaTerminal = term;
             pty.onDidDispose(() => delete doc.luaTerminal);
         }
-        return doc.luaTerminal.show();
+        return doc.luaTerminal;
+    }
+    #showLuaTerminal() {
+        const doc = this.#document;
+        if (!doc)
+            return;
+        return this.#ensureLuaTerminal(doc, this.#circuitView).show();
     }
     #removeSource(item) {
         const document = item.document || this.#document;

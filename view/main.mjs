@@ -229,8 +229,8 @@ class LuaRunner {
         this.#runners = {};
     }
 
-    #error(name, e, isrepl) {
-        vscode.postMessage({ command: "luaerror", name, message: e.luaMessage, isrepl });
+    #error(name, e, isrepl, label) {
+        vscode.postMessage({ command: "luaerror", name, message: e.luaMessage, isrepl, label });
     }
     #getRunner(name, isrepl, label) {
         if (isrepl) {
@@ -252,7 +252,7 @@ class LuaRunner {
             this.#run(name, script, true, label);
         });
         runner.on('thread:error', (pid, e) => {
-            this.#error(runner.djs_name, e, isrepl);
+            this.#error(runner.djs_name, e, isrepl, runner.djs_label);
         });
         runner.on('print', msgs => {
             vscode.postMessage({ command: "luaprint", name: runner.djs_name,
@@ -294,7 +294,7 @@ class LuaRunner {
         }
         catch (e) {
             if (e instanceof digitaljs_lua.LuaError) {
-                this.#error(name, e);
+                this.#error(name, e, isrepl, label);
             }
             else {
                 throw e;

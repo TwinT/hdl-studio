@@ -427,7 +427,8 @@ export class Document {
                 return;
             case 'luaerror': {
                 if (this.luaTerminal) {
-                    this.luaTerminal.creationOptions.pty.print(`ERROR: ${message.message}\n`,
+                    const prefix = message.isrepl ? '' : `[${message.label || message.name}] `;
+                    this.luaTerminal.creationOptions.pty.print(`${prefix}ERROR: ${message.message}\n`,
                                                                { start_newline: true });
                     if (this.luaTerminal === vscode.window.activeTerminal) {
                         return;
@@ -439,7 +440,8 @@ export class Document {
             case 'luaprint': {
                 const msg = message.messages.join('\t');
                 if (this.luaTerminal) {
-                    this.luaTerminal.creationOptions.pty.print(msg);
+                    const prefix = message.isrepl ? '' : `[${message.label}] `;
+                    this.luaTerminal.creationOptions.pty.print(`${prefix}${msg}`);
                     if (this.luaTerminal === vscode.window.activeTerminal) {
                         return;
                     }

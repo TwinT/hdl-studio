@@ -58,14 +58,28 @@ describe('Synthesis pipeline (yosys -> yosys2digitaljs)', function () {
         }
     });
 
-    const files = fs.readdirSync(verilogDir).filter((f) => f.endsWith('.sv')).sort();
+    // Each example lives in its own subfolder, named after its main module
+    // (test/verilog/<name>/<name>.sv), alongside a sim.lua. Only pick up
+    // single-file examples here: a subfolder qualifies if it contains exactly
+    // one .sv file, which excludes multi-file designs like test/verilog/alu/
+    // (whose own alu.sv is just one of several interdependent sources, not a
+    // standalone top-level design).
+    const files = fs.readdirSync(verilogDir, { withFileTypes: true })
+        .filter((e) => e.isDirectory())
+        .flatMap((e) => {
+            const dir = path.join(verilogDir, e.name);
+            const svFiles = fs.readdirSync(dir).filter((f) => f.endsWith('.sv'));
+            return svFiles.length === 1 ? [path.join(dir, svFiles[0])] : [];
+        })
+        .sort();
     assert.ok(files.length > 0, 'no .sv examples found in test/verilog');
 
     for (const f of files) {
-        it(`synthesizes and converts ${f}`, function () {
-            const output = synth(path.join(verilogDir, f));
-            assert.ok(output && output.devices, `${f}: no output produced`);
-            assert.ok(Object.keys(output.devices).length > 0, `${f}: no devices produced`);
+        const name = path.basename(f);
+        it(`synthesizes and converts ${name}`, function () {
+            const output = synth(f);
+            assert.ok(output && output.devices, `${name}: no output produced`);
+            assert.ok(Object.keys(output.devices).length > 0, `${name}: no devices produced`);
         });
     }
 
@@ -73,14 +87,15 @@ describe('Synthesis pipeline (yosys -> yosys2digitaljs)', function () {
     // latches and memories coarse (a bare `techmap` lowers them to $_DFF_P_ etc.
     // which yosys2digitaljs cannot convert).
     for (const f of files) {
-        it(`synthesizes and converts ${f} with techmap`, function () {
-            const output = synth(path.join(verilogDir, f), { techmap: true });
-            assert.ok(Object.keys(output.devices).length > 0, `${f}: no devices produced`);
+        const name = path.basename(f);
+        it(`synthesizes and converts ${name} with techmap`, function () {
+            const output = synth(f, { techmap: true });
+            assert.ok(Object.keys(output.devices).length > 0, `${name}: no devices produced`);
         });
     }
 
     it('keeps "decada" as a subcircuit in 08_contador_decadas.sv', function () {
-        const output = synth(path.join(verilogDir, '08_contador_decadas.sv'));
+        const output = synth(path.join(verilogDir, '08_contador_decadas', '08_contador_decadas.sv'));
         assert.ok(output.subcircuits && 'decada' in output.subcircuits,
                   'expected a "decada" subcircuit (module instantiation should not be flattened)');
     });
