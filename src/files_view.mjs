@@ -7,7 +7,9 @@ import * as path from 'path';
 import { rel_compat2 } from './utils.mjs';
 
 class CircuitFile extends vscode.TreeItem {
-    constructor(uri) {
+    constructor(circuit_view, is_active) {
+        const document = circuit_view.document;
+        const uri = document.uri;
         let name = 'Unnamed circuit';
         if (uri && uri.path) {
             const filename = path.basename(uri.path);
@@ -20,17 +22,21 @@ class CircuitFile extends vscode.TreeItem {
                 }
             }
         }
-        super(name, vscode.TreeItemCollapsibleState.Expanded);
+        super(name, is_active ? vscode.TreeItemCollapsibleState.Expanded
+                              : vscode.TreeItemCollapsibleState.Collapsed);
         this.iconPath = new vscode.ThemeIcon('circuit-board');
-        this.id = 'root-circuit';
+        this.id = uri.toString();
         this.contextValue = 'root-circuit';
         this.resourceUri = uri;
-        this.command = { title: 'Show', command: 'hdl-studio.revealCircuit' };
+        this.document = document;
+        this.circuitView = circuit_view;
+        this.command = { title: 'Show', command: 'hdl-studio.revealCircuit',
+                         arguments: [uri] };
     }
 }
 
 class SourceFile extends vscode.TreeItem {
-    constructor(doc_dir, uri) {
+    constructor(doc_dir, uri, document, circuit_view) {
         let name;
         if (rel_compat2(doc_dir, uri)) {
             name = path.relative(doc_dir.path, uri.path);
@@ -44,6 +50,8 @@ class SourceFile extends vscode.TreeItem {
         this.id = uri_str;
         this.resourceUri = uri;
         this.contextValue = uri_str;
+        this.document = document;
+        this.circuitView = circuit_view;
         this.command = { title: 'Open', command: 'vscode.open',
                          arguments: [uri] };
     }
@@ -52,38 +60,46 @@ class SourceFile extends vscode.TreeItem {
 export class FilesView {
     #djs
     #onDidChangeTreeData
-    #sourcesUpdateListener
+    #circuitsChangedListener
     constructor(djs) {
         this.#djs = djs;
         this.#onDidChangeTreeData = new vscode.EventEmitter();
         this.onDidChangeTreeData = this.#onDidChangeTreeData.event;
         vscode.commands.executeCommand('setContext', 'hdl-studio.script_running', []);
         vscode.commands.executeCommand('setContext', 'hdl-studio.script_not_running', []);
-        this.#sourcesUpdateListener = djs.sourcesUpdated(() => {
-            vscode.commands.executeCommand('setContext', 'hdl-studio.script_running',
-                                           djs.scriptRunning);
+        this.#circuitsChangedListener = djs.circuitsChanged(() => {
+            const running = [];
+            const not_running = [];
+            for (const view of djs.circuitViews) {
+                running.push(...view.document.sources.scriptRunning);
+                not_running.push(...view.document.sources.scriptNotRunning);
+            }
+            vscode.commands.executeCommand('setContext', 'hdl-studio.script_running', running);
             vscode.commands.executeCommand('setContext', 'hdl-studio.script_not_running',
-                                           djs.scriptNotRunning);
+                                           not_running);
             this.#onDidChangeTreeData.fire();
         });
     }
     dispose() {
-        this.#sourcesUpdateListener.dispose();
+        this.#circuitsChangedListener.dispose();
     }
 
     getTreeItem(element) {
         return element;
     }
     async getChildren(element) {
-        if (!element)
-            return [new CircuitFile(this.#djs.doc_uri)];
-        const doc_dir = this.#djs.doc_dir_uri;
+        if (!element) {
+            const active = this.#djs.activeCircuitView;
+            return this.#djs.circuitViews.map((view) => new CircuitFile(view, view === active));
+        }
         console.assert(element instanceof CircuitFile);
+        const document = element.document;
+        const doc_dir = document.sources.doc_dir_uri;
         let res = [];
-        for (let [uri_str, info] of this.#djs.sources_entries) {
+        for (let [uri_str, info] of document.sources.entries()) {
             if (info.deleted)
                 continue;
-            res.push(new SourceFile(doc_dir, info.uri));
+            res.push(new SourceFile(doc_dir, info.uri, document, element.circuitView));
         }
         return res;
     }

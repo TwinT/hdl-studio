@@ -76,7 +76,9 @@ class DigitalJS {
     #iopanelMessage
     #runStatesUpdated
     #synthOptionUpdated
+    #circuitsChanged
     #circuitView
+    #openCircuitViews = []
     #filesView
     #editor_markers = {}
     #untitled_tracker
@@ -110,6 +112,8 @@ class DigitalJS {
         this.runStatesUpdated = this.#runStatesUpdated.event;
         this.#synthOptionUpdated = new vscode.EventEmitter();
         this.synthOptionUpdated = this.#synthOptionUpdated.event;
+        this.#circuitsChanged = new vscode.EventEmitter();
+        this.circuitsChanged = this.#circuitsChanged.event;
 
         this.#untitled_tracker = new UntitledTracker();
 
@@ -139,7 +143,7 @@ class DigitalJS {
                                                 items?.length ? items : [item], true)));
         context.subscriptions.push(
             vscode.commands.registerCommand('hdl-studio.revealCircuit',
-                                            () => this.#revealCircuit()));
+                                            (uri) => this.#revealCircuit(uri)));
         context.subscriptions.push(
             vscode.commands.registerCommand('hdl-studio.pause',
                                             () => this.postPanelMessage({
@@ -308,7 +312,10 @@ class DigitalJS {
         }
         if (script === undefined)
             script = await read_txt_file(uri);
-        this.postPanelMessage({
+        const view = item.circuitView || this.#circuitView;
+        if (!view)
+            return;
+        view.post({
             command: 'runlua',
             name: item.resourceUri.toString(),
             label: item.label.label || item.label,
@@ -316,7 +323,10 @@ class DigitalJS {
         });
     }
     #stopScript(item) {
-        this.postPanelMessage({
+        const view = item.circuitView || this.#circuitView;
+        if (!view)
+            return;
+        view.post({
             command: 'stoplua',
             name: item.resourceUri.toString()
         });
@@ -337,8 +347,18 @@ class DigitalJS {
             }
         }
     }
+    get circuitViews() {
+        // Stable, open-order list (unlike the _djs_prev_view/_djs_next_view chain
+        // below, which is MRU-ordered and reshuffles every time a circuit becomes
+        // active — that's fine for #findViewByURI but not for the tree's row order).
+        return [...this.#openCircuitViews];
+    }
+    get activeCircuitView() {
+        return this.#circuitView;
+    }
     registerDocument(document, circuit_view) {
         vscode.commands.executeCommand('setContext', 'hdl-studio.view_isactive', true);
+        this.#openCircuitViews.push(circuit_view);
 
         const listeners = [];
         listeners.push(document.sourcesUpdated(() => {
@@ -346,6 +366,10 @@ class DigitalJS {
                 return;
             this.#sourcesUpdated.fire();
         }));
+        // Unlike the listener above, this one isn't gated to the active document:
+        // the multi-circuit Project Files tree needs to refresh on source changes
+        // in any open circuit, not just the focused one.
+        listeners.push(document.sourcesUpdated(() => this.#circuitsChanged.fire()));
         listeners.push(document.synthOptionUpdated(() => {
             if (document !== this.#document)
                 return;
@@ -384,6 +408,7 @@ class DigitalJS {
         const post_switch = () => {
             this.#sourcesUpdated.fire();
             this.#synthOptionUpdated.fire();
+            this.#circuitsChanged.fire();
             this.#processMarker({});
             this.#tickUpdated.fire(this.tick);
             this.#iopanelMessage.fire({ command: 'iopanel:view', view: this.iopanelViews });
@@ -454,6 +479,8 @@ class DigitalJS {
         circuit_view.onDidChangeViewState(on_view_state);
         on_view_state();
         // Make sure we links the new one in even if it's somehow hidden.
+        // (switch_document always applies here since circuit_view was just created,
+        // so this also fires circuitsChanged via post_switch.)
         switch_document(document, circuit_view);
         circuit_view.onDidDispose(() => {
             if (document.luaTerminal) {
@@ -469,6 +496,9 @@ class DigitalJS {
             }
             for (const listener of listeners)
                 listener.dispose();
+            const idx = this.#openCircuitViews.indexOf(circuit_view);
+            if (idx >= 0)
+                this.#openCircuitViews.splice(idx, 1);
             const was_active = this.#circuitView === circuit_view;
             unlink_view(circuit_view);
             if (was_active) {
@@ -477,6 +507,7 @@ class DigitalJS {
             }
             vscode.commands.executeCommand('setContext', 'hdl-studio.view_isactive',
                                            !!this.#circuitView);
+            this.#circuitsChanged.fire();
         });
         if (this.#pendingSources.length > 0) {
             const uri_str = document.uri.toString();
@@ -662,13 +693,15 @@ class DigitalJS {
         return doc.luaTerminal.show();
     }
     #removeSource(item) {
-        if (!this.#document)
+        const document = item.document || this.#document;
+        if (!document)
             return;
-        this.#document.removeSource(item.resourceUri);
+        document.removeSource(item.resourceUri);
     }
-    #revealCircuit() {
-        if (this.#circuitView) {
-            this.#circuitView.reveal();
+    #revealCircuit(uri) {
+        const view = uri ? this.#findViewByURI(uri) : this.#circuitView;
+        if (view) {
+            view.reveal();
         }
     }
     #openViewJSON(uri) {
