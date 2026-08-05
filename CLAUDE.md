@@ -37,11 +37,17 @@ webview logic is `view/synth_view.mjs`).
 ## Testing & lint
 
 - `npm test` → `test:pipeline` then `test:vscode`.
-- `test:pipeline` (`mocha test/pipeline.spec.mjs`) — synthesizes every
-  `test/verilog/*.sv` through the real flow (yosys → yosys2digitaljs → io_ui) and
-  asserts it converts. No VS Code, no DOM; needs `yosys` on PATH (skips if absent).
-  Named `.spec.mjs` on purpose so the electron glob (`**/**.test.js`) ignores it.
-  It imports the extension's own `build_yosys_script` so the test can't drift.
+- `test:pipeline` (`mocha test/pipeline.spec.mjs`) — synthesizes every single-file
+  example through the real flow (yosys → yosys2digitaljs → io_ui) and asserts it
+  converts. No VS Code, no DOM; needs `yosys` on PATH (skips if absent). Named
+  `.spec.mjs` on purpose so the electron glob (`**/**.test.js`) ignores it. It
+  imports the extension's own `build_yosys_script` so the test can't drift.
+  Examples live one per subfolder, `test/verilog/<name>/<name>.sv` (plus a
+  `sim.lua` demonstrating that module via the `digitaljs_lua` scripting API —
+  see `node_modules/digitaljs_lua/docs/USAGE.md`); the test only picks up
+  subfolders containing exactly one `.sv` file, which is what excludes
+  multi-file designs like `test/verilog/alu/` (its own Makefile-based flow, see
+  its README-style comments) from the single-file pipeline test.
 - `test:vscode` (`node test/runTest.js`) — `@vscode/test-electron` mocha suite.
 - Lint is ESLint 9+ **flat config** (`eslint.config.js`; the old `.eslintrc.json` is
   gone). All rules are `warn` so lint never blocks. `.vscode-test/` is ignored (it
