@@ -12,6 +12,47 @@ import { StatusProvider } from './status_provider.mjs';
 import { read_txt_file, write_txt_file, file_exist } from './utils.mjs';
 import { extension_formats } from '../lib/image_formats.mjs';
 
+const SOURCE_EXTS = ['.sv', '.v', '.vh', '.lua'];
+
+async function expandDir(dirUri, recursive) {
+    const result = [];
+    let entries;
+    try {
+        entries = await vscode.workspace.fs.readDirectory(dirUri);
+    } catch {
+        return result;
+    }
+    for (const [name, type] of entries) {
+        if (type & vscode.FileType.Directory) {
+            if (!recursive || name.startsWith('.') || name === 'node_modules')
+                continue;
+            result.push(...await expandDir(vscode.Uri.joinPath(dirUri, name), recursive));
+        }
+        else if (SOURCE_EXTS.includes(path.extname(name))) {
+            result.push(vscode.Uri.joinPath(dirUri, name));
+        }
+    }
+    return result;
+}
+async function expandSources(uris, recursive) {
+    const result = [];
+    for (const uri of uris) {
+        let stat;
+        try {
+            stat = await vscode.workspace.fs.stat(uri);
+        } catch {
+            continue;
+        }
+        if (stat.type & vscode.FileType.Directory) {
+            result.push(...await expandDir(uri, recursive));
+        }
+        else if (SOURCE_EXTS.includes(path.extname(uri.path))) {
+            result.push(uri);
+        }
+    }
+    return result;
+}
+
 export function activate(context) {
     new DigitalJS(context);
 }
@@ -138,9 +179,17 @@ class DigitalJS {
                                             (item, items) => this.#openViewSource(
                                                 items?.length ? items : [item])));
         context.subscriptions.push(
+            vscode.commands.registerCommand('hdl-studio.addToViewSourceRecursive',
+                                            (item, items) => this.#openViewSource(
+                                                items?.length ? items : [item], false, true)));
+        context.subscriptions.push(
             vscode.commands.registerCommand('hdl-studio.newViewSource',
                                             (item, items) => this.#openViewSource(
                                                 items?.length ? items : [item], true)));
+        context.subscriptions.push(
+            vscode.commands.registerCommand('hdl-studio.newViewSourceRecursive',
+                                            (item, items) => this.#openViewSource(
+                                                items?.length ? items : [item], true, true)));
         context.subscriptions.push(
             vscode.commands.registerCommand('hdl-studio.revealCircuit',
                                             (uri) => this.#revealCircuit(uri)));
@@ -710,7 +759,10 @@ class DigitalJS {
             vscode.commands.executeCommand("workbench.action.closeActiveEditor");
         vscode.commands.executeCommand("vscode.openWith", uri, EditorProvider.viewType);
     }
-    async #openViewSource(uris, force_new) {
+    async #openViewSource(uris, force_new, recursive = false) {
+        uris = await expandSources(uris, recursive);
+        if (uris.length === 0)
+            return;
         if (this.#circuitView && !force_new) {
             this.#circuitView.reveal();
             vscode.commands.executeCommand('hdl-studio-proj-files.focus');
@@ -773,7 +825,7 @@ class DigitalJS {
             }
             return this.#newJSON(uri, false);
         }
-        else if (['.sv', '.v', '.vh', '.lua'].includes(ext)) {
+        else if (SOURCE_EXTS.includes(ext)) {
             // Source file already in current document.
             if (this.#document && this.#document.sources.findByURI(uri)) {
                 vscode.commands.executeCommand('hdl-studio-proj-files.focus');

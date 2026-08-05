@@ -53,8 +53,20 @@
                 "category": "HDL Studio"
             },
             {
+                "command": "hdl-studio.addToViewSourceRecursive",
+                "title": "Add to HDL Studio (Recursive)",
+                "icon": "imgs/hdl-studio.svg",
+                "category": "HDL Studio"
+            },
+            {
                 "command": "hdl-studio.newViewSource",
                 "title": "Create circuit in HDL Studio",
+                "icon": "imgs/hdl-studio.svg",
+                "category": "HDL Studio"
+            },
+            {
+                "command": "hdl-studio.newViewSourceRecursive",
+                "title": "Create circuit in HDL Studio (Recursive)",
                 "icon": "imgs/hdl-studio.svg",
                 "category": "HDL Studio"
             },
@@ -160,7 +172,15 @@
                     "when": "false"
                 },
                 {
+                    "command": "hdl-studio.addToViewSourceRecursive",
+                    "when": "false"
+                },
+                {
                     "command": "hdl-studio.newViewSource",
+                    "when": "false"
+                },
+                {
+                    "command": "hdl-studio.newViewSourceRecursive",
                     "when": "false"
                 },
                 {
@@ -252,12 +272,22 @@
                 },
                 {
                     "command": "hdl-studio.addToViewSource",
-                    "when": "hdl-studio.view_isactive && resourceExtname =~ /^\\.sv$|^\\.v$|^\\.vh$|^\\.lua$/",
+                    "when": "hdl-studio.view_isactive && (resourceExtname =~ /^\\.sv$|^\\.v$|^\\.vh$|^\\.lua$/ || explorerResourceIsFolder)",
+                    "group": "navigation@99999"
+                },
+                {
+                    "command": "hdl-studio.addToViewSourceRecursive",
+                    "when": "hdl-studio.view_isactive && explorerResourceIsFolder",
                     "group": "navigation@99999"
                 },
                 {
                     "command": "hdl-studio.newViewSource",
-                    "when": "resourceExtname =~ /^\\.sv$|^\\.v$|^\\.vh$|^\\.lua$/",
+                    "when": "resourceExtname =~ /^\\.sv$|^\\.v$|^\\.vh$|^\\.lua$/ || explorerResourceIsFolder",
+                    "group": "navigation@100000"
+                },
+                {
+                    "command": "hdl-studio.newViewSourceRecursive",
+                    "when": "explorerResourceIsFolder",
                     "group": "navigation@100000"
                 }
             ],
