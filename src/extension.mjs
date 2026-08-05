@@ -274,6 +274,11 @@ class DigitalJS {
             return this.#document.runStates;
         return {};
     }
+    async topModuleCandidates() {
+        if (this.#document)
+            return this.#document.sources.topModuleCandidates();
+        return [];
+    }
     async doSynth() {
         if (this.#document) {
             await this.#document.doSynth();

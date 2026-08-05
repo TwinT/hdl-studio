@@ -29,7 +29,7 @@ export class SynthProvider {
     }
     async #extendedState() {
         return { options: this.#extendedOptions(),
-                topModules: await this.#djs.sources.topModuleCandidates() };
+                topModules: await this.#djs.topModuleCandidates() };
     }
     async resolveWebviewView(view, context, _token) {
         const ui_uri = view.webview.asWebviewUri(this.#djs.uiToolkitPath);
