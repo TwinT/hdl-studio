@@ -354,6 +354,7 @@
         }
     },
     "scripts": {
+        "postinstall": "patch-package",
         "vscode:prepublish": "npm run compile",
         "compile": "npm-run-all compile:*",
         "compile:views": "webpack --mode production",
@@ -381,6 +382,7 @@
         "jquery": "^4.0.0",
         "mocha": "^11.7.6",
         "npm-run-all": "^4.1.5",
+        "patch-package": "^8.0.1",
         "process": "^0.11.10",
         "sass": "^1.101.0",
         "sass-loader": "^17.0.0",

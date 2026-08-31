@@ -1,0 +1,13 @@
+diff --git a/node_modules/digitaljs/src/transform.mjs b/node_modules/digitaljs/src/transform.mjs
+index 7da66bc..49044cc 100644
+--- a/node_modules/digitaljs/src/transform.mjs
++++ b/node_modules/digitaljs/src/transform.mjs
+@@ -248,7 +248,7 @@ export function makeBinaryMuxes(model, dev, id)
+     newDev.bits.sel = bits;
+     newDev.type = sparse ? "MuxSparse" : "Mux";
+     if (sparse) {
+-        newDev.inputs = Object.keys(mapping).map(x => BigInt(x)).sort((a, b) => a > b || -(a < b));
++        newDev.inputs = Object.keys(mapping).map(x => Number(x)).sort((a, b) => a - b);
+         newDev.default_input = !muxInputs[0].every(conn => {
+             const inDev = model.getDevice(conn.from.id);
+             if (inDev.type != "Constant") return false;
