@@ -38,6 +38,12 @@ export function build_yosys_script(files, opts = {}) {
     }
 
     cmds.push('proc');
+    // yosys2digitaljs has no $tribuf cell type, so a tri-state output
+    // (`assign x = en ? val : 'z;`) fails synthesis outright. `-formal`
+    // converts every tristate buffer - including ones driving output ports -
+    // into plain non-tristate logic (0 when disabled), which is all
+    // digitaljs can represent anyway (it has no floating/shared-bus net).
+    cmds.push('tribuf -formal');
     cmds.push(opts.optimize ? 'opt' : 'opt_clean');
 
     if (opts.fsm && opts.fsm !== 'no') {
