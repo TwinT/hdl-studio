@@ -12,7 +12,7 @@ import { StatusProvider } from './status_provider.mjs';
 import { read_txt_file, write_txt_file, file_exist } from './utils.mjs';
 import { extension_formats } from '../lib/image_formats.mjs';
 
-const SOURCE_EXTS = ['.sv', '.v', '.vh', '.lua'];
+const SOURCE_EXTS = ['.sv', '.v', '.vh', '.lua', '.hex', '.mem'];
 
 async function expandDir(dirUri, recursive) {
     const result = [];
@@ -653,8 +653,9 @@ class DigitalJS {
             filters: {
                 "SystemVerilog (.sv)": ['sv'],
                 "Verilog (.v)": ['v'],
-                "Verilog HEX file (.vh)": ['vh'],
+                "Verilog header (.vh)": ['vh'],
                 "Lua script (.lua)": ['lua'],
+                "Memory init file (.hex, .mem)": ['hex', 'mem'],
             }
         });
         if (!files)

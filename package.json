@@ -272,7 +272,7 @@
                 },
                 {
                     "command": "hdl-studio.addToViewSource",
-                    "when": "hdl-studio.view_isactive && (resourceExtname =~ /^\\.sv$|^\\.v$|^\\.vh$|^\\.lua$/ || explorerResourceIsFolder)",
+                    "when": "hdl-studio.view_isactive && (resourceExtname =~ /^\\.sv$|^\\.v$|^\\.vh$|^\\.lua$|^\\.hex$|^\\.mem$/ || explorerResourceIsFolder)",
                     "group": "navigation@99999"
                 },
                 {
@@ -282,7 +282,7 @@
                 },
                 {
                     "command": "hdl-studio.newViewSource",
-                    "when": "resourceExtname =~ /^\\.sv$|^\\.v$|^\\.vh$|^\\.lua$/ || explorerResourceIsFolder",
+                    "when": "resourceExtname =~ /^\\.sv$|^\\.v$|^\\.vh$|^\\.lua$|^\\.hex$|^\\.mem$/ || explorerResourceIsFolder",
                     "group": "navigation@100000"
                 },
                 {
