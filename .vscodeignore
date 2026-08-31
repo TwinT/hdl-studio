@@ -5,6 +5,7 @@ test/**
 .yarnrc
 CLAUDE.md
 TODO.md
+4VL_INTEGRATION_PLAN.md
 vsc-extension-quickstart.md
 **/jsconfig.json
 **/*.map
