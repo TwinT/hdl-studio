@@ -8,7 +8,7 @@ import * as os from 'os';
 import { promisify } from 'util';
 import { yosys2digitaljs, io_ui } from 'yosys2digitaljs/core';
 import * as digitaljs_transform from '../node_modules/digitaljs/src/transform.mjs';
-import { build_yosys_script } from './yosys_script.mjs';
+import { build_yosys_script, isHdlFile } from './yosys_script.mjs';
 
 const execFile = promisify(child_process.execFile);
 
@@ -69,6 +69,19 @@ export async function run_yosys(files, options) {
         // Write each source file with a mapped name to avoid path issues
         const mappedFiles = {};
         for (const [name, content] of Object.entries(files)) {
+            if (!isHdlFile(name)) {
+                // Data file (e.g. .hex/.mem read via $readmemh/$readmemb):
+                // must exist on disk under its own (possibly nested) name for
+                // yosys to find it, but must never be read_verilog'd, so it's
+                // kept out of mappedFiles/FileMap entirely.
+                const fullPath = path.join(tmpDir, name);
+                if (!fullPath.startsWith(tmpDir + path.sep)) {
+                    throw { error: `Refusing to write source "${name}" outside the synthesis directory.` };
+                }
+                fs.mkdirSync(path.dirname(fullPath), { recursive: true });
+                fs.writeFileSync(fullPath, content);
+                continue;
+            }
             const ext = path.extname(name);
             const pre_ext = name.substring(0, name.length - ext.length);
             const mappedName = file_map.map_name(pre_ext) + ext;

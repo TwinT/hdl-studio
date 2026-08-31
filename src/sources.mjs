@@ -5,6 +5,7 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import { run_yosys } from './requests.mjs';
+import { isHdlFile } from './yosys_script.mjs';
 import { hash_sha512, get_dirname_uri, read_txt_file, rel_compat2 } from './utils.mjs';
 
 class SourceInfo {
@@ -269,12 +270,22 @@ export class Sources {
     }
     #prescanSources(basenames_map) {
         // Compute a short version of the file name
-        const doc_uri = this.doc_dri_uri;
+        const doc_uri = this.doc_dir_uri;
         for (const basename in basenames_map) {
             const infos = basenames_map[basename];
             if (infos.length == 1) {
-                // Unique basename
-                infos[0].name = basename;
+                const info = infos[0];
+                // Data files (e.g. .hex/.mem read via $readmemh/$readmemb) need a
+                // name that matches how the HDL source references them on disk,
+                // so prefer the path relative to the project directory over the
+                // bare basename whenever that's resolvable; fall back to the
+                // basename (e.g. unsaved/untitled project) same as HDL files.
+                if (!isHdlFile(basename) && rel_compat2(doc_uri, info.uri)) {
+                    info.name = path.relative(doc_uri.path, info.uri.path);
+                }
+                else {
+                    info.name = basename;
+                }
                 continue;
             }
             for (const info of infos) {

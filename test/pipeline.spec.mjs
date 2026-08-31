@@ -15,7 +15,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { execFileSync } from 'child_process';
 import { yosys2digitaljs, io_ui } from 'yosys2digitaljs/core';
-import { build_yosys_script } from '../src/yosys_script.mjs';
+import { build_yosys_script, isHdlFile } from '../src/yosys_script.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const verilogDir = path.resolve(__dirname, 'verilog');
@@ -47,6 +47,27 @@ function yosysAvailable() {
         return false;
     }
 }
+
+describe('isHdlFile', function () {
+    it('accepts .v and .sv, rejects data files like .hex/.mem', function () {
+        assert.strictEqual(isHdlFile('control_unit.sv'), true);
+        assert.strictEqual(isHdlFile('top.v'), true);
+        assert.strictEqual(isHdlFile('rtl/control_unit.hex'), false);
+        assert.strictEqual(isHdlFile('rom.mem'), false);
+    });
+});
+
+describe('build_yosys_script with a data file entry', function () {
+    it('never emits read_verilog for a non-HDL (.hex) file', function () {
+        // A data file referenced only via $readmemh/$readmemb must be excluded
+        // from the files map by the caller (run_yosys) - build_yosys_script
+        // itself just trusts the map it's given, so this locks down that
+        // caller-side contract instead.
+        const script = build_yosys_script({ 'control_unit.sv': '' });
+        assert.ok(!script.includes('.hex'), 'script must not reference the .hex file at all');
+        assert.ok(script.includes('read_verilog -sv -defer control_unit.sv'));
+    });
+});
 
 describe('Synthesis pipeline (yosys -> yosys2digitaljs)', function () {
     this.timeout(60000);

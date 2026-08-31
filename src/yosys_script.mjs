@@ -7,6 +7,15 @@
 
 import * as path from 'path';
 
+// Extensions read_verilog/read_slang can actually parse. Anything else added
+// as a source (e.g. a .hex/.mem referenced by $readmemh/$readmemb) is a data
+// file: it must exist on disk for yosys to find at elaboration time, but must
+// never be passed to read_verilog/read_slang.
+export const HDL_EXTENSIONS = new Set(['.v', '.sv']);
+export function isHdlFile(name) {
+    return HDL_EXTENSIONS.has(path.extname(name));
+}
+
 export function build_yosys_script(files, opts = {}) {
     const cmds = ['design -reset'];
 
