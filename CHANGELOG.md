@@ -5,6 +5,30 @@ All notable changes to HDL Studio will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] - 2026-08-31
+
+### Added
+- Synthesis now supports `$readmemh`/`$readmemb` auxiliary data files
+  (e.g. a ROM `.hex` image): add the `.hex`/`.mem` file to the circuit like
+  any other source (now accepted by "Add to HDL Studio" / "Create circuit in
+  HDL Studio" and the "Add Files" dialog, previously restricted to
+  `.sv`/`.v`/`.vh`/`.lua`) and it's written to the synthesis temp directory
+  under its path relative to the saved project so yosys/`$readmemh` finds it.
+
+### Fixed
+- Synthesized circuits with a wide `case`/dispatch (compiled by yosys into a
+  "sparse mux") no longer silently fail to display: patched a `digitaljs`
+  0.14.2 bug where such muxes embedded raw `BigInt` values in the circuit
+  data, which crashed `JSON.stringify` when posting the circuit to the
+  webview (via `patch-package`, see `patches/`).
+- Fixed a `Sources` bug where directory-relative source naming silently
+  never triggered due to a typo'd property access.
+
+### Changed
+- Updated devDependencies to their latest semver-compatible versions
+  (`webpack` pinned at `5.107.2`: `5.110.2`'s new native TypeScript
+  resolution breaks on a transitive dependency's `.ts` syntax).
+
 ## [0.3.0] - 2026-08-05
 
 ### Added
