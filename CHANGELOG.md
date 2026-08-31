@@ -5,6 +5,14 @@ All notable changes to HDL Studio will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.1] - 2026-08-31
+
+### Fixed
+- A tri-state output (`assign x = en ? val : 'z;`, e.g. a module driving a
+  shared bus) no longer fails synthesis with "Invalid cell type: $tribuf" -
+  `yosys2digitaljs` has no `$tribuf` cell type, so tristate buffers are now
+  converted to plain logic (0 when disabled) during synthesis.
+
 ## [0.4.0] - 2026-08-31
 
 ### Added
