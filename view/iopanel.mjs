@@ -3,7 +3,7 @@
 'use strict';
 
 import Backbone from 'backbone';
-import { Vector3vl } from '3vl';
+import { Vector4vl } from '@twint/4vl';
 
 export class RemoteIOPanel extends Backbone.View {
     initialize(args) {
@@ -56,7 +56,7 @@ export class RemoteIOPanel extends Backbone.View {
         const bits = cell.get('bits');
         row.bits = bits;
         this.updater[row.id] = (val) => {
-            cell.setInput(Vector3vl.fromBin(val, bits));
+            cell.setInput(Vector4vl.fromBin(val, bits));
         };
         row.value = cell.get('outputSignals').out.toBin();
         this.listenTo(cell, 'change:outputSignals', (cell, sigs) => {

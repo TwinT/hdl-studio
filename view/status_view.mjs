@@ -3,7 +3,7 @@
 'use strict';
 
 import $ from 'jquery';
-import { Vector3vl, Display3vlWithRegex, Display3vl } from '3vl';
+import { Vector4vl, Display4vlWithRegex, Display4vl } from '@twint/4vl';
 
 const vscode = acquireVsCodeApi();
 
@@ -15,7 +15,7 @@ const controlCodes20 = [
     'SP',  'DEL'];
 
 // Copied from digitaljs since it wasn't exported.
-class Display3vlASCII extends Display3vlWithRegex {
+class Display4vlASCII extends Display4vlWithRegex {
     constructor() {
         super('[\x20-\x7e\xa0-\xff\ufffd\u2400-\u2421]|' + controlCodes20.join('|'))
     }
@@ -31,16 +31,16 @@ class Display3vlASCII extends Display3vlWithRegex {
     read(data, bits) {
         if (data.length == 1) {
             const code = data.charCodeAt(0);
-            if (code == 0xfffd) return Vector3vl.xes(bits);
-            if (code == 0x2421) return Vector3vl.fromHex("7f", bits);
+            if (code == 0xfffd) return Vector4vl.xes(bits);
+            if (code == 0x2421) return Vector4vl.fromHex("7f", bits);
             if (code >= 0x2400 && code <= 0x2420)
-                return Vector3vl.fromHex((code - 0x2400).toString(16), bits);
-            return Vector3vl.fromHex(code.toString(16), bits);
+                return Vector4vl.fromHex((code - 0x2400).toString(16), bits);
+            return Vector4vl.fromHex(code.toString(16), bits);
         } else {
             const code = controlCodes20.indexOf(data);
-            if (code < 0) return Vector3vl.xes(bits);
-            if (code == 0x21) return Vector3vl.fromHex("7f", bits);
-            return Vector3vl.fromHex(code.toString(16), bits);
+            if (code < 0) return Vector4vl.xes(bits);
+            if (code == 0x21) return Vector4vl.fromHex("7f", bits);
+            return Vector4vl.fromHex(code.toString(16), bits);
         }
     }
     show(data) {
@@ -73,8 +73,8 @@ class Status {
     constructor() {
         window.addEventListener('message', event => this.#processMessage(event));
         window.addEventListener("load", () => this.#initialize());
-        this.#dp3vl = new Display3vl();
-        this.#dp3vl.addDisplay(new Display3vlASCII());
+        this.#dp3vl = new Display4vl();
+        this.#dp3vl.addDisplay(new Display4vlASCII());
         this.#widgets = {};
     }
     #initialize() {
@@ -145,7 +145,7 @@ class Status {
         widget.find('span.djs-io-name').text(view.label);
         const checkbox = widget.find('vscode-checkbox');
         const updater = (bin) => {
-            const value = Vector3vl.fromBin(bin, 1);
+            const value = Vector4vl.fromBin(bin, 1);
             if (!is_input)
                 checkbox.prop('indeterminate', !value.isDefined);
             checkbox.prop('checked', value.isHigh);
@@ -219,7 +219,7 @@ class Status {
         const updater = (new_bin) => {
             bin = new_bin;
             // Note that even if the value didn't change, the display value might.
-            const value = Vector3vl.fromBin(bin, bits);
+            const value = Vector4vl.fromBin(bin, bits);
             input.val(this.#dp3vl.show(base, value));
         };
         const base_updater = (new_base) => {

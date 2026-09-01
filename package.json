@@ -391,9 +391,9 @@
         "webpack-cli": "^7.0.3"
     },
     "dependencies": {
+        "@twint/4vl": "^1.0.1",
         "@vscode/codicons": "^0.0.45",
         "@vscode/webview-ui-toolkit": "^1.4.0",
-        "3vl": "^1.0.1",
         "assert": "^2.1.0",
         "backbone": "^1.6.1",
         "base64-arraybuffer": "^1.0.2",

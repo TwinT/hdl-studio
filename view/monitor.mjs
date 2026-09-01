@@ -4,7 +4,7 @@
 
 import $ from 'jquery';
 import Backbone from 'backbone';
-import { Vector3vl } from '3vl';
+import { Vector4vl } from '@twint/4vl';
 import { Waveform, drawWaveform, defaultSettings, extendSettings, calcGridStep } from 'wavecanvas';
 import ResizeObserver from 'resize-observer-polyfill';
 
@@ -175,10 +175,10 @@ export class MonitorView extends Backbone.View {
         this.$el.on('input', 'vscode-dropdown[name=trigger]', (e) => {
             const wireid = evt_wireid(e);
             switch (e.target.value) {
-                case 'rising': setTrigger(wireid, [Vector3vl.one]); break;
-                case 'falling': setTrigger(wireid, [Vector3vl.zero]); break;
-                case 'risefall': setTrigger(wireid, [Vector3vl.one, Vector3vl.zero]); break;
-                case 'undef': setTrigger(wireid, [Vector3vl.x]); break;
+                case 'rising': setTrigger(wireid, [Vector4vl.one]); break;
+                case 'falling': setTrigger(wireid, [Vector4vl.zero]); break;
+                case 'risefall': setTrigger(wireid, [Vector4vl.one, Vector4vl.zero]); break;
+                case 'undef': setTrigger(wireid, [Vector4vl.x]); break;
                 default: setTrigger(wireid, []);
             }
         });
