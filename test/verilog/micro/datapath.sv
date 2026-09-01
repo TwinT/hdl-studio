@@ -38,7 +38,7 @@ module datapath (
                      .ir_ld, .ir_oe, .rf_we, .alu_oe);
 
   pc pc_i (.clk, .rst, .ld(pc_ld), .inc(pc_inc), .oe(pc_oe), .bus_in(bus), .bus_out(bus), .val(pc_val));
-  memory #(.DEPTH(1024)) mem_i (.clk, .rst, .addr_ld(mem_addr_ld), .we(mem_we), .oe(mem_oe), .bus_in(bus),
+  memory #(.DEPTH(1024)) mem_i (.clk, .addr_ld(mem_addr_ld), .we(mem_we), .oe(mem_oe), .bus_in(bus),
                 .wdata(store_wdata), .byte_en(store_byte_en), .bus_out(bus));
   ir ir_i (.clk, .rst, .ld(ir_ld), .oe(ir_oe), .bus_in(bus), .bus_out(bus), .val(ir_val));
 
