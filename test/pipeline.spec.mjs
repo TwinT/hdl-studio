@@ -40,6 +40,32 @@ function synth(svPath, opts = {}) {
     }
 }
 
+// Like synth(), but for a multi-file design: copies every file in `dir`
+// (source + any .hex/.mem data files) into the temp synth dir instead of
+// just one. Needed for test/verilog/micro/, a multi-file design excluded
+// from the single-.sv-per-subfolder loop above.
+function synthDir(dir, opts = {}) {
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'hdl-test-'));
+    try {
+        const names = fs.readdirSync(dir).filter((f) => isHdlFile(f) || f.endsWith('.hex') || f.endsWith('.mem'));
+        const files = {};
+        for (const name of names) {
+            fs.copyFileSync(path.join(dir, name), path.join(tmp, name));
+            if (isHdlFile(name)) files[name] = '';
+        }
+        const outJson = path.join(tmp, 'out.json');
+        const script = build_yosys_script(files, opts) + `\njson -o ${outJson}`;
+        fs.writeFileSync(path.join(tmp, 'synth.ys'), script);
+        execFileSync('yosys', ['-q', '-s', 'synth.ys'], { cwd: tmp, stdio: 'pipe' });
+        const raw = JSON.parse(fs.readFileSync(outJson, 'utf8'));
+        const output = yosys2digitaljs(raw, {});
+        io_ui(output);
+        return output;
+    } finally {
+        fs.rmSync(tmp, { recursive: true, force: true });
+    }
+}
+
 function yosysAvailable() {
     try {
         execFileSync('yosys', ['--version'], { stdio: 'ignore' });
@@ -163,6 +189,24 @@ describe('Synthesis pipeline (yosys -> yosys2digitaljs)', function () {
 
         const cellNames = Object.keys(output.subcircuits || {});
         assert.strictEqual(cellNames.length, 4, 'expected 4 distinct bmux_regfile_cell subcircuits');
+    });
+
+    // Regression: forcing top to a module with no output ports (datapath.sv's
+    // only effect is internal register/memory state) used to render an
+    // arbitrary other module instead (e.g. alu.sv) - opt_clean's
+    // reachable-from-outputs sweep silently deleted every one of datapath's
+    // instantiated cells, and yosys2digitaljs's topsort-based top-detection
+    // then picked whichever now-orphaned leaf module happened to sort last.
+    // Fixed by keeping the requested top's contents alive across the opt
+    // passes (see build_yosys_script's `if (opts.top)` block).
+    it('keeps datapath.sv as top even though it has no output ports', function () {
+        const output = synthDir(path.join(verilogDir, 'micro'), { useSlang: true, top: 'datapath' });
+        for (const name of ['alu', 'branch_unit', 'control_unit', 'decoder', 'ir',
+                             'load_unit', 'memory', 'pc', 'register_file', 'store_unit']) {
+            const sub = Object.keys(output.subcircuits || {}).find((k) => k.startsWith(name + '$datapath.'));
+            assert.ok(sub, `expected a "${name}" subcircuit under datapath, got none ` +
+                            `(top devices: ${Object.keys(output.devices).join(', ')})`);
+        }
     });
 });
 
