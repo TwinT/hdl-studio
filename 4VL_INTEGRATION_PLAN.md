@@ -742,3 +742,54 @@ disabled driver, `npm run test:pipeline` (38/38), `npm run lint` (62
 warnings, unchanged baseline). Still outstanding: the user retesting F5 on
 `tribuf_bus2.sv` itself — every check here is headless, same caveat as
 every other step in this plan.
+
+## Post-plan: waveform monitor crash on multi-bit wires, Memory editor (2026-09-01)
+
+The user confirmed the `Tribuf`/`TriMerge` fix above works, then reported a
+new regression: adding a wire to the Waveform Monitor threw instead of
+adding it, for every multi-bit wire (1-bit wires unaffected) —
+`Cannot read properties of undefined (reading 'usableDisplays')` in
+`_baseSelectorMarkup`/`_createRow`, followed by a cascading
+`Cannot read properties of undefined (reading 'getContext')` in `_draw`
+(the wire was already registered by `addWire` before `_createRow` threw and
+aborted without appending its `<tr>`, so the next `_drawAll` tick found no
+`<canvas>` to draw into).
+
+Root cause: `view/monitor.mjs` (lines 147, 300, 324) and `view/main.mjs`
+(line 58, `digitaljs.cells.Memory.prototype.createEditor`) still read
+`this.model._circuit._display3vl` / `this.graph._display3vl` — a property
+that stopped existing the moment the digitaljs patch (step 1) renamed it to
+`_display4vl` everywhere inside `digitaljs` itself
+(`node_modules/digitaljs/src/circuit.mjs:76,102`; `digitaljs`'s own
+`monitor.mjs`, the template `view/monitor.mjs` was forked from per commit
+`b6c72dd`, already used `_display4vl` consistently). The commit that
+migrated these two files for 4vl (`5a173f8`, described as a "pure rename")
+swapped `Vector3vl`→`Vector4vl` and the trigger constants but missed these
+four `._display3vl` reads, so `baseSelectMarkupHTML`'s
+`display3vl.usableDisplays(...)` call has been running against `undefined`
+since that commit landed. Confirmed genuinely bit-width-gated for the
+Monitor case (not reporter imprecision): `_createRow` only calls
+`_baseSelectorMarkup` when `wire.get('bits') > 1`, exactly matching "fails
+whenever the bus has more than one signal." The `view/main.mjs` instance
+(Memory cell's contents-editor "base" dropdown) has no such guard at all —
+opening any Memory cell's editor, 1-bit or wider, would have hit the same
+crash; found while investigating, not part of the original report.
+`view/status_view.mjs`/`view/iopanel.mjs` (the other two files given direct
+4vl edits) were checked and have no `_display3vl` references.
+
+Fix: renamed the four `._display3vl` property reads to `._display4vl` in
+both files, and completed the rename commit `5a173f8` left half-done by also
+renaming every local `display3vl` variable/parameter to `display4vl`
+(`baseSelectMarkupHTML`'s own parameter included) — cosmetic, but leaves the
+code not calling a `Display4vl` instance by its old 3-valued name anymore,
+matching digitaljs's own upstream `monitor.mjs` naming.
+
+No automated test added — `view/*.mjs` imports `jquery`/`backbone` at
+module scope, which need a real DOM (the same constraint already documented
+for `digitaljs`'s View classes in steps 2/4), and this repo has no existing
+pattern for testing `view/*.mjs` headlessly. Verified via `npm run compile`
+(all 6 targets), `grep -c "_display3vl" dist/view-bundle.js` (0) and
+`grep -c "_display4vl\|usableDisplays" dist/view-bundle.js` (both present),
+`npm run lint` (62 warnings, unchanged baseline). Still outstanding: the
+user retesting F5 — add a multi-bit wire to the Waveform Monitor, and open a
+Memory cell's contents editor.

@@ -48,14 +48,14 @@ for (const View of [digitaljs.cells.MemoryView, digitaljs.cells.FSMView]) {
     View.prototype._djs_editor_patched = true;
 }
 
-function baseSelectMarkupHTML(display3vl, bits, base) {
-    const markup = display3vl.usableDisplays('read', bits)
+function baseSelectMarkupHTML(display4vl, bits, base) {
+    const markup = display4vl.usableDisplays('read', bits)
                              .map(n => '<option value="' + n + '"' + (n == base ? ' selected="selected"' : '') +'>' + n + '</option>');
     return '<select name="base" style="vertical-align: middle;">' + markup.join("") + '</select>';
 }
 
 digitaljs.cells.Memory.prototype.createEditor = function () {
-    const display3vl = this.graph._display3vl;
+    const display4vl = this.graph._display4vl;
     const div = $('<div>', {
         title: "Memory contents: " + this.get('label')
     }).appendTo('html > body');
@@ -64,7 +64,7 @@ digitaljs.cells.Memory.prototype.createEditor = function () {
         '<button name="prev" type="button" class="btn btn-secondary" style="vertical-align: middle;" title="Previous page"><i class="codicon codicon-arrow-left"></i></button>' +
         '<button name="next" type="button" class="btn btn-secondary" style="vertical-align: middle;" title="Next page"><i class="codicon codicon-arrow-right"></i></button>' +
         '<span style="padding-left:2px;"></span>' +
-        baseSelectMarkupHTML(display3vl, this.get('bits'), 'hex') +
+        baseSelectMarkupHTML(display4vl, this.get('bits'), 'hex') +
         '</div>' +
         '<table class="memeditor">' +
         '</table>'));
@@ -109,7 +109,7 @@ digitaljs.cells.Memory.prototype.createEditor = function () {
             col = col.next();
             for (let c = 0; c < columns; c++, col = col.next()) {
                 if (address + r * columns + c >= words) break;
-                col.find('input').val(display3vl.show(numbase, memdata.get(address + r * columns + c)))
+                col.find('input').val(display4vl.show(numbase, memdata.get(address + r * columns + c)))
                    .removeClass('invalid');
             }
         }
@@ -117,8 +117,8 @@ digitaljs.cells.Memory.prototype.createEditor = function () {
     };
     const redraw = () => {
         const numbase = get_numbase();
-        const ptrn = display3vl.pattern(numbase);
-        const ds = display3vl.size(numbase, this.get('bits'));
+        const ptrn = display4vl.pattern(numbase);
+        const ds = display4vl.size(numbase, this.get('bits'));
         columns = Math.min(words, 16, Math.ceil(32/ds));
         address = Math.max(0, Math.min(words - rows * columns, address));
         const table = div.find('table');
@@ -160,8 +160,8 @@ digitaljs.cells.Memory.prototype.createEditor = function () {
         const r = target.closest('tr').index();
         const addr = address + r * columns + c;
         const bits = this.get('bits');
-        if (display3vl.validate(numbase, evt.target.value, bits)) {
-            const val = display3vl.read(numbase, evt.target.value, bits);
+        if (display4vl.validate(numbase, evt.target.value, bits)) {
+            const val = display4vl.read(numbase, evt.target.value, bits);
             memdata.set(addr, val);
             this.trigger('manualMemChange', this, addr, val);
             target.removeClass('invalid');
@@ -173,7 +173,7 @@ digitaljs.cells.Memory.prototype.createEditor = function () {
         if (addr < address || addr > address + rows * columns) return;
         const numbase = get_numbase();
         const z = getCell(addr)
-            .val(display3vl.show(numbase, memdata.get(addr)))
+            .val(display4vl.show(numbase, memdata.get(addr)))
             .removeClass('invalid')
             .removeClass('flash');
         setTimeout(() => { z.addClass('flash') }, 10);

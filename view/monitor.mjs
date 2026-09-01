@@ -8,8 +8,8 @@ import { Vector4vl } from '@twint/4vl';
 import { Waveform, drawWaveform, defaultSettings, extendSettings, calcGridStep } from 'wavecanvas';
 import ResizeObserver from 'resize-observer-polyfill';
 
-function baseSelectMarkupHTML(display3vl, bits, base) {
-    const markup = display3vl.usableDisplays('read', bits)
+function baseSelectMarkupHTML(display4vl, bits, base) {
+    const markup = display4vl.usableDisplays('read', bits)
                              .map(n => '<vscode-option value="' + n + '"' + (n == base ? ' selected="selected"' : '') +'>' + n + '</vscode-option>');
     return '<vscode-dropdown name="base" position="below">' + markup.join("") + '</vscode-dropdown>';
 }
@@ -144,7 +144,7 @@ export class MonitorView extends Backbone.View {
         function evt_wireid(e) {
             return $(e.target).closest('tr').attr('wireid');
         }
-        const display3vl = this.model._circuit._display3vl;
+        const display4vl = this.model._circuit._display4vl;
         this.$el.on('click', 'vscode-button[name=remove]', (e) => { this.model.removeWire(evt_wireid(e)); });
         this.$el.on('input', 'vscode-dropdown[name=base]', (e) => {
             const base = e.target.value;
@@ -152,9 +152,9 @@ export class MonitorView extends Backbone.View {
             settings.base = base;
             const row = $(e.target).closest('tr');
             const trig = row.find('vscode-text-field[name=trigger]');
-            trig.attr('pattern', display3vl.pattern(base));
+            trig.attr('pattern', display4vl.pattern(base));
             if (settings.trigger.length)
-                trig.val(display3vl.show(base, settings.trigger[0]));
+                trig.val(display4vl.show(base, settings.trigger[0]));
             this.trigger('change');
         });
         const handleTrigger = () => {
@@ -189,10 +189,10 @@ export class MonitorView extends Backbone.View {
             const bits = this.model._wires.get(wireid).waveform.bits;
             if (e.target.value == "") {
                 setTrigger(wireid, []);
-            } else if (display3vl.validate(base, e.target.value, bits)) {
-                const val = display3vl.read(base, e.target.value, bits);
+            } else if (display4vl.validate(base, e.target.value, bits)) {
+                const val = display4vl.read(base, e.target.value, bits);
                 setTrigger(wireid, [val]);
-                e.target.value = display3vl.show(base, val);
+                e.target.value = display4vl.show(base, val);
             } else {
                 setTrigger(wireid, []);
             }
@@ -297,13 +297,13 @@ export class MonitorView extends Backbone.View {
         }
     }
     _draw(wireid) {
-        const display3vl = this.model._circuit._display3vl;
+        const display4vl = this.model._circuit._display4vl;
         const canvas = this.$('tr[wireid="'+wireid+'"]').find('canvas');
         const waveform = this.model._wires.get(wireid).waveform;
         // Something is triggering redraw when the vscode theme changes
         // so this appears to be good enough for now...
         this._settings.textColor = canvas.css("--foreground");
-        drawWaveform(waveform, canvas[0].getContext('2d'), this._settingsFor.get(wireid), display3vl);
+        drawWaveform(waveform, canvas[0].getContext('2d'), this._settingsFor.get(wireid), display4vl);
     }
     _handleAdd(wire) {
         const wireid = getWireId(wire);
@@ -321,8 +321,8 @@ export class MonitorView extends Backbone.View {
     _createRow(wire) {
         const wireid = getWireId(wire);
         const settings = this._settingsFor.get(wireid);
-        const display3vl = this.model._circuit._display3vl;
-        const base_sel = wire.get('bits') > 1 ? this._baseSelectorMarkup(display3vl, wire.get('bits'), settings.base) : '';
+        const display4vl = this.model._circuit._display4vl;
+        const base_sel = wire.get('bits') > 1 ? this._baseSelectorMarkup(display4vl, wire.get('bits'), settings.base) : '';
         const trigger = wire.get('bits') > 1 ? this._busTriggerMarkup : this._bitTriggerMarkup;
         const row = $('<tr><td class="name"></td><td>'+base_sel+'</td><td>'+trigger+'</td><td>'+this._removeButtonMarkup+'</td><td><canvas class="wavecanvas" height="30" draggable="true"></canvas></td></tr>');
         row.attr('wireid', wireid);
