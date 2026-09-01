@@ -1,5 +1,5 @@
 diff --git a/node_modules/digitaljs/lib/cells.js b/node_modules/digitaljs/lib/cells.js
-index 2cd5a5d..047c3be 100644
+index 2cd5a5d..6f4d3e4 100644
 --- a/node_modules/digitaljs/lib/cells.js
 +++ b/node_modules/digitaljs/lib/cells.js
 @@ -124,3 +124,25 @@ Object.keys(_display).forEach(function (key) {
@@ -28,6 +28,7 @@ index 2cd5a5d..047c3be 100644
 +    }
 +  });
 +});
+\ No newline at end of file
 diff --git a/node_modules/digitaljs/lib/cells/arith.js b/node_modules/digitaljs/lib/cells/arith.js
 index 82c329f..563dab4 100644
 --- a/node_modules/digitaljs/lib/cells/arith.js
@@ -651,7 +652,7 @@ index 5ade418..e8c1847 100644
          z.addClass('flash');
        }, 10);
 diff --git a/node_modules/digitaljs/lib/cells/mux.js b/node_modules/digitaljs/lib/cells/mux.js
-index 1db63cf..2f4499f 100644
+index 1db63cf..df7474e 100644
 --- a/node_modules/digitaljs/lib/cells/mux.js
 +++ b/node_modules/digitaljs/lib/cells/mux.js
 @@ -6,7 +6,7 @@ Object.defineProperty(exports, "__esModule", {
@@ -672,6 +673,24 @@ index 1db63cf..2f4499f 100644
      };
      return {
        out: data['in' + i]
+@@ -196,7 +196,7 @@ const MuxSparse = exports.MuxSparse = GenMux.define('MuxSparse', {
+ }, {
+   initialize() {
+     const inputs = this.get('inputs');
+-    for (let i = 0; i < inputs.length; i++) if (typeof inputs[i] != 'bigint') inputs[i] = BigInt(inputs[i]);
++    this._inputsBigInt = inputs.map(x => typeof x === 'bigint' ? x : BigInt(x));
+     GenMux.prototype.initialize.apply(this, arguments);
+   },
+   muxInputs(n) {
+@@ -205,7 +205,7 @@ const MuxSparse = exports.MuxSparse = GenMux.define('MuxSparse', {
+   muxInput(i) {
+     const deflt = this.get('default_input');
+     if (!i.isFullyDefined) return undefined;
+-    const idx = this.get('inputs').indexOf(i.toBigInt());
++    const idx = this._inputsBigInt.indexOf(i.toBigInt());
+     return idx < 0 ? deflt ? 0 : undefined : deflt ? idx + 1 : idx;
+   },
+   _gateParams: GenMux.prototype._gateParams.concat(['inputs', 'default_input']),
 diff --git a/node_modules/digitaljs/lib/cells/tribuf.js b/node_modules/digitaljs/lib/cells/tribuf.js
 new file mode 100644
 index 0000000..8fcbd34
@@ -1861,7 +1880,7 @@ index fb7f101..b69a1f4 100644
                  .removeClass('flash');
              setTimeout(() => { z.addClass('flash') }, 10);
 diff --git a/node_modules/digitaljs/src/cells/mux.mjs b/node_modules/digitaljs/src/cells/mux.mjs
-index a8e6a67..7a10722 100644
+index a8e6a67..2302ada 100644
 --- a/node_modules/digitaljs/src/cells/mux.mjs
 +++ b/node_modules/digitaljs/src/cells/mux.mjs
 @@ -2,7 +2,7 @@
@@ -1882,6 +1901,26 @@ index a8e6a67..7a10722 100644
          return { out: data['in' + i] };
      },
      getLayoutSize() {
+@@ -165,9 +165,7 @@ export const MuxSparse = GenMux.define('MuxSparse', {
+ }, {
+     initialize() {
+         const inputs = this.get('inputs');
+-        for (let i = 0; i < inputs.length; i++)
+-            if (typeof inputs[i] != 'bigint')
+-                inputs[i] = BigInt(inputs[i]);
++        this._inputsBigInt = inputs.map(x => typeof x === 'bigint' ? x : BigInt(x));
+         GenMux.prototype.initialize.apply(this, arguments);
+     },
+     muxInputs(n) {
+@@ -179,7 +177,7 @@ export const MuxSparse = GenMux.define('MuxSparse', {
+     muxInput(i) {
+         const deflt = this.get('default_input');
+         if (!i.isFullyDefined) return undefined;
+-        const idx = this.get('inputs').indexOf(i.toBigInt());
++        const idx = this._inputsBigInt.indexOf(i.toBigInt());
+         return idx < 0 ? (deflt ? 0 : undefined) : (deflt ? idx + 1 : idx);
+     },
+     _gateParams: GenMux.prototype._gateParams.concat(['inputs', 'default_input']),
 diff --git a/node_modules/digitaljs/src/cells/tribuf.mjs b/node_modules/digitaljs/src/cells/tribuf.mjs
 new file mode 100644
 index 0000000..66fbf33

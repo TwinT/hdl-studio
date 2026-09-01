@@ -273,6 +273,35 @@ describe('digitaljs cell operation() z-input safety', function () {
             '_gateParams, WorkerEngine reconstructs the cell without it and ' +
             'operation() silently computes a 0-bit vector for a disabled driver');
     });
+
+    // Regression: MuxSparse.initialize() used to mutate its own 'inputs'
+    // attribute in place, converting every element from Number to BigInt
+    // (needed so muxInput()'s .indexOf(i.toBigInt()) comparison works).
+    // 'inputs' is listed in _gateParams, so getGateParams()/circuit.toJSON()
+    // returned that same corrupted BigInt array - and view/main.mjs sends
+    // circuit.toJSON() to the extension host via vscode.postMessage(), which
+    // JSON.stringifies in the webview and throws "Do not know how to
+    // serialize a BigInt" the moment any MuxSparse device exists (e.g. a
+    // wide sparse case/dispatch, like control_unit.sv's opcode switch).
+    // Fixed by keeping the BigInt-converted values in a private instance
+    // field instead of mutating the serializable attribute.
+    it('MuxSparse keeps inputs as plain Numbers in its gate params (JSON-serializable for postMessage)', function () {
+        const dev = new cells.MuxSparse({
+            id: 'm1', type: 'MuxSparse',
+            bits: { in: 4, sel: 7 },
+            inputs: [1, 2, 3],
+            default_input: false
+        });
+        const params = dev.getGateParams();
+        for (const v of params.inputs)
+            assert.strictEqual(typeof v, 'number',
+                'MuxSparse.initialize() must not mutate the serializable "inputs" ' +
+                'attribute into BigInt - it gets sent to the webview via ' +
+                'circuit.toJSON() -> postMessage, which JSON.stringifies and ' +
+                'throws on BigInt');
+        assert.deepStrictEqual(params.inputs, [1, 2, 3]);
+        assert.doesNotThrow(() => JSON.stringify(params));
+    });
 });
 
 // step 5 of 4VL_INTEGRATION_PLAN.md - a 4th visual state for Z in wire/lamp/
