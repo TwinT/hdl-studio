@@ -4,3 +4,10 @@ node_modules
 .vscode-test-web/
 *.vsix
 obj_dir/
+
+
+graphify-out/cost.json
+graphify-out/cache/
+graphify-out/.graphify_labels.json
+.graphify_python
+.graphify_root

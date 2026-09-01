@@ -671,3 +671,74 @@ isolate the trigger by hand if it recurs, and to exercise `TriMerge` with
 combinations all resolve as expected). `test:pipeline`: 37/37 (up from 31,
 new fixtures × plain/techmap). Still unverified: whether the fix actually
 resolves the crash in the real webview — that needs the user to retest F5.
+
+## Post-plan: TriMerge not letting the enabled driver win (2026-09-01)
+
+The user re-ran F5 on the new `tribuf_single`/`tribuf_bus2` fixtures. First
+crash (a device with `type: 'Tribuf'` had no matching cell in `digitaljs`'s
+`_cells`, so `getCellType` fell through to `Subcircuit` and recursed into
+`subcircuits[undefined]`) turned out to be a `node_modules` install-state
+problem, not a code bug: `patch-package`'s postinstall step had silently
+failed for `digitaljs` (a stale/partial `node_modules/digitaljs` left over
+from an earlier interrupted `npm install`, same root cause as an unrelated
+`@twint/4vl` resolution error hit the same day). Fixed by `rm -rf
+node_modules && npm install`, no source change needed.
+
+The real bug came next, on `tribuf_bus2.sv`: with one driver disabled (z) and
+the other enabled and driving a real value, the merged bus should show the
+enabled driver's value — it didn't. `Tribuf.operation()` and
+`TriMerge._mergeTwo()` were re-verified correct (again) via `SynchEngine`/
+`HeadlessCircuit` against the exact generated JSON — every scenario resolved
+correctly there, same as step 2/3's original verification. The divergence
+was exactly the risk step 2's completion notes flagged and then didn't fully
+check: **`Tribuf` had no `_gateParams` override**, so it inherited the base
+`['label', 'type', 'propagation', 'source_positions']` — missing `bits`.
+Under `SynchEngine`, `operation()`'s `this.get('bits')` reads the live
+Backbone model and always works, masking the gap. Under the real webview's
+`WorkerEngine`, cells are reconstructed inside the worker from
+`getGateParams()`'s `pick(attributes, _gateParams)` — `bits` was dropped,
+so `this.get('bits')` was `undefined` there. `Vector4vl.zes(undefined)`
+(`bits = undefined | 0 = 0`) turned a disabled driver's output into a 0-bit
+vector instead of an N-bit all-z one; `TriMerge._mergeTwo` then read
+out-of-range `Uint32Array` entries off that vector as `0` (logic-0, not z),
+either collapsing the whole merge to 0 bits (disabled driver as `in0`) or
+forcing spurious contention (`x`) on bits where the real driver held a `1`.
+
+Fix: added `_gateParams: Box.prototype._gateParams.concat(['bits'])` (and
+the matching `_unsupportedPropChanges` entry, following every other
+`bits`-bearing cell's convention — `TriMerge`, `Memory`, `Fsm`, `Mux`,
+`Dff`, `io.mjs`'s `NumBase`) to `Tribuf` in both `src/cells/tribuf.mjs` and
+`lib/cells/tribuf.js`, then regenerated `patches/digitaljs+0.14.2.patch`.
+Regenerating it hit the *exact* `lib/cells.js` truncation bug this doc
+already names twice (steps 2 and 5) — a third recurrence, for the same
+reason: the working-tree `lib/cells.js` that a fresh `npm install` had
+produced was missing its final `});` (not just a trailing newline this
+time), because `patch-package`'s own patch-application step is what drops
+it, independent of anything this step edited. Fixed by hand-restoring the
+missing line, then regenerating from that corrected state — the doc's
+existing rule already covers this ("check trailing newlines on every file
+the patch touches before regenerating, not just the ones edited this
+step"); worth restating as **also check the file actually parses
+(`node --check`), not just that it ends in `\n`**, since a missing line can
+still leave a spurious trailing newline of its own.
+
+New regression test (`test/pipeline.spec.mjs`, `digitaljs cell operation()
+z-input safety` describe block): asserts `new
+cells.Tribuf({...}).getGateParams().bits === 4` directly, targeting the
+`_gateParams`/`getGateParams()` mechanism itself rather than re-testing
+`operation()`'s already-covered logic — confirmed it fails with the
+pre-fix code and passes with the fix. This is the check step 2's own
+completion notes said was needed ("the worker's cell-instantiation pattern
+needs checking, not assuming") but wasn't actually done for `Tribuf` at the
+time.
+
+Verified from a fresh `npm install`: `npx patch-package` shows
+`digitaljs@0.14.2 ✔` with no `.rej` files, `node --check` on both touched
+`lib/*.js` files, `npm run compile` (all 6 targets), `grep -c "'Tribuf'"
+dist/view-bundle.js dist/digitaljs-sym-worker.js` (1 each), a hand-built
+worker-side reconstruction (`getGateParams()` → plain object → `operation()`
+→ `TriMerge.operation()`) confirming `1010` merges correctly with a `zzzz`
+disabled driver, `npm run test:pipeline` (38/38), `npm run lint` (62
+warnings, unchanged baseline). Still outstanding: the user retesting F5 on
+`tribuf_bus2.sv` itself — every check here is headless, same caveat as
+every other step in this plan.

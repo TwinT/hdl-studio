@@ -1,0 +1,602 @@
+{
+  ".claude/settings.local.json": {
+    "mtime": 1788265444.8082833,
+    "seen": 1788266061.0732613,
+    "ast_hash": "5a11c8c4b2bb1f6488df27cdbde30e9c",
+    "semantic_hash": "5a11c8c4b2bb1f6488df27cdbde30e9c"
+  },
+  ".vscode/extensions.json": {
+    "mtime": 1781621918.2933059,
+    "seen": 1788266061.0732648,
+    "ast_hash": "ce7fd4805d817097687ebf2d711ec1d4",
+    "semantic_hash": "ce7fd4805d817097687ebf2d711ec1d4"
+  },
+  ".vscode/launch.json": {
+    "mtime": 1782310814.83756,
+    "seen": 1788266061.0732665,
+    "ast_hash": "d761f7e02fb5bb75d2d1e455c839fd57",
+    "semantic_hash": "d761f7e02fb5bb75d2d1e455c839fd57"
+  },
+  "eslint.config.js": {
+    "mtime": 1782846140.2836676,
+    "seen": 1788266061.0732672,
+    "ast_hash": "313a5493bd78af8ee5eed8f1a8653f90",
+    "semantic_hash": "313a5493bd78af8ee5eed8f1a8653f90"
+  },
+  "jsconfig.json": {
+    "mtime": 1781621918.295424,
+    "seen": 1788266061.0732677,
+    "ast_hash": "43807a178e085202a31bfccc66242ab9",
+    "semantic_hash": "43807a178e085202a31bfccc66242ab9"
+  },
+  "lib/image_formats.mjs": {
+    "mtime": 1781621918.295424,
+    "seen": 1788266061.0732684,
+    "ast_hash": "aac08dfc327b29d7743e0927265efabf",
+    "semantic_hash": "aac08dfc327b29d7743e0927265efabf"
+  },
+  "package.json": {
+    "mtime": 1788261313.7296245,
+    "seen": 1788266061.0732691,
+    "ast_hash": "2f24639cab7b70a894c271471f120960",
+    "semantic_hash": "2f24639cab7b70a894c271471f120960"
+  },
+  "src/circuit_view.mjs": {
+    "mtime": 1782917661.420052,
+    "seen": 1788266061.0732698,
+    "ast_hash": "65e3b1f573fedb259365e84694c0688a",
+    "semantic_hash": "65e3b1f573fedb259365e84694c0688a"
+  },
+  "src/document.mjs": {
+    "mtime": 1785954363.6932049,
+    "seen": 1788266061.0732703,
+    "ast_hash": "f53946791eb9bddf470fb2b0818b06f8",
+    "semantic_hash": "f53946791eb9bddf470fb2b0818b06f8"
+  },
+  "src/editor.mjs": {
+    "mtime": 1782310780.5174267,
+    "seen": 1788266061.0732708,
+    "ast_hash": "9ef0ac35ea46752075717f83170aa63c",
+    "semantic_hash": "9ef0ac35ea46752075717f83170aa63c"
+  },
+  "src/extension.mjs": {
+    "mtime": 1788195784.4210072,
+    "seen": 1788266061.0732715,
+    "ast_hash": "f143bd765b13d150f0f66b3dca63a8b8",
+    "semantic_hash": "f143bd765b13d150f0f66b3dca63a8b8"
+  },
+  "src/files_view.mjs": {
+    "mtime": 1785950037.8752396,
+    "seen": 1788266061.0732722,
+    "ast_hash": "44e4bf9b120e311dc447974432def124",
+    "semantic_hash": "44e4bf9b120e311dc447974432def124"
+  },
+  "src/lua_terminal.mjs": {
+    "mtime": 1782310780.5176136,
+    "seen": 1788266061.073273,
+    "ast_hash": "e6539bb894af68af7e1753f69ea7d810",
+    "semantic_hash": "e6539bb894af68af7e1753f69ea7d810"
+  },
+  "src/repl.mjs": {
+    "mtime": 1781621918.3351655,
+    "seen": 1788266061.0732734,
+    "ast_hash": "2da743d6c5dde7c0b373809c1075f1ea",
+    "semantic_hash": "2da743d6c5dde7c0b373809c1075f1ea"
+  },
+  "src/repl_history.mjs": {
+    "mtime": 1781621918.3361654,
+    "seen": 1788266061.0732741,
+    "ast_hash": "0cb598c5d8d8a4964fbd29ef6f84cb1a",
+    "semantic_hash": "0cb598c5d8d8a4964fbd29ef6f84cb1a"
+  },
+  "src/requests.mjs": {
+    "mtime": 1788194798.5028214,
+    "seen": 1788266061.0732746,
+    "ast_hash": "2de11efa3149f440b9d70261654b5f29",
+    "semantic_hash": "2de11efa3149f440b9d70261654b5f29"
+  },
+  "src/sources.mjs": {
+    "mtime": 1788194782.1627216,
+    "seen": 1788266061.073275,
+    "ast_hash": "d6f4fc2ce4a12dd736507e2548b3b674",
+    "semantic_hash": "d6f4fc2ce4a12dd736507e2548b3b674"
+  },
+  "src/status_provider.mjs": {
+    "mtime": 1781621918.3361654,
+    "seen": 1788266061.0732756,
+    "ast_hash": "d18e56f0e71f2137f0e78e23b9c14fb2",
+    "semantic_hash": "d18e56f0e71f2137f0e78e23b9c14fb2"
+  },
+  "src/synth_provider.mjs": {
+    "mtime": 1785943428.5728889,
+    "seen": 1788266061.0732765,
+    "ast_hash": "81279f8cf5fe9b4359530338f3374160",
+    "semantic_hash": "81279f8cf5fe9b4359530338f3374160"
+  },
+  "src/unicode_utils.mjs": {
+    "mtime": 1781621918.3361654,
+    "seen": 1788266061.073277,
+    "ast_hash": "f8691ba9803dd0a955e46d5705c1dfb7",
+    "semantic_hash": "f8691ba9803dd0a955e46d5705c1dfb7"
+  },
+  "src/utils.mjs": {
+    "mtime": 1781621918.3361654,
+    "seen": 1788266061.0732775,
+    "ast_hash": "23e675fc579d4494bab1f090abc78f3b",
+    "semantic_hash": "23e675fc579d4494bab1f090abc78f3b"
+  },
+  "src/webview_msg_queue.mjs": {
+    "mtime": 1781621918.3361654,
+    "seen": 1788266061.073278,
+    "ast_hash": "693652eac5ffcc6971437dcee263735c",
+    "semantic_hash": "693652eac5ffcc6971437dcee263735c"
+  },
+  "src/yosys_script.mjs": {
+    "mtime": 1788261313.7306244,
+    "seen": 1788266061.0732787,
+    "ast_hash": "24d70abd5a4431e3050bf847b5b1f6cf",
+    "semantic_hash": "24d70abd5a4431e3050bf847b5b1f6cf"
+  },
+  "test/pipeline.spec.mjs": {
+    "mtime": 1788265205.9822526,
+    "seen": 1788266061.0732791,
+    "ast_hash": "cb966f0624e82e4d52b8e7498c91315f",
+    "semantic_hash": "cb966f0624e82e4d52b8e7498c91315f"
+  },
+  "test/runTest.js": {
+    "mtime": 1781621918.3361654,
+    "seen": 1788266061.07328,
+    "ast_hash": "9acd8f33e76e6482982b06e51c631c87",
+    "semantic_hash": "9acd8f33e76e6482982b06e51c631c87"
+  },
+  "test/suite/extension.test.js": {
+    "mtime": 1781621918.3371987,
+    "seen": 1788266061.0732806,
+    "ast_hash": "4dcc7ec6c623478cba86fb785b5e57df",
+    "semantic_hash": "4dcc7ec6c623478cba86fb785b5e57df"
+  },
+  "test/suite/index.js": {
+    "mtime": 1782846109.9193826,
+    "seen": 1788266061.073281,
+    "ast_hash": "e2dbacc92b591dc1d7460998b7113ce0",
+    "semantic_hash": "e2dbacc92b591dc1d7460998b7113ce0"
+  },
+  "test/verilog/01_sr_latch/01_sr_latch.sv": {
+    "mtime": 1782827610.9790642,
+    "seen": 1788266061.0732818,
+    "ast_hash": "dae387ff4ec0b05f91ff91c311dcc6e4",
+    "semantic_hash": "dae387ff4ec0b05f91ff91c311dcc6e4"
+  },
+  "test/verilog/01_sr_latch/sr_latch_sim.lua": {
+    "mtime": 1785957589.9626305,
+    "seen": 1788266061.0732822,
+    "ast_hash": "7fa1726582c0c0a6c4e05a88bd5be5bc",
+    "semantic_hash": "7fa1726582c0c0a6c4e05a88bd5be5bc"
+  },
+  "test/verilog/02_d_latch/02_d_latch.sv": {
+    "mtime": 1782827624.9044826,
+    "seen": 1788266061.0732827,
+    "ast_hash": "7f4fb364bc4b21d4a937060c713f9f99",
+    "semantic_hash": "7f4fb364bc4b21d4a937060c713f9f99"
+  },
+  "test/verilog/02_d_latch/d_latch_sim.lua": {
+    "mtime": 1785957595.5767279,
+    "seen": 1788266061.0732834,
+    "ast_hash": "a8c31492f7a1d6259d86936f5737acb9",
+    "semantic_hash": "a8c31492f7a1d6259d86936f5737acb9"
+  },
+  "test/verilog/03_full_adder/03_full_adder.sv": {
+    "mtime": 1782827635.4971411,
+    "seen": 1788266061.073284,
+    "ast_hash": "a3f92d0f28112073d22b90e5cf4e71e5",
+    "semantic_hash": "a3f92d0f28112073d22b90e5cf4e71e5"
+  },
+  "test/verilog/03_full_adder/full_adder_sim.lua": {
+    "mtime": 1785957603.3867857,
+    "seen": 1788266061.0732844,
+    "ast_hash": "637d7156e84856e71918b213d9241278",
+    "semantic_hash": "637d7156e84856e71918b213d9241278"
+  },
+  "test/verilog/04_counter/04_counter.sv": {
+    "mtime": 1782827647.8831797,
+    "seen": 1788266061.073285,
+    "ast_hash": "7c561d091204ba2eae5f8e4e869455a1",
+    "semantic_hash": "7c561d091204ba2eae5f8e4e869455a1"
+  },
+  "test/verilog/04_counter/counter_sim.lua": {
+    "mtime": 1785957612.148148,
+    "seen": 1788266061.0732856,
+    "ast_hash": "1a3f4925fe8457d3b4ec29eeb1afa980",
+    "semantic_hash": "1a3f4925fe8457d3b4ec29eeb1afa980"
+  },
+  "test/verilog/05_lfsr/05_lfsr.sv": {
+    "mtime": 1782827660.299218,
+    "seen": 1788266061.073286,
+    "ast_hash": "adf1edeef697e4ee96b5583b8ee2b336",
+    "semantic_hash": "adf1edeef697e4ee96b5583b8ee2b336"
+  },
+  "test/verilog/05_lfsr/lfsr_sim.lua": {
+    "mtime": 1785957616.3229098,
+    "seen": 1788266061.0732868,
+    "ast_hash": "f0d6dd0478771e7e808ad0917c8a5d4c",
+    "semantic_hash": "f0d6dd0478771e7e808ad0917c8a5d4c"
+  },
+  "test/verilog/06_ram/06_ram.sv": {
+    "mtime": 1782827671.9515765,
+    "seen": 1788266061.0732872,
+    "ast_hash": "9611e3a66a9a22e0b2c268764763212d",
+    "semantic_hash": "9611e3a66a9a22e0b2c268764763212d"
+  },
+  "test/verilog/06_ram/ram_sim.lua": {
+    "mtime": 1785957625.1369457,
+    "seen": 1788266061.073288,
+    "ast_hash": "fff75c72ab19e48f31f55c7a209d3602",
+    "semantic_hash": "fff75c72ab19e48f31f55c7a209d3602"
+  },
+  "test/verilog/07_rom/07_rom.sv": {
+    "mtime": 1782844829.791318,
+    "seen": 1788266061.0732884,
+    "ast_hash": "8910e145f00e53ffa5064162a7e01bb4",
+    "semantic_hash": "8910e145f00e53ffa5064162a7e01bb4"
+  },
+  "test/verilog/07_rom/rom_sim.lua": {
+    "mtime": 1785957629.703177,
+    "seen": 1788266061.073289,
+    "ast_hash": "b6b7aa18519dff8038c6d1ac2623740a",
+    "semantic_hash": "b6b7aa18519dff8038c6d1ac2623740a"
+  },
+  "test/verilog/08_contador_decadas/08_contador_decadas.sv": {
+    "mtime": 1782843822.930609,
+    "seen": 1788266061.0732894,
+    "ast_hash": "d710b145fb47aa201c5691a3d636d922",
+    "semantic_hash": "d710b145fb47aa201c5691a3d636d922"
+  },
+  "test/verilog/08_contador_decadas/contador_decadas_sim.lua": {
+    "mtime": 1785957635.188949,
+    "seen": 1788266061.0732899,
+    "ast_hash": "6d1868772d22db8cb1f6f8f5c9bef753",
+    "semantic_hash": "6d1868772d22db8cb1f6f8f5c9bef753"
+  },
+  "test/verilog/alu/alu.sv": {
+    "mtime": 1785873043.5671067,
+    "seen": 1788266061.073291,
+    "ast_hash": "09ec803b70ac5a302be361f6786e8753",
+    "semantic_hash": "09ec803b70ac5a302be361f6786e8753"
+  },
+  "test/verilog/alu/alu_if.sv": {
+    "mtime": 1785873043.5672953,
+    "seen": 1788266061.0732915,
+    "ast_hash": "f224f2c7b3cc7fb21ba6d0104342aba9",
+    "semantic_hash": "f224f2c7b3cc7fb21ba6d0104342aba9"
+  },
+  "test/verilog/alu/fsm.sv": {
+    "mtime": 1785873043.5674784,
+    "seen": 1788266061.073292,
+    "ast_hash": "84019c19429a03ba43ed503c73337ecd",
+    "semantic_hash": "84019c19429a03ba43ed503c73337ecd"
+  },
+  "test/verilog/alu/reg_file.sv": {
+    "mtime": 1785873043.6879444,
+    "seen": 1788266061.0732927,
+    "ast_hash": "3baefd2518b6b52f3c2b1be1665a5730",
+    "semantic_hash": "3baefd2518b6b52f3c2b1be1665a5730"
+  },
+  "test/verilog/alu/sim_main.cpp": {
+    "mtime": 1785873043.6883552,
+    "seen": 1788266061.0732932,
+    "ast_hash": "232dfc53b947b3bb12c9e09652845173",
+    "semantic_hash": "232dfc53b947b3bb12c9e09652845173"
+  },
+  "test/verilog/alu/top_module.sv": {
+    "mtime": 1785873043.6887772,
+    "seen": 1788266061.073294,
+    "ast_hash": "ba65de76a55bb2ce59045cb620440c6c",
+    "semantic_hash": "ba65de76a55bb2ce59045cb620440c6c"
+  },
+  "test/verilog/alu/top_module_tb.sv": {
+    "mtime": 1785873043.688979,
+    "seen": 1788266061.0732944,
+    "ast_hash": "8adf50dcdf075351ff8e8face6aafa82",
+    "semantic_hash": "8adf50dcdf075351ff8e8face6aafa82"
+  },
+  "test/verilog/alu/tp1_pkg.sv": {
+    "mtime": 1785873043.6891618,
+    "seen": 1788266061.0732949,
+    "ast_hash": "934448fe0f0a0ca9fc6373b61a767afb",
+    "semantic_hash": "934448fe0f0a0ca9fc6373b61a767afb"
+  },
+  "test/verilog/bus_top/bus_top.sv": {
+    "mtime": 1788261313.7306244,
+    "seen": 1788266061.0732954,
+    "ast_hash": "cf07b196cf4994bdc475a68373798d2c",
+    "semantic_hash": "cf07b196cf4994bdc475a68373798d2c"
+  },
+  "test/verilog/bus_top/bus_top_sim.lua": {
+    "mtime": 1788261313.73151,
+    "seen": 1788266061.073296,
+    "ast_hash": "920a22ef8394a2d12287747f9780cbd8",
+    "semantic_hash": "920a22ef8394a2d12287747f9780cbd8"
+  },
+  "test/verilog/control_unit/rtl/control_unit.sv": {
+    "mtime": 1788196880.776589,
+    "seen": 1788266061.0732965,
+    "ast_hash": "da2d99facca1022e558a7cfc3b4af45a",
+    "semantic_hash": "da2d99facca1022e558a7cfc3b4af45a"
+  },
+  "test/verilog/memory/memory.sv": {
+    "mtime": 1788200246.4113855,
+    "seen": 1788266061.0732973,
+    "ast_hash": "08c78f0e86a3383ff8187fb165e412d0",
+    "semantic_hash": "08c78f0e86a3383ff8187fb165e412d0"
+  },
+  "test/verilog/micro/alu.sv": {
+    "mtime": 1788261313.73151,
+    "seen": 1788266061.0732977,
+    "ast_hash": "4347d3b21f5b56b9df86f5ef701cdd5f",
+    "semantic_hash": "4347d3b21f5b56b9df86f5ef701cdd5f"
+  },
+  "test/verilog/micro/branch_unit.sv": {
+    "mtime": 1788261313.7316535,
+    "seen": 1788266061.0732982,
+    "ast_hash": "61b70fae1732cc5b49f6f97e3cb363c0",
+    "semantic_hash": "61b70fae1732cc5b49f6f97e3cb363c0"
+  },
+  "test/verilog/micro/control_unit.sv": {
+    "mtime": 1788261313.7316535,
+    "seen": 1788266061.073299,
+    "ast_hash": "23e026da3e694aeae7e0c871a284eedf",
+    "semantic_hash": "23e026da3e694aeae7e0c871a284eedf"
+  },
+  "test/verilog/micro/datapath.sv": {
+    "mtime": 1788261313.7316535,
+    "seen": 1788266061.0732994,
+    "ast_hash": "b25f18e83dba150e20a466de8afa8118",
+    "semantic_hash": "b25f18e83dba150e20a466de8afa8118"
+  },
+  "test/verilog/micro/decoder.sv": {
+    "mtime": 1788261313.7316535,
+    "seen": 1788266061.0733,
+    "ast_hash": "71bd8cae4f06ed40444dc205fec05f4b",
+    "semantic_hash": "71bd8cae4f06ed40444dc205fec05f4b"
+  },
+  "test/verilog/micro/ir.sv": {
+    "mtime": 1788261313.7316535,
+    "seen": 1788266061.0733004,
+    "ast_hash": "50709011f0b96f62dd6debd4e17849ec",
+    "semantic_hash": "50709011f0b96f62dd6debd4e17849ec"
+  },
+  "test/verilog/micro/load_unit.sv": {
+    "mtime": 1788261313.7316535,
+    "seen": 1788266061.0733013,
+    "ast_hash": "eb8d021708d3bdfc23cf1deea461b1f2",
+    "semantic_hash": "eb8d021708d3bdfc23cf1deea461b1f2"
+  },
+  "test/verilog/micro/memory.sv": {
+    "mtime": 1788261313.7316535,
+    "seen": 1788266061.0733018,
+    "ast_hash": "08c78f0e86a3383ff8187fb165e412d0",
+    "semantic_hash": "08c78f0e86a3383ff8187fb165e412d0"
+  },
+  "test/verilog/micro/pc.sv": {
+    "mtime": 1788261313.7316535,
+    "seen": 1788266061.0733023,
+    "ast_hash": "c071b9e022a93ae7217b7cdaa17ea18d",
+    "semantic_hash": "c071b9e022a93ae7217b7cdaa17ea18d"
+  },
+  "test/verilog/micro/register_file.sv": {
+    "mtime": 1788261313.7316535,
+    "seen": 1788266061.0733027,
+    "ast_hash": "0eaedc66609cdf7b94f3f4d0596b89cd",
+    "semantic_hash": "0eaedc66609cdf7b94f3f4d0596b89cd"
+  },
+  "test/verilog/micro/store_unit.sv": {
+    "mtime": 1788261313.7316535,
+    "seen": 1788266061.0733035,
+    "ast_hash": "83fb8b42386494cb6347f70a2b9f92e0",
+    "semantic_hash": "83fb8b42386494cb6347f70a2b9f92e0"
+  },
+  "test/verilog/tribuf_bus2/tribuf_bus2.sv": {
+    "mtime": 1788261313.7316535,
+    "seen": 1788266061.0733042,
+    "ast_hash": "6de1ece71e5ea697585a939f23c248f0",
+    "semantic_hash": "6de1ece71e5ea697585a939f23c248f0"
+  },
+  "test/verilog/tribuf_bus2/tribuf_bus2_sim.lua": {
+    "mtime": 1788261313.7323864,
+    "seen": 1788266061.0733047,
+    "ast_hash": "6b106c2ed1b0fb37d17546116b1897a7",
+    "semantic_hash": "6b106c2ed1b0fb37d17546116b1897a7"
+  },
+  "test/verilog/tribuf_bus3/tribuf_bus3.sv": {
+    "mtime": 1788261313.7323864,
+    "seen": 1788266061.0733051,
+    "ast_hash": "bc4241e8de94d5761aabfd0d9648b34d",
+    "semantic_hash": "bc4241e8de94d5761aabfd0d9648b34d"
+  },
+  "test/verilog/tribuf_bus3/tribuf_bus3_sim.lua": {
+    "mtime": 1788261313.732517,
+    "seen": 1788266061.0733058,
+    "ast_hash": "91e7a90e363bf29473ef01c4e1aca71a",
+    "semantic_hash": "91e7a90e363bf29473ef01c4e1aca71a"
+  },
+  "test/verilog/tribuf_single/tribuf_single.sv": {
+    "mtime": 1788261313.732517,
+    "seen": 1788266061.0733063,
+    "ast_hash": "f91b83a23a486ce4fccf56bcc5ce56d2",
+    "semantic_hash": "f91b83a23a486ce4fccf56bcc5ce56d2"
+  },
+  "test/verilog/tribuf_single/tribuf_single_sim.lua": {
+    "mtime": 1788261313.7326517,
+    "seen": 1788266061.0733068,
+    "ast_hash": "0e4516597cf9dc0bad7ed4bf106ae8d2",
+    "semantic_hash": "0e4516597cf9dc0bad7ed4bf106ae8d2"
+  },
+  "view/imgutils.mjs": {
+    "mtime": 1782310814.870039,
+    "seen": 1788266061.0733073,
+    "ast_hash": "fe7f4d97fedd674c472e385c87945c19",
+    "semantic_hash": "fe7f4d97fedd674c472e385c87945c19"
+  },
+  "view/iopanel.mjs": {
+    "mtime": 1788261313.7326517,
+    "seen": 1788266061.073308,
+    "ast_hash": "c8c46c1984a3fffaab6d70df783d7bb1",
+    "semantic_hash": "c8c46c1984a3fffaab6d70df783d7bb1"
+  },
+  "view/main.mjs": {
+    "mtime": 1788261313.7326517,
+    "seen": 1788266061.0733087,
+    "ast_hash": "7e28584add8ec8b35e57497f594a12c7",
+    "semantic_hash": "7e28584add8ec8b35e57497f594a12c7"
+  },
+  "view/monitor.mjs": {
+    "mtime": 1788261313.7326517,
+    "seen": 1788266061.0733092,
+    "ast_hash": "b85788437bd3bcd93a09894d95139f4f",
+    "semantic_hash": "b85788437bd3bcd93a09894d95139f4f"
+  },
+  "view/status_view.mjs": {
+    "mtime": 1788261313.7326517,
+    "seen": 1788266061.0733097,
+    "ast_hash": "07b84167cc6c04772841f1f725910de2",
+    "semantic_hash": "07b84167cc6c04772841f1f725910de2"
+  },
+  "view/synth_view.mjs": {
+    "mtime": 1785942239.0395527,
+    "seen": 1788266061.0733101,
+    "ast_hash": "0b79d0e9e20e75cb9b71099c3836cae8",
+    "semantic_hash": "0b79d0e9e20e75cb9b71099c3836cae8"
+  },
+  "view/touch-punch.mjs": {
+    "mtime": 1781621918.337887,
+    "seen": 1788266061.073311,
+    "ast_hash": "84bc5d6885b3eb7e248d13fe9e43f921",
+    "semantic_hash": "84bc5d6885b3eb7e248d13fe9e43f921"
+  },
+  "webpack.config.js": {
+    "mtime": 1782310814.852168,
+    "seen": 1788266061.0733116,
+    "ast_hash": "aa73d04a0e35a1681791b8c61a5db7d2",
+    "semantic_hash": "aa73d04a0e35a1681791b8c61a5db7d2"
+  },
+  "4VL_INTEGRATION_PLAN.md": {
+    "mtime": 1788265253.1441905,
+    "seen": 1788266061.073312,
+    "ast_hash": "6156c25a0ee8bd54d9d3d7327223e1d1",
+    "semantic_hash": "6156c25a0ee8bd54d9d3d7327223e1d1"
+  },
+  "CHANGELOG.md": {
+    "mtime": 1788200647.368495,
+    "seen": 1788266061.0733128,
+    "ast_hash": "c8a14ab50960edb4905c58089719ed98",
+    "semantic_hash": "c8a14ab50960edb4905c58089719ed98"
+  },
+  "CLAUDE.md": {
+    "mtime": 1785953029.921662,
+    "seen": 1788266061.0733132,
+    "ast_hash": "13106fda8b8617913987cbcc19a016b3",
+    "semantic_hash": "13106fda8b8617913987cbcc19a016b3"
+  },
+  "README.md": {
+    "mtime": 1785871623.6416535,
+    "seen": 1788266061.0733137,
+    "ast_hash": "a19ef45a62f8e8160d0e8a25e9e9b1e3",
+    "semantic_hash": "a19ef45a62f8e8160d0e8a25e9e9b1e3"
+  },
+  "TODO.md": {
+    "mtime": 1788202873.471017,
+    "seen": 1788266061.0733142,
+    "ast_hash": "2faece99775f8df9d69696b95a3cc86a",
+    "semantic_hash": "2faece99775f8df9d69696b95a3cc86a"
+  },
+  "imgs/hdl-studio.png": {
+    "mtime": 1782219901.8239155,
+    "seen": 1788266061.0733228,
+    "ast_hash": "450547893fe6a48bf26a5ce95999ea14",
+    "semantic_hash": "450547893fe6a48bf26a5ce95999ea14"
+  },
+  "imgs/hdl-studio.svg": {
+    "mtime": 1782310814.8376718,
+    "seen": 1788266061.0733244,
+    "ast_hash": "b16860e5e2e2f590cb961fea0ad1b63d",
+    "semantic_hash": "b16860e5e2e2f590cb961fea0ad1b63d"
+  },
+  "imgs/hdl-studio_mono.svg": {
+    "mtime": 1782310814.8377895,
+    "seen": 1788266061.0733252,
+    "ast_hash": "0c29a56aa970c07ba5657134fee58fad",
+    "semantic_hash": "0c29a56aa970c07ba5657134fee58fad"
+  },
+  "imgs/screenshots/code-highlight.png": {
+    "mtime": 1781621918.2942266,
+    "seen": 1788266061.0733259,
+    "ast_hash": "8bb5129abcedabf6aca9776dbfeba9c6",
+    "semantic_hash": "8bb5129abcedabf6aca9776dbfeba9c6"
+  },
+  "imgs/screenshots/create-circuit-src.png": {
+    "mtime": 1781621918.295424,
+    "seen": 1788266061.0733263,
+    "ast_hash": "067ecddae26c2c295e7780928dc0482a",
+    "semantic_hash": "067ecddae26c2c295e7780928dc0482a"
+  },
+  "imgs/screenshots/digitaljs-files-sidepanel.png": {
+    "mtime": 1781621918.295424,
+    "seen": 1788266061.0733268,
+    "ast_hash": "8299d754a12b0f46a932b30ae3b8facd",
+    "semantic_hash": "8299d754a12b0f46a932b30ae3b8facd"
+  },
+  "imgs/screenshots/lua-repl.png": {
+    "mtime": 1781621918.295424,
+    "seen": 1788266061.0733273,
+    "ast_hash": "ca69204449960c6e50a1b05f62b53056",
+    "semantic_hash": "ca69204449960c6e50a1b05f62b53056"
+  },
+  "view/scss/images/gutter-dark.png": {
+    "mtime": 1781621918.3377843,
+    "seen": 1788266061.0733278,
+    "ast_hash": "1a166cb1a9344a2a6b14afc3ef84f96b",
+    "semantic_hash": "1a166cb1a9344a2a6b14afc3ef84f96b"
+  },
+  "view/scss/images/gutter-light.png": {
+    "mtime": 1781621918.337887,
+    "seen": 1788266061.0733285,
+    "ast_hash": "0264356596756c55414bfa558ca273e2",
+    "semantic_hash": "0264356596756c55414bfa558ca273e2"
+  },
+  "view/scss/images/ui-icons_444444_256x240.png": {
+    "mtime": 1781621918.337887,
+    "seen": 1788266061.073329,
+    "ast_hash": "43731f4098bc029be8ba60689f6c70c5",
+    "semantic_hash": "43731f4098bc029be8ba60689f6c70c5"
+  },
+  "view/scss/images/ui-icons_555555_256x240.png": {
+    "mtime": 1781621918.337887,
+    "seen": 1788266061.0733297,
+    "ast_hash": "375667595338c6f9ec76487fa25c7aae",
+    "semantic_hash": "375667595338c6f9ec76487fa25c7aae"
+  },
+  "view/scss/images/ui-icons_777620_256x240.png": {
+    "mtime": 1781621918.337887,
+    "seen": 1788266061.0733302,
+    "ast_hash": "271f63073acc62a83769fdc79dcf0200",
+    "semantic_hash": "271f63073acc62a83769fdc79dcf0200"
+  },
+  "view/scss/images/ui-icons_777777_256x240.png": {
+    "mtime": 1781621918.337887,
+    "seen": 1788266061.0733306,
+    "ast_hash": "fef617b79c91905973f04bc14d1b91d6",
+    "semantic_hash": "fef617b79c91905973f04bc14d1b91d6"
+  },
+  "view/scss/images/ui-icons_cc0000_256x240.png": {
+    "mtime": 1781621918.337887,
+    "seen": 1788266061.0733314,
+    "ast_hash": "3106c10f5c4ae23507c80177151bdc3c",
+    "semantic_hash": "3106c10f5c4ae23507c80177151bdc3c"
+  },
+  "view/scss/images/ui-icons_ffffff_256x240.png": {
+    "mtime": 1781621918.337887,
+    "seen": 1788266061.073332,
+    "ast_hash": "30a8a9292ba4e121d0505d2b21fdb0bd",
+    "semantic_hash": "30a8a9292ba4e121d0505d2b21fdb0bd"
+  }
+}
