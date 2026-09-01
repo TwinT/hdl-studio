@@ -137,6 +137,33 @@ describe('Synthesis pipeline (yosys -> yosys2digitaljs)', function () {
         assert.strictEqual(merges[0].inputs, 2);
         assert.strictEqual(merges[0].bits, 4);
     });
+
+    // bmux_regfile.sv's q[] is populated by separate module instances (not a
+    // single memory-inferring write), so a dynamic read of q[raddr] compiles
+    // to a $bmux cell (word-wide binary-select) - but only through the
+    // read_slang frontend (the classic read_verilog frontend resolves the
+    // same RTL straight to $mux without ever producing $bmux, which is why
+    // the generic per-example loop above, run without useSlang, doesn't
+    // exercise this path). This is the only test in this suite that passes
+    // useSlang:true - the real extension always does when yosys has slang
+    // support (see src/requests.mjs's slang_available()), so this path
+    // matters even though nothing else here covers it.
+    it('converts bmux_regfile.sv ($bmux) via the read_slang frontend', function () {
+        const output = synth(path.join(verilogDir, 'bmux_regfile', 'bmux_regfile.sv'),
+                              { useSlang: true, top: 'bmux_regfile' });
+        const muxes = Object.values(output.devices).filter((d) => d.type === 'Mux' && d.bits.sel > 1);
+        assert.strictEqual(muxes.length, 1, 'expected exactly one wide (binary-select) Mux device');
+        assert.strictEqual(muxes[0].bits.sel, 2);
+        assert.strictEqual(muxes[0].bits.in, 8);
+
+        assert.ok(!Object.values(output.devices).some((d) => d.type === 'Mux1Hot'),
+                  '$bmux must not fall back to a one-hot Mux1Hot device');
+        assert.ok(!Object.values(output.devices).some((d) => d.type === 'BusGroup'),
+                  '$bmux\'s select is already a plain binary bus - no BusGroup should be needed');
+
+        const cellNames = Object.keys(output.subcircuits || {});
+        assert.strictEqual(cellNames.length, 4, 'expected 4 distinct bmux_regfile_cell subcircuits');
+    });
 });
 
 // A net with 2+ sources arises in practice via $tribuf (converted above, real

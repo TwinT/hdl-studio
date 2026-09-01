@@ -1,5 +1,5 @@
 diff --git a/node_modules/yosys2digitaljs/dist/core.js b/node_modules/yosys2digitaljs/dist/core.js
-index 7e927b4..6edbe99 100644
+index 7e927b4..3014fb2 100644
 --- a/node_modules/yosys2digitaljs/dist/core.js
 +++ b/node_modules/yosys2digitaljs/dist/core.js
 @@ -7,7 +7,7 @@ exports.prepare_yosys_script = prepare_yosys_script;
@@ -19,7 +19,15 @@ index 7e927b4..6edbe99 100644
      ['$and', 'And'],
      ['$nand', 'Nand'],
      ['$or', 'Or'],
-@@ -196,6 +197,7 @@ function order_ports(data) {
+@@ -80,6 +81,7 @@ const gate_subst = new Map([
+     ['$pow', 'Power'],
+     ['$mux', 'Mux'],
+     ['$pmux', 'Mux1Hot'],
++    ['$bmux', 'Mux'],
+     ['$mem', 'Memory'],
+     ['$mem_v2', 'Memory'],
+     ['$lut', 'Memory'],
+@@ -196,6 +198,7 @@ function order_ports(data) {
      const binmap = { A: 'in1', B: 'in2', Y: 'out' };
      const out = {
          '$mux': { A: 'in0', B: 'in1', S: 'sel', Y: 'out' },
@@ -27,7 +35,7 @@ index 7e927b4..6edbe99 100644
          '$dff': { CLK: 'clk', D: 'in', Q: 'out' },
          '$dffe': { CLK: 'clk', EN: 'en', D: 'in', Q: 'out' },
          '$adff': { CLK: 'clk', ARST: 'arst', D: 'in', Q: 'out' },
-@@ -268,7 +270,10 @@ function parse_source_positions(str) {
+@@ -268,7 +271,10 @@ function parse_source_positions(str) {
          const colonIdx = entry.lastIndexOf(':');
          const name = entry.slice(0, colonIdx);
          const pos = entry.slice(colonIdx + 1);
@@ -39,7 +47,7 @@ index 7e927b4..6edbe99 100644
          ret.push({ name, from, to });
      }
      return ret;
-@@ -303,7 +308,7 @@ function yosys_to_digitaljs_mod(name, mod, portmaps, options = {}) {
+@@ -303,7 +309,7 @@ function yosys_to_digitaljs_mod(name, mod, portmaps, options = {}) {
          if (!nets.has(k)) {
              const nms = netnames.get(k);
              const src = netsrc.get(k);
@@ -48,7 +56,7 @@ index 7e927b4..6edbe99 100644
          }
          return nets.get(k);
      }
-@@ -311,11 +316,10 @@ function yosys_to_digitaljs_mod(name, mod, portmaps, options = {}) {
+@@ -311,11 +317,10 @@ function yosys_to_digitaljs_mod(name, mod, portmaps, options = {}) {
          if (k.length == 0)
              return; // for unconnected ports
          const net = get_net(k);
@@ -64,7 +72,7 @@ index 7e927b4..6edbe99 100644
          if (primary)
              for (const [nbit, bit] of k.entries()) {
                  bits.set(bit, { id: d, port: p, num: nbit });
-@@ -341,7 +345,7 @@ function yosys_to_digitaljs_mod(name, mod, portmaps, options = {}) {
+@@ -341,7 +346,7 @@ function yosys_to_digitaljs_mod(name, mod, portmaps, options = {}) {
          return dname;
      }
      function add_busgroup(nbits, groups) {
@@ -73,7 +81,23 @@ index 7e927b4..6edbe99 100644
              return; // the bits were already grouped
          const dname = add_device({
              type: 'BusGroup',
-@@ -469,7 +473,7 @@ function yosys_to_digitaljs_mod(name, mod, portmaps, options = {}) {
+@@ -376,6 +381,15 @@ function yosys_to_digitaljs_mod(name, mod, portmaps, options = {}) {
+             add_net_target(cell.connections.B.slice(p, p + decode_json_number(cell.parameters.WIDTH)), dname, 'in' + (i + 1));
+         }
+     }
++    function connect_bmux(dname, cell) {
++        const width = decode_json_number(cell.parameters.WIDTH);
++        const swidth = decode_json_number(cell.parameters.S_WIDTH);
++        add_net_target(cell.connections.S, dname, 'sel');
++        add_net_source(cell.connections.Y, dname, 'out', true);
++        for (const i of Array(1 << swidth).keys()) {
++            add_net_target(cell.connections.A.slice(i * width, (i + 1) * width), dname, 'in' + i);
++        }
++    }
+     function connect_mem(dname, cell, dev) {
+         for (const [k, port] of dev.rdports.entries()) {
+             const portname = "rd" + k;
+@@ -469,7 +483,7 @@ function yosys_to_digitaljs_mod(name, mod, portmaps, options = {}) {
                  const ccon = con.slice();
                  const pad = sig ? con.slice(-1)[0] : '0';
                  con.splice(con.length, 0, ...Array(sz - con.length).fill(pad));
@@ -82,7 +106,32 @@ index 7e927b4..6edbe99 100644
                      // WARNING: potentially troublesome hack for readability
                      // handled generally in the grouping phase,
                      // but it's hard to add sign extensions there
-@@ -841,7 +845,7 @@ function yosys_to_digitaljs_mod(name, mod, portmaps, options = {}) {
+@@ -717,6 +731,24 @@ function yosys_to_digitaljs_mod(name, mod, portmaps, options = {}) {
+                     sel: decode_json_number(cell.parameters.S_WIDTH)
+                 };
+                 break;
++            case '$bmux':
++                // $bmux: Y = A[S*WIDTH +: WIDTH] - a dynamic word-select out of a flat
++                // concatenated array A, indexed by a plain binary S (unlike $pmux's
++                // one-hot S). Maps onto digitaljs's existing generic Mux class, which
++                // already implements exactly this (2^sel binary-selected inputs) - no
++                // new digitaljs cell type needed, just wiring A's word-sized slices
++                // onto in0..in(2^S_WIDTH-1) (see connect_bmux).
++                assert(cell.connections.A.length == decode_json_number(cell.parameters.WIDTH) * (1 << decode_json_number(cell.parameters.S_WIDTH)));
++                assert(cell.connections.S.length == decode_json_number(cell.parameters.S_WIDTH));
++                assert(cell.connections.Y.length == decode_json_number(cell.parameters.WIDTH));
++                assert(cell.port_directions.A == 'input');
++                assert(cell.port_directions.S == 'input');
++                assert(cell.port_directions.Y == 'output');
++                dev.bits = {
++                    in: decode_json_number(cell.parameters.WIDTH),
++                    sel: decode_json_number(cell.parameters.S_WIDTH)
++                };
++                break;
+             case '$dff':
+                 dev.bits = decode_json_number(cell.parameters.WIDTH);
+                 dev.polarity = {
+@@ -841,7 +873,7 @@ function yosys_to_digitaljs_mod(name, mod, portmaps, options = {}) {
                      + decode_json_number(cell.parameters.CTRL_IN_WIDTH)
                      + decode_json_number(cell.parameters.CTRL_OUT_WIDTH);
                  const tt = typeof (cell.parameters.TRANS_TABLE) == "number"
@@ -91,7 +140,7 @@ index 7e927b4..6edbe99 100644
                      : cell.parameters.TRANS_TABLE;
                  assert(tt.length == TRANS_NUM * step);
                  dev.polarity = {
-@@ -915,12 +919,12 @@ function yosys_to_digitaljs_mod(name, mod, portmaps, options = {}) {
+@@ -915,12 +947,12 @@ function yosys_to_digitaljs_mod(name, mod, portmaps, options = {}) {
                  const rdsrst = v2_feature_const(cell.parameters.RD_SRST_VALUE, dev.bits * RD_PORTS);
                  if (cell.parameters.INIT) {
                      const l = init.slice(-1)[0] == 'x' ? 'x' : '0';
@@ -106,7 +155,7 @@ index 7e927b4..6edbe99 100644
                      }
                      dev.memdata = memdata.toJSON();
                  }
-@@ -998,6 +1002,11 @@ function yosys_to_digitaljs_mod(name, mod, portmaps, options = {}) {
+@@ -998,6 +1030,11 @@ function yosys_to_digitaljs_mod(name, mod, portmaps, options = {}) {
                  delete cell.connections.A;
                  delete cell.connections.Y;
                  break;
@@ -118,7 +167,16 @@ index 7e927b4..6edbe99 100644
              default:
          }
          if (dev.type == 'Dff') {
-@@ -1027,7 +1036,7 @@ function yosys_to_digitaljs_mod(name, mod, portmaps, options = {}) {
+@@ -1016,6 +1053,8 @@ function yosys_to_digitaljs_mod(name, mod, portmaps, options = {}) {
+             connect_device(dname, cell, portmap);
+         else if (cell.type == '$pmux')
+             connect_pmux(dname, cell);
++        else if (cell.type == '$bmux')
++            connect_bmux(dname, cell);
+         else if (cell.type == '$mem')
+             connect_mem(dname, cell, dev);
+         else if (cell.type == '$mem_v2')
+@@ -1027,7 +1066,7 @@ function yosys_to_digitaljs_mod(name, mod, portmaps, options = {}) {
      }
      // Group bits into nets for complex sources
      for (const [nbits, net] of nets.entries()) {
@@ -127,7 +185,7 @@ index 7e927b4..6edbe99 100644
              continue;
          const groups = [[]];
          let pbitinfo = undefined;
-@@ -1067,7 +1076,7 @@ function yosys_to_digitaljs_mod(name, mod, portmaps, options = {}) {
+@@ -1067,7 +1106,7 @@ function yosys_to_digitaljs_mod(name, mod, portmaps, options = {}) {
      }
      // Add constants
      for (const [nbits, net] of nets.entries()) {
@@ -136,7 +194,7 @@ index 7e927b4..6edbe99 100644
              continue;
          if (!nbits.every(constbit))
              continue;
-@@ -1080,7 +1089,7 @@ function yosys_to_digitaljs_mod(name, mod, portmaps, options = {}) {
+@@ -1080,7 +1119,7 @@ function yosys_to_digitaljs_mod(name, mod, portmaps, options = {}) {
      }
      // Select bits from complex targets
      for (const [nbits, net] of nets.entries()) {
@@ -145,7 +203,7 @@ index 7e927b4..6edbe99 100644
              continue;
          // constants should be already handled!
          assert(nbits.every(x => constbit(x) || (typeof x == 'number' && x > 1)));
-@@ -1102,17 +1111,28 @@ function yosys_to_digitaljs_mod(name, mod, portmaps, options = {}) {
+@@ -1102,17 +1141,28 @@ function yosys_to_digitaljs_mod(name, mod, portmaps, options = {}) {
          add_net_source(nbits, dname, 'out');
          add_net_target(cconn, dname, 'in');
      }
