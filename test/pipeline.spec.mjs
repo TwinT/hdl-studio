@@ -255,6 +255,24 @@ describe('digitaljs cell operation() z-input safety', function () {
         const withZ = dev.operation({ sel: Vector4vl.fromBin('z0'), ...inputs });
         assert.strictEqual(withZ.out.toBin(), 'xxxx');
     });
+
+    // Regression: Tribuf.operation() reads this.get('bits'), but that only
+    // works via a live Backbone model (this describe block's own instances,
+    // and SynchEngine/HeadlessCircuit). The real webview runs WorkerEngine,
+    // which reconstructs each cell from getGateParams() - a pick() of only
+    // the keys listed in _gateParams - inside the worker. Tribuf originally
+    // had no _gateParams override, so 'bits' silently became undefined
+    // there: Vector4vl.zes(undefined) collapsed to a 0-bit vector instead of
+    // an N-bit all-z one, corrupting every downstream TriMerge. This test
+    // targets the actual mechanism (getGateParams()), not operation()'s
+    // already-covered logic, so it fails the same way the real bug did.
+    it('Tribuf includes bits in its gate params (needed by the Worker engine)', function () {
+        const dev = new cells.Tribuf({ id: 't1', type: 'Tribuf', bits: 4 });
+        assert.strictEqual(dev.getGateParams().bits, 4,
+            'Tribuf.operation() reads this.get("bits"); if it is missing from ' +
+            '_gateParams, WorkerEngine reconstructs the cell without it and ' +
+            'operation() silently computes a 0-bit vector for a disabled driver');
+    });
 });
 
 // step 5 of 4VL_INTEGRATION_PLAN.md - a 4th visual state for Z in wire/lamp/
