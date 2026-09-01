@@ -1,0 +1,330 @@
+diff --git a/node_modules/digitaljs_lua/src/index.mjs b/node_modules/digitaljs_lua/src/index.mjs
+index 484b5c8..639d9c8 100644
+--- a/node_modules/digitaljs_lua/src/index.mjs
++++ b/node_modules/digitaljs_lua/src/index.mjs
+@@ -2,7 +2,7 @@
+ import { luaconf, lua, lauxlib, lualib, to_jsstring, to_luastring } from "fengari-web";
+ import Backbone from 'backbone';
+ import _ from 'lodash';
+-import { Vector3vl } from '3vl';
++import { Vector4vl } from '@twint/4vl';
+ 
+ const {
+     luaL_openlibs
+@@ -143,33 +143,33 @@ function lua_checkevent(L, n) {
+     return ret;
+ }
+ 
+-function lua_push3vl(L, v) {
++function lua_push4vl(L, v) {
+     const udata = lua_newuserdata(L, 0);
+     udata.v = v;
+     luaL_setmetatable(L, LUA_VECTOR3VL);
+ }
+ 
+-function lua_to3vl(L, n, bits) {
++function lua_to4vl(L, n, bits) {
+     const udata = luaL_testudata(L, n, LUA_VECTOR3VL);
+     let ret = null;
+     if (udata !== null) ret = udata.v; 
+     else if (lua_isboolean(L, n))
+-        ret = Vector3vl.fromBool(lua_toboolean(L, n), bits);
++        ret = Vector4vl.fromBool(lua_toboolean(L, n), bits);
+     else if (lua_isinteger(L, n))
+-        ret = Vector3vl.fromNumber(lua_tointeger(L, n), bits);
++        ret = Vector4vl.fromNumber(lua_tointeger(L, n), bits);
+     else if (lua_isstring(L, n)) 
+-        ret = protect(L, Vector3vl.fromString)(to_jsstring(lua_tostring(L, n)));
++        ret = protect(L, Vector4vl.fromString)(to_jsstring(lua_tostring(L, n)));
+     if (ret !== null && bits !== undefined) {
+         if (ret.bits < bits)
+-            ret = udata.v.concat(Vector3vl.zeros(bits - udata.v.bits));
++            ret = udata.v.concat(Vector4vl.zeros(bits - udata.v.bits));
+         else if (ret.bits > bits)
+             ret = ret.slice(0, bits);
+     }
+     return ret;
+ }
+ 
+-function lua_check3vl(L, n, bits) {
+-    const ret = lua_to3vl(L, n, bits);
++function lua_check4vl(L, n, bits) {
++    const ret = lua_to4vl(L, n, bits);
+     if (ret === null) luaL_argerror(L, n, "not convertible to vec");
+     return ret;
+ }
+@@ -178,31 +178,31 @@ const veclib = {
+     frombin: (L) => {
+         const str = luaL_checkstring(L, 1);
+         const bits = luaL_optinteger(L, 2, undefined);
+-        lua_push3vl(L, Vector3vl.fromBin(to_jsstring(str), bits));
++        lua_push4vl(L, Vector4vl.fromBin(to_jsstring(str), bits));
+         return 1;
+     },
+     fromoct: (L) => {
+         const str = luaL_checkstring(L, 1);
+         const bits = luaL_optinteger(L, 2, undefined);
+-        lua_push3vl(L, Vector3vl.fromOct(to_jsstring(str), bits));
++        lua_push4vl(L, Vector4vl.fromOct(to_jsstring(str), bits));
+         return 1;
+     },
+     fromhex: (L) => {
+         const str = luaL_checkstring(L, 1);
+         const bits = luaL_optinteger(L, 2, undefined);
+-        lua_push3vl(L, Vector3vl.fromHex(to_jsstring(str), bits));
++        lua_push4vl(L, Vector4vl.fromHex(to_jsstring(str), bits));
+         return 1;
+     },
+     frombool: (L) => {
+         const b = lua_toboolean(L, 1);
+         const bits = luaL_optinteger(L, 2, undefined);
+-        lua_push3vl(L, Vector3vl.fromBool(b, bits));
++        lua_push4vl(L, Vector4vl.fromBool(b, bits));
+         return 1;
+     },
+     frominteger: (L) => {
+         const n = luaL_checknumber(L, 1);
+         const bits = luaL_optinteger(L, 2, undefined);
+-        lua_push3vl(L, Vector3vl.fromNumber(n, bits));
++        lua_push4vl(L, Vector4vl.fromNumber(n, bits));
+         return 1;
+     }
+ };
+@@ -210,8 +210,8 @@ const veclib = {
+ const veclibmeta = {
+     '__call': (L) => {
+         const bits = luaL_optinteger(L, 3, undefined);
+-        const v = lua_check3vl(L, 2, bits);
+-        lua_push3vl(L, v);
++        const v = lua_check4vl(L, 2, bits);
++        lua_push4vl(L, v);
+         return 1;
+     }
+ };
+@@ -226,68 +226,68 @@ function luaopen_vec(L) {
+     }
+     const add_unary_method = (f_push, f_check, name, method) => {
+         add_method(name, (L) => {
+-            const lhs = lua_check3vl(L, 1);
++            const lhs = lua_check4vl(L, 1);
+             f_push(L, method.call(lhs, f_check(L, 2, lhs.bits)));
+         });
+     }
+     const add_nullary_method = (f_push, name, method) => {
+         add_method(name, (L) => {
+-            f_push(L, method.call(lua_check3vl(L, 1)));
++            f_push(L, method.call(lua_check4vl(L, 1)));
+         });
+     }
+     const add_property = (f_push, name, what, fld) => {
+         add_nullary_method(f_push, name, Object.getOwnPropertyDescriptor(what, fld).get);
+     }
+     luaL_newmetatable(L, LUA_VECTOR3VL);
+-    add_unary_method(lua_push3vl, lua_check3vl, "__band", Vector3vl.prototype.and);
+-    add_unary_method(lua_push3vl, lua_check3vl, "__bor", Vector3vl.prototype.or);
+-    add_unary_method(lua_push3vl, lua_check3vl, "__bxor", Vector3vl.prototype.xor);
+-    add_unary_method(lua_pushboolean, (L, n) => lua_check3vl(L, n), "__eq", Vector3vl.prototype.eq);
+-    add_nullary_method(lua_push3vl, "__bnot", Vector3vl.prototype.not);
+-    add_property(lua_pushinteger, "__len", Vector3vl.prototype, "bits");
++    add_unary_method(lua_push4vl, lua_check4vl, "__band", Vector4vl.prototype.and);
++    add_unary_method(lua_push4vl, lua_check4vl, "__bor", Vector4vl.prototype.or);
++    add_unary_method(lua_push4vl, lua_check4vl, "__bxor", Vector4vl.prototype.xor);
++    add_unary_method(lua_pushboolean, (L, n) => lua_check4vl(L, n), "__eq", Vector4vl.prototype.eq);
++    add_nullary_method(lua_push4vl, "__bnot", Vector4vl.prototype.not);
++    add_property(lua_pushinteger, "__len", Vector4vl.prototype, "bits");
+     add_method("__call", function(L) {
+-        const v = lua_check3vl(L, 1);
++        const v = lua_check4vl(L, 1);
+         const i = luaL_checkinteger(L, 2);
+         luaL_argcheck(L, i >= -v.bits && i < v.bits, 2, "index out of bounds");
+         const ii = i >= 0 ? i : v.bits + i;
+         const j = luaL_optinteger(L, 3, undefined);
+         if (j === undefined)
+-            lua_push3vl(L, Vector3vl.make(1, v.get(ii)));
++            lua_push4vl(L, Vector4vl.make(1, v.get(ii)));
+         else {
+             luaL_argcheck(L, j >= 0, "slice count negative");
+-            lua_push3vl(L, v.slice(ii, ii + j));
++            lua_push4vl(L, v.slice(ii, ii + j));
+         }
+         return 1;
+     });
+-    add_unary_method(lua_push3vl, (L, n) => lua_check3vl(L, n), "__concat", function(v) {
++    add_unary_method(lua_push4vl, (L, n) => lua_check4vl(L, n), "__concat", function(v) {
+         return v.concat(this);
+     });
+-    add_nullary_method(lua_pushstring, "__tostring", Vector3vl.prototype.toBin);
++    add_nullary_method(lua_pushstring, "__tostring", Vector4vl.prototype.toBin);
+     lua_newtable(L);
+-    add_unary_method(lua_push3vl, lua_check3vl, "band", Vector3vl.prototype.and);
+-    add_unary_method(lua_push3vl, lua_check3vl, "bor", Vector3vl.prototype.or);
+-    add_unary_method(lua_push3vl, lua_check3vl, "bxor", Vector3vl.prototype.xor);
+-    add_unary_method(lua_push3vl, lua_check3vl, "bnand", Vector3vl.prototype.nand);
+-    add_unary_method(lua_push3vl, lua_check3vl, "bnor", Vector3vl.prototype.nor);
+-    add_unary_method(lua_push3vl, lua_check3vl, "bxnor", Vector3vl.prototype.xnor);
+-    add_nullary_method(lua_push3vl, "bnot", Vector3vl.prototype.not);
+-    add_nullary_method(lua_push3vl, "xmask", Vector3vl.prototype.xmask);
+-    add_nullary_method(lua_push3vl, "rand", Vector3vl.prototype.reduceAnd);
+-    add_nullary_method(lua_push3vl, "ror", Vector3vl.prototype.reduceOr);
+-    add_nullary_method(lua_push3vl, "rxor", Vector3vl.prototype.reduceXor);
+-    add_nullary_method(lua_push3vl, "rnand", Vector3vl.prototype.reduceNand);
+-    add_nullary_method(lua_push3vl, "rnor", Vector3vl.prototype.reduceNor);
+-    add_nullary_method(lua_push3vl, "rxnor", Vector3vl.prototype.reduceXnor);
+-    add_nullary_method(lua_pushstring, "tohex", Vector3vl.prototype.toHex);
+-    add_nullary_method(lua_pushstring, "tobin", Vector3vl.prototype.toBin);
+-    add_nullary_method(lua_pushstring, "tooct", Vector3vl.prototype.toOct);
+-    add_nullary_method(lua_pushinteger, "tointeger", Vector3vl.prototype.toNumber);
+-    add_nullary_method(lua_pushinteger, "tointegersigned", Vector3vl.prototype.toNumberSigned);
+-    add_property(lua_pushboolean, "ishigh", Vector3vl.prototype, "isHigh");
+-    add_property(lua_pushboolean, "islow", Vector3vl.prototype, "isLow");
+-    add_property(lua_pushboolean, "isdefined", Vector3vl.prototype, "isDefined");
+-    add_property(lua_pushboolean, "isfullydefined", Vector3vl.prototype, "isFullyDefined");
+-    add_property(lua_pushinteger, "bits", Vector3vl.prototype, "bits");
++    add_unary_method(lua_push4vl, lua_check4vl, "band", Vector4vl.prototype.and);
++    add_unary_method(lua_push4vl, lua_check4vl, "bor", Vector4vl.prototype.or);
++    add_unary_method(lua_push4vl, lua_check4vl, "bxor", Vector4vl.prototype.xor);
++    add_unary_method(lua_push4vl, lua_check4vl, "bnand", Vector4vl.prototype.nand);
++    add_unary_method(lua_push4vl, lua_check4vl, "bnor", Vector4vl.prototype.nor);
++    add_unary_method(lua_push4vl, lua_check4vl, "bxnor", Vector4vl.prototype.xnor);
++    add_nullary_method(lua_push4vl, "bnot", Vector4vl.prototype.not);
++    add_nullary_method(lua_push4vl, "xmask", Vector4vl.prototype.xmask);
++    add_nullary_method(lua_push4vl, "rand", Vector4vl.prototype.reduceAnd);
++    add_nullary_method(lua_push4vl, "ror", Vector4vl.prototype.reduceOr);
++    add_nullary_method(lua_push4vl, "rxor", Vector4vl.prototype.reduceXor);
++    add_nullary_method(lua_push4vl, "rnand", Vector4vl.prototype.reduceNand);
++    add_nullary_method(lua_push4vl, "rnor", Vector4vl.prototype.reduceNor);
++    add_nullary_method(lua_push4vl, "rxnor", Vector4vl.prototype.reduceXnor);
++    add_nullary_method(lua_pushstring, "tohex", Vector4vl.prototype.toHex);
++    add_nullary_method(lua_pushstring, "tobin", Vector4vl.prototype.toBin);
++    add_nullary_method(lua_pushstring, "tooct", Vector4vl.prototype.toOct);
++    add_nullary_method(lua_pushinteger, "tointeger", Vector4vl.prototype.toNumber);
++    add_nullary_method(lua_pushinteger, "tointegersigned", Vector4vl.prototype.toNumberSigned);
++    add_property(lua_pushboolean, "ishigh", Vector4vl.prototype, "isHigh");
++    add_property(lua_pushboolean, "islow", Vector4vl.prototype, "isLow");
++    add_property(lua_pushboolean, "isdefined", Vector4vl.prototype, "isDefined");
++    add_property(lua_pushboolean, "isfullydefined", Vector4vl.prototype, "isFullyDefined");
++    add_property(lua_pushinteger, "bits", Vector4vl.prototype, "bits");
+     lua_setfield(L, -2, to_luastring("__index"));
+     lua_pop(L, 1);
+     luaL_newlib(L, veclib);
+@@ -329,7 +329,7 @@ export class LuaRunner {
+             const wire = this._vararg_findwire(L, args, 0);
+             if (wire === undefined) luaL_error(L, "sim.posedge: wire not found");
+             if (wire.get('bits') != 1) luaL_error(L, "sim.posedge: wire not 1-bit");
+-            lua_pushevent(L, this._make_event(wire, Vector3vl.one));
++            lua_pushevent(L, this._make_event(wire, Vector4vl.one));
+             return 1;
+         },
+         negedge: (L) => {
+@@ -338,7 +338,7 @@ export class LuaRunner {
+             const wire = this._vararg_findwire(L, args, 0);
+             if (wire === undefined) luaL_error(L, "sim.negedge: wire not found");
+             if (wire.get('bits') != 1) luaL_error(L, "sim.negedge: wire not 1-bit");
+-            lua_pushevent(L, this._make_event(wire, Vector3vl.zero));
++            lua_pushevent(L, this._make_event(wire, Vector4vl.zero));
+             return 1;
+         },
+         value: (L) => {
+@@ -346,7 +346,7 @@ export class LuaRunner {
+             if (args < 2) luaL_error(L, "sim.value: not enough arguments");
+             const wire = this._vararg_findwire(L, args, 1);
+             if (wire === undefined) luaL_error(L, "sim.value: wire not found");
+-            const val = lua_check3vl(L, 1, wire.get('bits'));
++            const val = lua_check4vl(L, 1, wire.get('bits'));
+             lua_pushevent(L, this._make_event(wire, val));
+             return 1;
+         },
+@@ -357,7 +357,7 @@ export class LuaRunner {
+         setinput: (L) => {
+             const name = luaL_checkstring(L, 1);
+             const inp = this.#circuit.findInputByNet(to_jsstring(name));
+-            const vec = lua_check3vl(L, 2, inp.get('bits'));
++            const vec = lua_check4vl(L, 2, inp.get('bits'));
+             luaL_argcheck(L, inp !== undefined, 1, "input not found");
+             inp.setInput(vec);
+             return 0;
+@@ -367,19 +367,19 @@ export class LuaRunner {
+             const out = this.#circuit.findOutputByNet(to_jsstring(name));
+             luaL_argcheck(L, out !== undefined, 1, "output not found");
+             const res = out.getOutput();
+-            lua_push3vl(L, res);
++            lua_push4vl(L, res);
+             return 1;
+         },
+         setinput_id: (L) => {
+             const name = luaL_checkstring(L, 1);
+-            const vec = lua_check3vl(L, 2);
++            const vec = lua_check4vl(L, 2);
+             this.#circuit.setInput(to_jsstring(name), vec);
+             return 0;
+         },
+         getoutput_id: (L) => {
+             const name = luaL_checkstring(L, 1);
+             const res = this.#circuit.getOutput(to_jsstring(name));
+-            lua_push3vl(L, res);
++            lua_push4vl(L, res);
+             return 1;
+         },
+         getvalue: (L) => {
+@@ -387,11 +387,11 @@ export class LuaRunner {
+             if (args < 1) luaL_error(L, "sim.getvalue: not enough arguments");
+             const wire = this._vararg_findwire(L, args, 0);
+             if (wire === undefined) luaL_error(L, "sim.getvalue: wire not found");
+-            lua_push3vl(L, wire.get('signal'));
++            lua_push4vl(L, wire.get('signal'));
+             return 1;
+         },
+         registerdisplay: lprotect((L) => {
+-            const display = new Display3vlLua({L: L});
++            const display = new Display4vlLua({L: L});
+             this.#circuit.addDisplay(display);
+             // TODO: remove displays on shutdown
+             return 0;
+@@ -469,9 +469,9 @@ export class LuaRunner {
+         lua_pop(this.#L, 1);
+         return ret;
+     }
+-    run3vl(source) {
++    run4vl(source) {
+         this._run(source, 1);
+-        const ret = lua_to3vl(this.#L, 1);
++        const ret = lua_to4vl(this.#L, 1);
+         lua_pop(this.#L, 1);
+         return ret;
+     }
+@@ -573,7 +573,7 @@ export class LuaRunner {
+ 
+ _.extend(LuaRunner.prototype, Backbone.Events);
+ 
+-export class Display3vlLua {
++export class Display4vlLua {
+     #L;
+     #name;
+     #pattern;
+@@ -589,7 +589,7 @@ export class Display3vlLua {
+             lua_pop(this.#L, 1);
+         }
+         if (L === undefined && source === undefined) {
+-            throw new Error("Display3vlLua: no definition");
++            throw new Error("Display4vlLua: no definition");
+         }
+         if (source !== undefined) {
+             const ret = lua_load_jsstring_error(this.#L, source);
+@@ -659,7 +659,7 @@ export class Display3vlLua {
+         } catch (e) {
+             return null;
+         }
+-        const ret = lua_to3vl(this.#L, -1, bits);
++        const ret = lua_to4vl(this.#L, -1, bits);
+         lua_pop(this.#L, 1);
+         return ret;
+     }
+@@ -667,7 +667,7 @@ export class Display3vlLua {
+         lua_rawgeti(this.#L, LUA_REGISTRYINDEX, this.#ref);
+         lua_getfield(this.#L, -1, to_luastring("show"));
+         lua_remove(this.#L, -2);
+-        lua_push3vl(this.#L, data);
++        lua_push4vl(this.#L, data);
+         try {
+             lua_pcall_error(this.#L, 1, 1, 0);
+         } catch (e) {

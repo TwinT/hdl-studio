@@ -1,0 +1,178 @@
+diff --git a/node_modules/yosys2digitaljs/dist/core.js b/node_modules/yosys2digitaljs/dist/core.js
+index 7e927b4..6edbe99 100644
+--- a/node_modules/yosys2digitaljs/dist/core.js
++++ b/node_modules/yosys2digitaljs/dist/core.js
+@@ -7,7 +7,7 @@ exports.prepare_yosys_script = prepare_yosys_script;
+ exports.prepare_verilator_args = prepare_verilator_args;
+ const HashMap = require("hashmap");
+ const bigInt = require("big-integer");
+-const _3vl_1 = require("3vl");
++const _4vl_1 = require("@twint/4vl");
+ const topsort = require('topsort');
+ function assert_fallback(val, msg) {
+     if (!val)
+@@ -46,6 +46,7 @@ const techmap_binary_gates = new Set([
+ const gate_subst = new Map([
+     // Frontend cells (simlib.v)
+     ['$not', 'Not'],
++    ['$tribuf', 'Tribuf'],
+     ['$and', 'And'],
+     ['$nand', 'Nand'],
+     ['$or', 'Or'],
+@@ -196,6 +197,7 @@ function order_ports(data) {
+     const binmap = { A: 'in1', B: 'in2', Y: 'out' };
+     const out = {
+         '$mux': { A: 'in0', B: 'in1', S: 'sel', Y: 'out' },
++        '$tribuf': { A: 'in', EN: 'en', Y: 'out' },
+         '$dff': { CLK: 'clk', D: 'in', Q: 'out' },
+         '$dffe': { CLK: 'clk', EN: 'en', D: 'in', Q: 'out' },
+         '$adff': { CLK: 'clk', ARST: 'arst', D: 'in', Q: 'out' },
+@@ -268,7 +270,10 @@ function parse_source_positions(str) {
+         const colonIdx = entry.lastIndexOf(':');
+         const name = entry.slice(0, colonIdx);
+         const pos = entry.slice(colonIdx + 1);
+-        const [from, to] = pos.split('-').map(s => s.split('.').map(v => Number(v))).map(([line, column]) => ({ line, column }));
++        const parts = pos.split('-');
++        if (parts.length !== 2)
++            continue; // not a well-formed "from-to" range - skip rather than emit a half-populated entry
++        const [from, to] = parts.map(s => s.split('.').map(v => Number(v))).map(([line, column]) => ({ line, column }));
+         ret.push({ name, from, to });
+     }
+     return ret;
+@@ -303,7 +308,7 @@ function yosys_to_digitaljs_mod(name, mod, portmaps, options = {}) {
+         if (!nets.has(k)) {
+             const nms = netnames.get(k);
+             const src = netsrc.get(k);
+-            nets.set(k, { source: undefined, targets: [], name: nms ? nms[0] : undefined, source_positions: src || [] });
++            nets.set(k, { sources: [], targets: [], name: nms ? nms[0] : undefined, source_positions: src || [] });
+         }
+         return nets.get(k);
+     }
+@@ -311,11 +316,10 @@ function yosys_to_digitaljs_mod(name, mod, portmaps, options = {}) {
+         if (k.length == 0)
+             return; // for unconnected ports
+         const net = get_net(k);
+-        if (net.source !== undefined) {
+-            // multiple sources driving one net, disallowed in digitaljs
+-            throw Error('Multiple sources driving net: ' + net.name);
+-        }
+-        net.source = { id: d, port: p };
++        // multiple sources driving one net: merged into a TriMerge device
++        // right before connection generation, see the "Resolve multi-driver
++        // nets" pass below.
++        net.sources.push({ id: d, port: p });
+         if (primary)
+             for (const [nbit, bit] of k.entries()) {
+                 bits.set(bit, { id: d, port: p, num: nbit });
+@@ -341,7 +345,7 @@ function yosys_to_digitaljs_mod(name, mod, portmaps, options = {}) {
+         return dname;
+     }
+     function add_busgroup(nbits, groups) {
+-        if (get_net(nbits).source !== undefined)
++        if (get_net(nbits).sources.length > 0)
+             return; // the bits were already grouped
+         const dname = add_device({
+             type: 'BusGroup',
+@@ -469,7 +473,7 @@ function yosys_to_digitaljs_mod(name, mod, portmaps, options = {}) {
+                 const ccon = con.slice();
+                 const pad = sig ? con.slice(-1)[0] : '0';
+                 con.splice(con.length, 0, ...Array(sz - con.length).fill(pad));
+-                if (!con.every(constbit) && get_net(con).source === undefined) {
++                if (!con.every(constbit) && get_net(con).sources.length === 0) {
+                     // WARNING: potentially troublesome hack for readability
+                     // handled generally in the grouping phase,
+                     // but it's hard to add sign extensions there
+@@ -841,7 +845,7 @@ function yosys_to_digitaljs_mod(name, mod, portmaps, options = {}) {
+                     + decode_json_number(cell.parameters.CTRL_IN_WIDTH)
+                     + decode_json_number(cell.parameters.CTRL_OUT_WIDTH);
+                 const tt = typeof (cell.parameters.TRANS_TABLE) == "number"
+-                    ? _3vl_1.Vector3vl.fromBin(bigInt(cell.parameters.TRANS_TABLE).toString(2), TRANS_NUM * step).toBin() // workaround for yosys silliness
++                    ? _4vl_1.Vector4vl.fromBin(bigInt(cell.parameters.TRANS_TABLE).toString(2), TRANS_NUM * step).toBin() // workaround for yosys silliness
+                     : cell.parameters.TRANS_TABLE;
+                 assert(tt.length == TRANS_NUM * step);
+                 dev.polarity = {
+@@ -915,12 +919,12 @@ function yosys_to_digitaljs_mod(name, mod, portmaps, options = {}) {
+                 const rdsrst = v2_feature_const(cell.parameters.RD_SRST_VALUE, dev.bits * RD_PORTS);
+                 if (cell.parameters.INIT) {
+                     const l = init.slice(-1)[0] == 'x' ? 'x' : '0';
+-                    const memdata = new _3vl_1.Mem3vl(dev.bits, dev.words);
++                    const memdata = new _4vl_1.Mem4vl(dev.bits, dev.words);
+                     for (const k of Array(dev.words).keys()) {
+                         const wrd = init.slice(dev.bits * k, dev.bits * (k + 1));
+                         while (wrd.length < dev.bits)
+                             wrd.push(l);
+-                        memdata.set(k, _3vl_1.Vector3vl.fromBin(wrd.reverse().join('')));
++                        memdata.set(k, _4vl_1.Vector4vl.fromBin(wrd.reverse().join('')));
+                     }
+                     dev.memdata = memdata.toJSON();
+                 }
+@@ -998,6 +1002,11 @@ function yosys_to_digitaljs_mod(name, mod, portmaps, options = {}) {
+                 delete cell.connections.A;
+                 delete cell.connections.Y;
+                 break;
++            case '$tribuf':
++                // No A_SIGNED param and A/Y always share WIDTH (simlib.v), so
++                // match_port doesn't apply here the way it does for $not.
++                dev.bits = cell.connections.Y.length;
++                break;
+             default:
+         }
+         if (dev.type == 'Dff') {
+@@ -1027,7 +1036,7 @@ function yosys_to_digitaljs_mod(name, mod, portmaps, options = {}) {
+     }
+     // Group bits into nets for complex sources
+     for (const [nbits, net] of nets.entries()) {
+-        if (net.source !== undefined)
++        if (net.sources.length > 0)
+             continue;
+         const groups = [[]];
+         let pbitinfo = undefined;
+@@ -1067,7 +1076,7 @@ function yosys_to_digitaljs_mod(name, mod, portmaps, options = {}) {
+     }
+     // Add constants
+     for (const [nbits, net] of nets.entries()) {
+-        if (net.source !== undefined)
++        if (net.sources.length > 0)
+             continue;
+         if (!nbits.every(constbit))
+             continue;
+@@ -1080,7 +1089,7 @@ function yosys_to_digitaljs_mod(name, mod, portmaps, options = {}) {
+     }
+     // Select bits from complex targets
+     for (const [nbits, net] of nets.entries()) {
+-        if (net.source !== undefined)
++        if (net.sources.length > 0)
+             continue;
+         // constants should be already handled!
+         assert(nbits.every(x => constbit(x) || (typeof x == 'number' && x > 1)));
+@@ -1102,17 +1111,28 @@ function yosys_to_digitaljs_mod(name, mod, portmaps, options = {}) {
+         add_net_source(nbits, dname, 'out');
+         add_net_target(cconn, dname, 'in');
+     }
++    // Resolve multi-driver nets: fold N sources into a single TriMerge
++    // device output, so the connection-generation pass below can keep
++    // treating every net as having exactly one source, same as before.
++    for (const [nbits, net] of nets.entries()) {
++        if (net.sources.length <= 1)
++            continue;
++        const dname = add_device({ type: 'TriMerge', bits: nbits.length, inputs: net.sources.length });
++        net.sources.forEach((src, i) => mout.connectors.push({ from: src, to: { id: dname, port: 'in' + i } }));
++        net.sources = [{ id: dname, port: 'out' }];
++    }
+     // Generate connections between devices
+     for (const [nbits, net] of nets.entries()) {
+-        if (net.source === undefined) {
++        if (net.sources.length === 0) {
+             console.warn('Undriven net in ' + name + ': ' + nbits);
+             continue;
+         }
++        const source = net.sources[0];
+         let first = true;
+         for (const target in net.targets) {
+             const conn = {
+                 to: net.targets[target],
+-                from: net.source
++                from: source
+             };
+             if (net.name)
+                 conn.name = net.name;

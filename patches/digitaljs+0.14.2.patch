@@ -1,8 +1,2448 @@
+diff --git a/node_modules/digitaljs/lib/cells.js b/node_modules/digitaljs/lib/cells.js
+index 2cd5a5d..047c3be 100644
+--- a/node_modules/digitaljs/lib/cells.js
++++ b/node_modules/digitaljs/lib/cells.js
+@@ -124,3 +124,25 @@ Object.keys(_display).forEach(function (key) {
+     }
+   });
+ });
++var _trimerge = require("./cells/trimerge.js");
++Object.keys(_trimerge).forEach(function (key) {
++  if (key === "default" || key === "__esModule") return;
++  if (key in exports && exports[key] === _trimerge[key]) return;
++  Object.defineProperty(exports, key, {
++    enumerable: true,
++    get: function () {
++      return _trimerge[key];
++    }
++  });
++});
++var _tribuf = require("./cells/tribuf.js");
++Object.keys(_tribuf).forEach(function (key) {
++  if (key === "default" || key === "__esModule") return;
++  if (key in exports && exports[key] === _tribuf[key]) return;
++  Object.defineProperty(exports, key, {
++    enumerable: true,
++    get: function () {
++      return _tribuf[key];
++    }
++  });
++});
+diff --git a/node_modules/digitaljs/lib/cells/arith.js b/node_modules/digitaljs/lib/cells/arith.js
+index 82c329f..563dab4 100644
+--- a/node_modules/digitaljs/lib/cells/arith.js
++++ b/node_modules/digitaljs/lib/cells/arith.js
+@@ -5,7 +5,7 @@ Object.defineProperty(exports, "__esModule", {
+ });
+ exports.UnaryPlusView = exports.UnaryPlus = exports.SubtractionView = exports.SubtractionConstView = exports.SubtractionConst = exports.Subtraction = exports.ShiftRightView = exports.ShiftRightConstView = exports.ShiftRightConst = exports.ShiftRight = exports.ShiftLeftView = exports.ShiftLeftConstView = exports.ShiftLeftConst = exports.ShiftLeft = exports.ShiftConst = exports.Shift = exports.PowerView = exports.PowerConstView = exports.PowerConst = exports.Power = exports.OpConst = exports.NegationView = exports.Negation = exports.NeView = exports.NeConstView = exports.NeConst = exports.Ne = exports.MultiplicationView = exports.MultiplicationConstView = exports.MultiplicationConst = exports.Multiplication = exports.ModuloView = exports.ModuloConstView = exports.ModuloConst = exports.Modulo = exports.LtView = exports.LtConstView = exports.LtConst = exports.Lt = exports.LeView = exports.LeConstView = exports.LeConst = exports.Le = exports.GtView = exports.GtConstView = exports.GtConst = exports.Gt = exports.GeView = exports.GeConstView = exports.GeConst = exports.Ge = exports.EqView = exports.EqConstView = exports.EqConst = exports.EqCompareConst = exports.EqCompare = exports.Eq = exports.DivisionView = exports.DivisionConstView = exports.DivisionConst = exports.Division = exports.CompareConst = exports.Compare = exports.BaseCompareConst = exports.BaseCompare = exports.ArithConst = exports.Arith21 = exports.Arith11 = exports.Arith = exports.AdditionView = exports.AdditionConstView = exports.AdditionConst = exports.Addition = void 0;
+ var _base = require("./base.js");
+-var _vl = require("3vl");
++var _vl = require("@twint/4vl");
+ function isSafeInteger(v) {
+   return v <= Number.MAX_SAFE_INTEGER && v >= -Number.MAX_SAFE_INTEGER;
+ }
+@@ -112,10 +112,10 @@ const Arith11 = exports.Arith11 = Arith.define('Arith11', {
+   operation(data) {
+     const bits = this.get('bits');
+     if (!data.in.isFullyDefined) return {
+-      out: _vl.Vector3vl.xes(bits.out)
++      out: _vl.Vector4vl.xes(bits.out)
+     };
+     return {
+-      out: _vl.Vector3vl.fromNumber(this.arithop(data.in.toBigInt(this.get('signed'))), bits.out)
++      out: _vl.Vector4vl.fromNumber(this.arithop(data.in.toBigInt(this.get('signed'))), bits.out)
+     };
+   },
+   _operationHelpers: Arith.prototype._operationHelpers.concat(['arithop'])
+@@ -161,19 +161,19 @@ const Arith21 = exports.Arith21 = Arith.define('Arith21', {
+     const bits = this.get('bits');
+     const sgn = this.get('signed');
+     if (!data.in1.isFullyDefined || !data.in2.isFullyDefined) return {
+-      out: _vl.Vector3vl.xes(bits.out)
++      out: _vl.Vector4vl.xes(bits.out)
+     };
+     return {
+-      out: _vl.Vector3vl.fromNumber(this.arithop(data.in1.toBigInt(sgn.in1 && sgn.in2), data.in2.toBigInt(sgn.in1 && sgn.in2)), bits.out)
++      out: _vl.Vector4vl.fromNumber(this.arithop(data.in1.toBigInt(sgn.in1 && sgn.in2), data.in2.toBigInt(sgn.in1 && sgn.in2)), bits.out)
+     };
+   },
+   _operationHelpers: Arith.prototype._operationHelpers.concat(['arithop'])
+ });
+ function shiftHelp(in1, am, bits_in, bits_out, sgn_in, sgn_out, fillx) {
+   const signbit = in1.get(in1.bits - 1);
+-  const ext = _vl.Vector3vl.make(Math.max(0, bits_out - bits_in), fillx ? 0 : sgn_in ? signbit : -1);
++  const ext = _vl.Vector4vl.make(Math.max(0, bits_out - bits_in), fillx ? 0 : sgn_in ? signbit : -1);
+   const my_in = in1.concat(ext);
+-  const out = am < 0 ? _vl.Vector3vl.make(-am, fillx ? 0 : -1).concat(my_in) : my_in.slice(am).concat(_vl.Vector3vl.make(am, fillx ? 0 : sgn_out ? my_in.get(my_in.bits - 1) : -1));
++  const out = am < 0 ? _vl.Vector4vl.make(-am, fillx ? 0 : -1).concat(my_in) : my_in.slice(am).concat(_vl.Vector4vl.make(am, fillx ? 0 : sgn_out ? my_in.get(my_in.bits - 1) : -1));
+   return out.slice(0, bits_out);
+ }
+ 
+@@ -220,7 +220,7 @@ const Shift = exports.Shift = Arith.define('Shift', {
+     const sgn = this.get('signed');
+     const fillx = this.get('fillx');
+     if (!data.in2.isFullyDefined) return {
+-      out: _vl.Vector3vl.xes(bits.out)
++      out: _vl.Vector4vl.xes(bits.out)
+     };
+     const am = data.in2.toNumber(sgn.in2) * this.shiftdir;
+     return {
+@@ -275,10 +275,10 @@ const Compare = exports.Compare = BaseCompare.define('Compare', {}, {
+     const bits = this.get('bits');
+     const sgn = this.get('signed');
+     if (!data.in1.isFullyDefined || !data.in2.isFullyDefined) return {
+-      out: _vl.Vector3vl.xes(1)
++      out: _vl.Vector4vl.xes(1)
+     };
+     return {
+-      out: _vl.Vector3vl.fromBool(this.arithcomp(data.in1.toBigInt(sgn.in1 && sgn.in2), data.in2.toBigInt(sgn.in1 && sgn.in2)))
++      out: _vl.Vector4vl.fromBool(this.arithcomp(data.in1.toBigInt(sgn.in1 && sgn.in2), data.in2.toBigInt(sgn.in1 && sgn.in2)))
+     };
+   },
+   _operationHelpers: BaseCompare.prototype._operationHelpers.concat(['arithcomp'])
+@@ -289,8 +289,8 @@ const EqCompare = exports.EqCompare = BaseCompare.define('EqCompare', {}, {
+   operation(data) {
+     const bits = this.get('bits');
+     const sgn = this.get('signed');
+-    const in1 = bits.in1 >= bits.in2 ? data.in1 : data.in1.concat(_vl.Vector3vl.make(bits.in2 - bits.in1, sgn.in1 && sgn.in2 ? data.in1.msb : -1));
+-    const in2 = bits.in2 >= bits.in1 ? data.in2 : data.in2.concat(_vl.Vector3vl.make(bits.in1 - bits.in2, sgn.in1 && sgn.in2 ? data.in2.msb : -1));
++    const in1 = bits.in1 >= bits.in2 ? data.in1 : data.in1.concat(_vl.Vector4vl.make(bits.in2 - bits.in1, sgn.in1 && sgn.in2 ? data.in1.msb : -1));
++    const in2 = bits.in2 >= bits.in1 ? data.in2 : data.in2.concat(_vl.Vector4vl.make(bits.in1 - bits.in2, sgn.in1 && sgn.in2 ? data.in2.msb : -1));
+     return {
+       out: this.bincomp(in1, in2)
+     };
+@@ -561,12 +561,12 @@ const ArithConst = exports.ArithConst = OpConst.define('ArithConst', {
+     const sgn = this.get('signed');
+     const constant = this.get('constant');
+     if (!data.in.isFullyDefined) return {
+-      out: _vl.Vector3vl.xes(bits.out)
++      out: _vl.Vector4vl.xes(bits.out)
+     };
+     if (this.get('leftOp')) return {
+-      out: _vl.Vector3vl.fromNumber(this.arithop(BigInt(constant), data.in.toBigInt(sgn.in)), bits.out)
++      out: _vl.Vector4vl.fromNumber(this.arithop(BigInt(constant), data.in.toBigInt(sgn.in)), bits.out)
+     };else return {
+-      out: _vl.Vector3vl.fromNumber(this.arithop(data.in.toBigInt(sgn.in), BigInt(constant)), bits.out)
++      out: _vl.Vector4vl.fromNumber(this.arithop(data.in.toBigInt(sgn.in), BigInt(constant)), bits.out)
+     };
+   },
+   _operationHelpers: OpConst.prototype._operationHelpers.concat(['arithop'])
+@@ -607,10 +607,10 @@ const ShiftConst = exports.ShiftConst = OpConst.define('ShiftConst', {
+     const constant = this.get('constant');
+     if (this.get('leftOp')) {
+       if (!data.in.isFullyDefined) return {
+-        out: _vl.Vector3vl.xes(bits.out)
++        out: _vl.Vector4vl.xes(bits.out)
+       };
+       const am = data.in.toNumber(sgn.in);
+-      const sig = _vl.Vector3vl.fromNumber(constant);
++      const sig = _vl.Vector4vl.fromNumber(constant);
+       return {
+         out: shiftHelp(sig, am * this.shiftdir, sig.bits, bits.out, constant < 0, sgn.out, fillx)
+       };
+@@ -657,12 +657,12 @@ const CompareConst = exports.CompareConst = BaseCompareConst.define('CompareCons
+     const sgn = this.get('signed');
+     const constant = this.get('constant');
+     if (!data.in.isFullyDefined) return {
+-      out: _vl.Vector3vl.x
++      out: _vl.Vector4vl.x
+     };
+     if (this.get('leftOp')) return {
+-      out: _vl.Vector3vl.fromBool(this.arithcomp(BigInt(constant), data.in.toBigInt(sgn.in)))
++      out: _vl.Vector4vl.fromBool(this.arithcomp(BigInt(constant), data.in.toBigInt(sgn.in)))
+     };else return {
+-      out: _vl.Vector3vl.fromBool(this.arithcomp(data.in.toBigInt(sgn.in), BigInt(constant)))
++      out: _vl.Vector4vl.fromBool(this.arithcomp(data.in.toBigInt(sgn.in), BigInt(constant)))
+     };
+   },
+   _operationHelpers: BaseCompareConst.prototype._operationHelpers.concat(['arithcomp'])
+@@ -675,9 +675,9 @@ const EqCompareConst = exports.EqCompareConst = BaseCompareConst.define('EqCompa
+     const sgn = this.get('signed');
+     const constant = this.get('constant');
+     if (this.get('leftOp')) return {
+-      out: this.bincomp(_vl.Vector3vl.fromNumber(constant, bits.in), data.in)
++      out: this.bincomp(_vl.Vector4vl.fromNumber(constant, bits.in), data.in)
+     };else return {
+-      out: this.bincomp(data.in, _vl.Vector3vl.fromNumber(constant, bits.in))
++      out: this.bincomp(data.in, _vl.Vector4vl.fromNumber(constant, bits.in))
+     };
+   },
+   _operationHelpers: BaseCompareConst.prototype._operationHelpers.concat(['bincomp'])
+diff --git a/node_modules/digitaljs/lib/cells/base.js b/node_modules/digitaljs/lib/cells/base.js
+index 3ca5527..079f726 100644
+--- a/node_modules/digitaljs/lib/cells/base.js
++++ b/node_modules/digitaljs/lib/cells/base.js
+@@ -3,13 +3,24 @@
+ Object.defineProperty(exports, "__esModule", {
+   value: true
+ });
+-exports.portGroupAttrs = exports.WireView = exports.Wire = exports.GateView = exports.Gate = exports.BoxView = exports.Box = void 0;
++exports.portGroupAttrs = exports.isAllZ = exports.WireView = exports.Wire = exports.GateView = exports.Gate = exports.BoxView = exports.Box = void 0;
+ var joint = _interopRequireWildcard(require("@joint/core"));
+-var _vl = require("3vl");
++var _vl = require("@twint/4vl");
+ var tools = _interopRequireWildcard(require("../tools.js"));
+ var _jquery = _interopRequireDefault(require("jquery"));
+ function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
+ function _interopRequireWildcard(e, t) { if ("function" == typeof WeakMap) var r = new WeakMap(), n = new WeakMap(); return (_interopRequireWildcard = function (e, t) { if (!t && e && e.__esModule) return e; var o, i, f = { __proto__: null, default: e }; if (null === e || "object" != typeof e && "function" != typeof e) return f; if (o = t ? n : r) { if (o.has(e)) return o.get(e); o.set(e, f); } for (const t in e) "default" !== t && {}.hasOwnProperty.call(e, t) && ((i = (o = Object.defineProperty) && Object.getOwnPropertyDescriptor(e, t)) && (i.get || i.set) ? o(f, t, i) : f[t] = e[t]); return f; })(e, t); }
++// True iff every bit of the vector is z (fully floating/high-impedance),
++// as opposed to merely "not fully defined" (which also covers x and mixes
++// of x/z/defined bits) - used to give a floating net its own visual state
++// distinct from plain-undefined instead of lumping both into one grey bucket.
++function isAllZ(v) {
++  for (let i = 0; i < v.bits; i++) {
++    if (v.get(i) !== 2) return false;
++  }
++  return true;
++}
++exports.isAllZ = isAllZ;
+ const portGroupAttrs = exports.portGroupAttrs = {
+   wire: {
+     stroke: '#4B4F6A',
+@@ -164,7 +175,7 @@ const Gate = exports.Gate = joint.dia.Element.define('Gate', {
+   },
+   _clearInput(port) {
+     const bits = this.getPort(port).bits;
+-    this._setInput(_vl.Vector3vl.xes(bits), port);
++    this._setInput(_vl.Vector4vl.xes(bits), port);
+   },
+   _preprocessPorts(ports) {
+     this._resetPortsSignals(ports);
+@@ -217,7 +228,7 @@ const Gate = exports.Gate = joint.dia.Element.define('Gate', {
+     return bits > 1 ? bits : '';
+   },
+   _resetPortValue(port) {
+-    return _vl.Vector3vl.xes(port.bits);
++    return _vl.Vector4vl.xes(port.bits);
+   },
+   _resetPortsSignals(ports) {
+     const signals = {
+@@ -359,6 +370,11 @@ const GateView = exports.GateView = joint.dia.ElementView.extend({
+           'stroke': '#779ecb'
+         }
+       },
++      highz: {
++        port: {
++          'stroke': '#f39c12'
++        }
++      },
+       undef: {
+         port: {
+           'stroke': '#999'
+@@ -386,7 +402,7 @@ const GateView = exports.GateView = joint.dia.ElementView.extend({
+     const signals = dir === 'in' ? this.model.get('inputSignals') : dir === 'out' ? this.model.get('outputSignals') : joint.util.merge({}, this.model.get('inputSignals'), this.model.get('outputSignals'));
+     for (const port in signals) {
+       const signal = signals[port];
+-      const attrs = this.attrs.signal[!signal.isDefined ? 'undef' : signal.isHigh ? 'high' : signal.isLow ? 'low' : 'def'];
++      const attrs = this.attrs.signal[!signal.isDefined ? isAllZ(signal) ? 'highz' : 'undef' : signal.isHigh ? 'high' : signal.isLow ? 'low' : 'def'];
+       this._applyPortAttrs(port, attrs);
+     }
+   },
+@@ -422,7 +438,7 @@ const Wire = exports.Wire = joint.shapes.standard.Link.define('Wire', {
+       stroke: 'red'
+     }
+   },
+-  signal: _vl.Vector3vl.xes(1),
++  signal: _vl.Vector4vl.xes(1),
+   bits: 1,
+   warning: false,
+   // show behind gates
+@@ -481,7 +497,7 @@ const Wire = exports.Wire = joint.shapes.standard.Link.define('Wire', {
+       //set signal after checking connection to avoid false signal propagation
+       this.set('signal', source.get('outputSignals')[src.port]);
+     } else {
+-      this.set('signal', _vl.Vector3vl.xes(this.get('bits')));
++      this.set('signal', _vl.Vector4vl.xes(this.get('bits')));
+     }
+   },
+   _changeTarget(tar) {
+@@ -550,6 +566,11 @@ const WireView = exports.WireView = joint.dia.LinkView.extend({
+           'stroke': '#779ecb'
+         }
+       },
++      highz: {
++        line: {
++          'stroke': '#f39c12'
++        }
++      },
+       undef: {
+         line: {
+           'stroke': '#999'
+@@ -630,7 +651,7 @@ const WireView = exports.WireView = joint.dia.LinkView.extend({
+   },
+   _updateSignal() {
+     const signal = this.model.get('signal');
+-    const attrs = this.attrs.signal[!signal.isDefined ? 'undef' : signal.isHigh ? 'high' : signal.isLow ? 'low' : 'def'];
++    const attrs = this.attrs.signal[!signal.isDefined ? isAllZ(signal) ? 'highz' : 'undef' : signal.isHigh ? 'high' : signal.isLow ? 'low' : 'def'];
+     this._applyAttrs(attrs);
+   },
+   _updateBits() {
+@@ -692,8 +713,8 @@ const WireView = exports.WireView = joint.dia.LinkView.extend({
+   _generateTextForTooltip() {
+     if (!this.wire_hover) return;
+     const sig = this.model.get('signal');
+-    const display3vl = this.model.graph._display3vl;
+-    const hovertext = ['Hex: ' + display3vl.show('hex', sig) + '<br>', 'Dec: ' + display3vl.show('dec', sig) + '<br>', 'Oct: ' + display3vl.show('oct', sig) + '<br>', 'Bin: ' + display3vl.show('bin', sig)].join('');
++    const display4vl = this.model.graph._display4vl;
++    const hovertext = ['Hex: ' + display4vl.show('hex', sig) + '<br>', 'Dec: ' + display4vl.show('dec', sig) + '<br>', 'Oct: ' + display4vl.show('oct', sig) + '<br>', 'Bin: ' + display4vl.show('bin', sig)].join('');
+     this.wire_hover.html(hovertext);
+   },
+   // Quick-and-dirty performance fix
+diff --git a/node_modules/digitaljs/lib/cells/bus.js b/node_modules/digitaljs/lib/cells/bus.js
+index ab33314..7e72ac8 100644
+--- a/node_modules/digitaljs/lib/cells/bus.js
++++ b/node_modules/digitaljs/lib/cells/bus.js
+@@ -5,7 +5,7 @@ Object.defineProperty(exports, "__esModule", {
+ });
+ exports.ZeroExtendView = exports.ZeroExtend = exports.SignExtendView = exports.SignExtend = exports.BusUngroupView = exports.BusUngroup = exports.BusSliceView = exports.BusSlice = exports.BusRegroupView = exports.BusRegroup = exports.BusGroupView = exports.BusGroup = exports.BitExtendView = exports.BitExtend = void 0;
+ var _base = require("./base.js");
+-var _vl = require("3vl");
++var _vl = require("@twint/4vl");
+ // Bit extending
+ const BitExtend = exports.BitExtend = _base.Box.define('BitExtend', {
+   /* default properties */
+@@ -48,7 +48,7 @@ const BitExtend = exports.BitExtend = _base.Box.define('BitExtend', {
+   operation(data) {
+     const ex = this.get('extend');
+     return {
+-      out: data.in.concat(_vl.Vector3vl.make(ex.output - ex.input, this._extBit(data.in)))
++      out: data.in.concat(_vl.Vector4vl.make(ex.output - ex.input, this._extBit(data.in)))
+     };
+   },
+   markup: _base.Box.prototype.markup.concat([{
+@@ -196,7 +196,7 @@ const BusGroup = exports.BusGroup = BusRegroup.define('BusGroup', {}, {
+       outdata.push(data['in' + num]);
+     }
+     return {
+-      out: _vl.Vector3vl.concat(...outdata)
++      out: _vl.Vector4vl.concat(...outdata)
+     };
+   }
+ });
+diff --git a/node_modules/digitaljs/lib/cells/dff.js b/node_modules/digitaljs/lib/cells/dff.js
+index a940148..a318ff2 100644
+--- a/node_modules/digitaljs/lib/cells/dff.js
++++ b/node_modules/digitaljs/lib/cells/dff.js
+@@ -5,7 +5,7 @@ Object.defineProperty(exports, "__esModule", {
+ });
+ exports.DffView = exports.Dff = void 0;
+ var _base = require("./base.js");
+-var _vl = require("3vl");
++var _vl = require("@twint/4vl");
+ // D flip-flops
+ const Dff = exports.Dff = _base.Box.define('Dff', {
+   /* default properties */
+@@ -148,7 +148,7 @@ const Dff = exports.Dff = _base.Box.define('Dff', {
+     _base.Box.prototype.initialize.apply(this, arguments);
+   },
+   _resetPortValue(port) {
+-    if (port.id == "out" && port.dir == "out") return _vl.Vector3vl.fromBin(this.get('initial'), port.bits);else return _base.Box.prototype._resetPortValue.call(this, port);
++    if (port.id == "out" && port.dir == "out") return _vl.Vector4vl.fromBin(this.get('initial'), port.bits);else return _base.Box.prototype._resetPortValue.call(this, port);
+   },
+   operation(data) {
+     const polarity = this.get('polarity');
+@@ -162,7 +162,7 @@ const Dff = exports.Dff = _base.Box.define('Dff', {
+       this.last_clk = data.clk.get(0);
+     }
+     if ('arst' in polarity && data.arst.get(0) == pol('arst')) return {
+-      out: _vl.Vector3vl.fromBin(this.get('arst_value'), this.get('bits'))
++      out: _vl.Vector4vl.fromBin(this.get('arst_value'), this.get('bits'))
+     };
+     if ('aload' in polarity && data.aload.get(0) == pol('aload')) return {
+       out: data.ain
+@@ -172,13 +172,13 @@ const Dff = exports.Dff = _base.Box.define('Dff', {
+       srbitmask = polarity.set ? data.set.not() : data.set;
+     }
+     if ('clr' in polarity) {
+-      srbits = srbits ? srbits : _vl.Vector3vl.zeros(this.get('bits'));
++      srbits = srbits ? srbits : _vl.Vector4vl.zeros(this.get('bits'));
+       const clrbitmask = polarity.clr ? data.clr.not() : data.clr;
+       srbitmask = srbitmask ? clrbitmask.and(srbitmask) : clrbitmask;
+     }
+     if ('enable' in polarity && data.en.get(0) != pol('enable') && this.get('enable_srst')) return apply_sr(this.get('outputSignals').out);
+     if (!('clock' in polarity) || data.clk.get(0) == pol('clock') && last_clk == -pol('clock')) {
+-      if ('srst' in polarity && data.srst.get(0) == pol('srst')) return apply_sr(_vl.Vector3vl.fromBin(this.get('srst_value'), this.get('bits')));
++      if ('srst' in polarity && data.srst.get(0) == pol('srst')) return apply_sr(_vl.Vector4vl.fromBin(this.get('srst_value'), this.get('bits')));
+       if ('enable' in polarity && data.en.get(0) != pol('enable') && !this.get('enable_srst')) return apply_sr(this.get('outputSignals').out);
+       if (this.get('no_data')) return apply_sr(this.get('outputSignals').out);
+       return apply_sr(data.in);
+diff --git a/node_modules/digitaljs/lib/cells/fsm.js b/node_modules/digitaljs/lib/cells/fsm.js
+index ec13773..4944f89 100644
+--- a/node_modules/digitaljs/lib/cells/fsm.js
++++ b/node_modules/digitaljs/lib/cells/fsm.js
+@@ -8,7 +8,7 @@ var _jquery = _interopRequireDefault(require("jquery"));
+ var joint = _interopRequireWildcard(require("@joint/core"));
+ var _layoutDirectedGraph = require("@joint/layout-directed-graph");
+ var _base = require("./base.js");
+-var _vl = require("3vl");
++var _vl = require("@twint/4vl");
+ function _interopRequireWildcard(e, t) { if ("function" == typeof WeakMap) var r = new WeakMap(), n = new WeakMap(); return (_interopRequireWildcard = function (e, t) { if (!t && e && e.__esModule) return e; var o, i, f = { __proto__: null, default: e }; if (null === e || "object" != typeof e && "function" != typeof e) return f; if (o = t ? n : r) { if (o.has(e)) return o.get(e); o.set(e, f); } for (const t in e) "default" !== t && {}.hasOwnProperty.call(e, t) && ((i = (o = Object.defineProperty) && Object.getOwnPropertyDescriptor(e, t)) && (i.get || i.set) ? o(f, t, i) : f[t] = e[t]); return f; })(e, t); }
+ function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
+ const FSM = exports.FSM = _base.Box.define('FSM', {
+@@ -149,8 +149,8 @@ const FSM = exports.FSM = _base.Box.define('FSM', {
+       this.transitions.get(tr.state_in).push({
+         id: 'tr' + id,
+         stateOut: tr.state_out,
+-        ctrlIn: _vl.Vector3vl.fromBin(tr.ctrl_in, bits.in),
+-        ctrlOut: _vl.Vector3vl.fromBin(tr.ctrl_out, bits.out)
++        ctrlIn: _vl.Vector4vl.fromBin(tr.ctrl_in, bits.in),
++        ctrlOut: _vl.Vector4vl.fromBin(tr.ctrl_out, bits.out)
+       });
+       id++;
+     }
+@@ -182,7 +182,7 @@ const FSM = exports.FSM = _base.Box.define('FSM', {
+         const xmask = ctrlIn.xmask().or(ixmask);
+         if (data.in.or(xmask).eq(ctrlIn.or(xmask))) results.push(trans.ctrlOut);
+       }
+-      const xes = _vl.Vector3vl.xes(bits.out);
++      const xes = _vl.Vector4vl.xes(bits.out);
+       if (results.length == 0) return xes;
+       while (results.length > 1) {
+         const other = results.pop();
+diff --git a/node_modules/digitaljs/lib/cells/io.js b/node_modules/digitaljs/lib/cells/io.js
+index 30675da..0ca6685 100644
+--- a/node_modules/digitaljs/lib/cells/io.js
++++ b/node_modules/digitaljs/lib/cells/io.js
+@@ -7,7 +7,7 @@ exports.OutputView = exports.Output = exports.NumEntryView = exports.NumEntry =
+ var joint = _interopRequireWildcard(require("@joint/core"));
+ var _base = require("./base.js");
+ var _jquery = _interopRequireDefault(require("jquery"));
+-var _vl = require("3vl");
++var _vl = require("@twint/4vl");
+ function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
+ function _interopRequireWildcard(e, t) { if ("function" == typeof WeakMap) var r = new WeakMap(), n = new WeakMap(); return (_interopRequireWildcard = function (e, t) { if (!t && e && e.__esModule) return e; var o, i, f = { __proto__: null, default: e }; if (null === e || "object" != typeof e && "function" != typeof e) return f; if (o = t ? n : r) { if (o.has(e)) return o.get(e); o.set(e, f); } for (const t in e) "default" !== t && {}.hasOwnProperty.call(e, t) && ((i = (o = Object.defineProperty) && Object.getOwnPropertyDescriptor(e, t)) && (i.get || i.set) ? o(f, t, i) : f[t] = e[t]); return f; })(e, t); }
+ // Things with numbers
+@@ -19,8 +19,8 @@ const NumBase = exports.NumBase = _base.Box.define('NumBase', {
+   initialize() {
+     _base.Box.prototype.initialize.apply(this, arguments);
+     this.on('change:bits', (_, bits) => {
+-      const display3vl = this.graph._display3vl;
+-      const displays = display3vl.usableDisplays(this.numbaseType, this.get('bits'));
++      const display4vl = this.graph._display4vl;
++      const displays = display4vl.usableDisplays(this.numbaseType, this.get('bits'));
+       if (!displays.includes(this.get('numbase'))) this.set('numbase', 'hex');
+     });
+   },
+@@ -72,8 +72,8 @@ const NumBaseView = exports.NumBaseView = _base.BoxView.extend({
+   _makeNumBaseSelector() {
+     this.$('select.numbase').empty();
+     const numbase = this.model.get('numbase');
+-    const display3vl = this.model.graph._display3vl;
+-    for (const base of display3vl.usableDisplays(this.model.numbaseType, this.model.get('bits'))) {
++    const display4vl = this.model.graph._display4vl;
++    for (const base of display4vl.usableDisplays(this.model.numbaseType, this.model.get('bits'))) {
+       const opt = (0, _jquery.default)('<option>').attr('value', base).prop('selected', base == numbase).text(base).appendTo(this.$('select.numbase'));
+     }
+   },
+@@ -196,7 +196,7 @@ const Input = exports.Input = IO.define('Input', {
+     if (port.id == "out" && port.dir == "out") {
+       const bits = this.get('bits');
+       const mode = this.get('mode');
+-      return mode == 1 ? _vl.Vector3vl.zeros(bits) : _vl.Vector3vl.xes(bits);
++      return mode == 1 ? _vl.Vector4vl.zeros(bits) : _vl.Vector4vl.xes(bits);
+     } else return IO.prototype._resetPortValue.call(this, port);
+   },
+   _checkMode() {
+@@ -273,8 +273,8 @@ const InputView = exports.InputView = IOView.extend({
+     this._applyAttrs(attrs);
+   },
+   _updateNumEntry() {
+-    const display3vl = this.model.graph._display3vl;
+-    this.$('input').val(display3vl.show(this.model.get('numbase'), this.model.get('outputSignals').out));
++    const display4vl = this.model.graph._display4vl;
++    this.$('input').val(display4vl.show(this.model.get('numbase'), this.model.get('outputSignals').out));
+     this.$('input').removeClass('invalid');
+   },
+   render() {
+@@ -302,9 +302,9 @@ const InputView = exports.InputView = IOView.extend({
+   _onNumEntry(evt) {
+     const numbase = this.model.get('numbase');
+     const bits = this.model.get('bits');
+-    const display3vl = this.model.graph._display3vl;
+-    if (display3vl.validate(numbase, evt.target.value, bits)) {
+-      const val = display3vl.read(numbase, evt.target.value, bits);
++    const display4vl = this.model.graph._display4vl;
++    if (display4vl.validate(numbase, evt.target.value, bits)) {
++      const val = display4vl.read(numbase, evt.target.value, bits);
+       this.model.setInput(val);
+     } else {
+       this.$('input').addClass('invalid');
+@@ -364,6 +364,11 @@ const OutputView = exports.OutputView = IOView.extend({
+           'fill': '#fc7c68'
+         }
+       },
++      highz: {
++        led: {
++          'fill': '#f39c12'
++        }
++      },
+       undef: {
+         led: {
+           'fill': '#bfc5c6'
+@@ -387,12 +392,12 @@ const OutputView = exports.OutputView = IOView.extend({
+   },
+   _updateLamp() {
+     const signal = this.model.get('inputSignals').in;
+-    const attrs = this.attrs.lamp[signal.isHigh ? 'high' : signal.isLow ? 'low' : 'undef'];
++    const attrs = this.attrs.lamp[signal.isHigh ? 'high' : signal.isLow ? 'low' : _base.isAllZ(signal) ? 'highz' : 'undef'];
+     this._applyAttrs(attrs);
+   },
+   _updateNumDisplay() {
+-    const display3vl = this.model.graph._display3vl;
+-    this.$('text.value tspan').text(display3vl.show(this.model.get('numbase'), this.model.get('inputSignals').in));
++    const display4vl = this.model.graph._display4vl;
++    this.$('text.value tspan').text(display4vl.show(this.model.get('numbase'), this.model.get('inputSignals').in));
+   },
+   render() {
+     IOView.prototype.render.apply(this, arguments);
+@@ -437,13 +442,13 @@ const Constant = exports.Constant = NumBase.define('Constant', {
+         out: bits
+       });
+       this.set('bits', bits);
+-      this.set('constantCache', _vl.Vector3vl.fromBin(constant, bits));
++      this.set('constantCache', _vl.Vector4vl.fromBin(constant, bits));
+     });
+   },
+   prepare() {
+     const constant = this.get('constant');
+     const bits = constant.length;
+-    this.set('constantCache', _vl.Vector3vl.fromBin(constant, bits));
++    this.set('constantCache', _vl.Vector4vl.fromBin(constant, bits));
+   },
+   operation() {
+     return {
+@@ -467,8 +472,8 @@ const ConstantView = exports.ConstantView = NumBaseView.extend({
+     if (this.hasFlag(flags, 'CONSTANT') || this.hasFlag(flags, 'NUMBASE')) this._showText();
+   },
+   _showText() {
+-    const display3vl = this.model.graph._display3vl;
+-    this.$('text.value tspan').text(display3vl.show(this.model.get('numbase'), this.model.get('constantCache')));
++    const display4vl = this.model.graph._display4vl;
++    this.$('text.value tspan').text(display4vl.show(this.model.get('numbase'), this.model.get('constantCache')));
+   },
+   update() {
+     NumBaseView.prototype.update.apply(this, arguments);
+@@ -495,7 +500,7 @@ const Clock = exports.Clock = _base.Box.define('Clock', {
+ }, {
+   _resetPortValue(port) {
+     if (port.id == "out" && port.dir == "out") {
+-      return _vl.Vector3vl.zero;
++      return _vl.Vector4vl.zero;
+     } else return _base.Box.prototype._resetPortValue(port);
+   },
+   operation() {
+diff --git a/node_modules/digitaljs/lib/cells/memory.js b/node_modules/digitaljs/lib/cells/memory.js
+index 5ade418..e8c1847 100644
+--- a/node_modules/digitaljs/lib/cells/memory.js
++++ b/node_modules/digitaljs/lib/cells/memory.js
+@@ -7,7 +7,7 @@ exports.MemoryView = exports.Memory = void 0;
+ var _jquery = _interopRequireDefault(require("jquery"));
+ var _base = require("./base.js");
+ var help = _interopRequireWildcard(require("../help.js"));
+-var _vl = require("3vl");
++var _vl = require("@twint/4vl");
+ function _interopRequireWildcard(e, t) { if ("function" == typeof WeakMap) var r = new WeakMap(), n = new WeakMap(); return (_interopRequireWildcard = function (e, t) { if (!t && e && e.__esModule) return e; var o, i, f = { __proto__: null, default: e }; if (null === e || "object" != typeof e && "function" != typeof e) return f; if (o = t ? n : r) { if (o.has(e)) return o.get(e); o.set(e, f); } for (const t in e) "default" !== t && {}.hasOwnProperty.call(e, t) && ((i = (o = Object.defineProperty) && Object.getOwnPropertyDescriptor(e, t)) && (i.get || i.set) ? o(f, t, i) : f[t] = e[t]); return f; })(e, t); }
+ function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
+ // Memory cell
+@@ -186,7 +186,7 @@ const Memory = exports.Memory = _base.Box.define('Memory', {
+     if (port.dir == "out") {
+       const res = /^rd([0-9]+)data$/.exec(port.id);
+       const portdata = res ? this.get('rdports')[res[1]] : {};
+-      if ('init_value' in portdata) return _vl.Vector3vl.fromBin(portdata.init_value, port.bits);
++      if ('init_value' in portdata) return _vl.Vector4vl.fromBin(portdata.init_value, port.bits);
+     }
+     return _base.Box.prototype._resetPortValue.call(this, port);
+   },
+@@ -200,7 +200,7 @@ const Memory = exports.Memory = _base.Box.define('Memory', {
+         init: true
+       });
+     }
+-    if (memdata) this.memdata = _vl.Mem3vl.fromJSON(bits, memdata);else this.memdata = new _vl.Mem3vl(bits, words);
++    if (memdata) this.memdata = _vl.Mem4vl.fromJSON(bits, memdata);else this.memdata = new _vl.Mem4vl(bits, words);
+     console.assert(this.memdata.words == words);
+     this.last_clk = {};
+     for (const [portname, port] of this._memports()) {
+@@ -225,7 +225,7 @@ const Memory = exports.Memory = _base.Box.define('Memory', {
+     const valid_addr = n => n >= 0 && n < this.get('words');
+     const do_comb_read = (portname, port) => {
+       const addr = this._calcaddr(data[portname + 'addr']);
+-      if (valid_addr(addr)) out[portname + 'data'] = this.memdata.get(addr);else out[portname + 'data'] = _vl.Vector3vl.xes(bits);
++      if (valid_addr(addr)) out[portname + 'data'] = this.memdata.get(addr);else out[portname + 'data'] = _vl.Vector4vl.xes(bits);
+     };
+     const write_value = (portname, port, oldval, val) => {
+       if (port.no_bit_enable || !('enable_polarity' in port)) return val;
+@@ -238,7 +238,7 @@ const Memory = exports.Memory = _base.Box.define('Memory', {
+         const wrportname = 'wr' + num;
+         const mask_ok = (val, num) => typeof val == 'boolean' ? val : val[num];
+         if ('transparent' in port && mask_ok(port.transparent, num) && port_active(wrportname, wrport) && is_enabled(wrportname, wrport) && data[portname + 'addr'] == data[wrportname + 'addr']) out[portname + 'data'] = write_value(wrportname, wrport, out[portname + 'data'], data[wrportname + 'data']);
+-        if ('collision' in port && mask_ok(port.collision, num) && port_active(wrportname, wrport) && is_enabled(wrportname, wrport) && data[portname + 'addr'] == data[wrportname + 'addr']) out[portname + 'data'] = write_value(wrportname, wrport, out[portname + 'data'], _vl.Vector3vl.xes(bits));
++        if ('collision' in port && mask_ok(port.collision, num) && port_active(wrportname, wrport) && is_enabled(wrportname, wrport) && data[portname + 'addr'] == data[wrportname + 'addr']) out[portname + 'data'] = write_value(wrportname, wrport, out[portname + 'data'], _vl.Vector4vl.xes(bits));
+       }
+     };
+     const do_write = (portname, port) => {
+@@ -252,10 +252,10 @@ const Memory = exports.Memory = _base.Box.define('Memory', {
+       }
+     };
+     const do_srst = (portname, port) => {
+-      if (data[portname + 'srst'].get(0) == pol(port, 'srst')) out[portname + 'data'] = 'srst_value' in port ? _vl.Vector3vl.fromBin(port.srst_value, bits) : _vl.Vector3vl.zeros(bits);
++      if (data[portname + 'srst'].get(0) == pol(port, 'srst')) out[portname + 'data'] = 'srst_value' in port ? _vl.Vector4vl.fromBin(port.srst_value, bits) : _vl.Vector4vl.zeros(bits);
+     };
+     const do_arst = (portname, port) => {
+-      if (data[portname + 'arst'].get(0) == pol(port, 'arst')) out[portname + 'data'] = 'arst_value' in port ? _vl.Vector3vl.fromBin(port.arst_value, bits) : _vl.Vector3vl.zeros(bits);
++      if (data[portname + 'arst'].get(0) == pol(port, 'arst')) out[portname + 'data'] = 'arst_value' in port ? _vl.Vector4vl.fromBin(port.arst_value, bits) : _vl.Vector4vl.zeros(bits);
+     };
+     const update_last_clk = (portname, port) => {
+       if ('clock_polarity' in port) {
+@@ -319,7 +319,7 @@ const MemoryView = exports.MemoryView = _base.BoxView.extend({
+   _displayEditor(evt) {
+     evt.stopPropagation();
+     const model = this.model;
+-    const display3vl = model.graph._display3vl;
++    const display4vl = model.graph._display4vl;
+     const div = (0, _jquery.default)('<div>', {
+       title: "Memory contents: " + model.get('label')
+     }).appendTo('html > body');
+@@ -328,7 +328,7 @@ const MemoryView = exports.MemoryView = _base.BoxView.extend({
+     //            '<button type="button" class="btn btn-secondary" title="Load contents">Load</button>' +
+     //            '<button type="button" class="btn btn-secondary" title="Save contents">Save</button>' +
+     //            '</div>' + 
+-    '<div class="input-group">' + help.baseSelectMarkupHTML(display3vl, model.get('bits'), 'hex') + '</div>' + '</div>' + '<table class="memeditor">' + '</table>'));
++    '<div class="input-group">' + help.baseSelectMarkupHTML(display4vl, model.get('bits'), 'hex') + '</div>' + '</div>' + '<table class="memeditor">' + '</table>'));
+     const words = model.get('words');
+     const memdata = model.memdata;
+     const ahex = Math.ceil(model.get('abits') / 4);
+@@ -371,15 +371,15 @@ const MemoryView = exports.MemoryView = _base.BoxView.extend({
+         col = col.next();
+         for (let c = 0; c < columns; c++, col = col.next()) {
+           if (address + r * columns + c >= words) break;
+-          col.find('input').val(display3vl.show(numbase, memdata.get(address + r * columns + c))).removeClass('invalid');
++          col.find('input').val(display4vl.show(numbase, memdata.get(address + r * columns + c))).removeClass('invalid');
+         }
+       }
+       displayMarkings(model.get('inputSignals'));
+     };
+     const redraw = () => {
+       const numbase = get_numbase();
+-      const ptrn = display3vl.pattern(numbase);
+-      const ds = display3vl.size(numbase, model.get('bits'));
++      const ptrn = display4vl.pattern(numbase);
++      const ds = display4vl.size(numbase, model.get('bits'));
+       columns = Math.min(words, 16, Math.ceil(32 / ds));
+       address = Math.max(0, Math.min(words - rows * columns, address));
+       const table = div.find('table');
+@@ -417,8 +417,8 @@ const MemoryView = exports.MemoryView = _base.BoxView.extend({
+       const r = target.closest('tr').index();
+       const addr = address + r * columns + c;
+       const bits = model.get('bits');
+-      if (display3vl.validate(numbase, evt.target.value, bits)) {
+-        const val = display3vl.read(numbase, evt.target.value, bits);
++      if (display4vl.validate(numbase, evt.target.value, bits)) {
++        const val = display4vl.read(numbase, evt.target.value, bits);
+         memdata.set(addr, val);
+         model.trigger('manualMemChange', model, addr, val);
+         target.removeClass('invalid');
+@@ -429,7 +429,7 @@ const MemoryView = exports.MemoryView = _base.BoxView.extend({
+     const mem_change_cb = (addr, data) => {
+       if (addr < address || addr > address + rows * columns) return;
+       const numbase = get_numbase();
+-      const z = getCell(addr).val(display3vl.show(numbase, memdata.get(addr))).removeClass('invalid').removeClass('flash');
++      const z = getCell(addr).val(display4vl.show(numbase, memdata.get(addr))).removeClass('invalid').removeClass('flash');
+       setTimeout(() => {
+         z.addClass('flash');
+       }, 10);
+diff --git a/node_modules/digitaljs/lib/cells/mux.js b/node_modules/digitaljs/lib/cells/mux.js
+index 1db63cf..2f4499f 100644
+--- a/node_modules/digitaljs/lib/cells/mux.js
++++ b/node_modules/digitaljs/lib/cells/mux.js
+@@ -6,7 +6,7 @@ Object.defineProperty(exports, "__esModule", {
+ exports.MuxView = exports.MuxSparseView = exports.MuxSparse = exports.Mux1HotView = exports.Mux1Hot = exports.Mux = exports.GenMuxView = exports.GenMux = void 0;
+ var joint = _interopRequireWildcard(require("@joint/core"));
+ var _base = require("./base.js");
+-var _vl = require("3vl");
++var _vl = require("@twint/4vl");
+ function _interopRequireWildcard(e, t) { if ("function" == typeof WeakMap) var r = new WeakMap(), n = new WeakMap(); return (_interopRequireWildcard = function (e, t) { if (!t && e && e.__esModule) return e; var o, i, f = { __proto__: null, default: e }; if (null === e || "object" != typeof e && "function" != typeof e) return f; if (o = t ? n : r) { if (o.has(e)) return o.get(e); o.set(e, f); } for (const t in e) "default" !== t && {}.hasOwnProperty.call(e, t) && ((i = (o = Object.defineProperty) && Object.getOwnPropertyDescriptor(e, t)) && (i.get || i.set) ? o(f, t, i) : f[t] = e[t]); return f; })(e, t); }
+ // add offset of 30pt to account for the top selection port and oversized box at layout time
+ const mux_pos_offset = 20;
+@@ -97,7 +97,7 @@ const GenMux = exports.GenMux = _base.Gate.define('GenMux', {
+   operation(data) {
+     const i = this.muxInput(data.sel);
+     if (i === undefined) return {
+-      out: _vl.Vector3vl.xes(this.get('bits').in)
++      out: _vl.Vector4vl.xes(this.get('bits').in)
+     };
+     return {
+       out: data['in' + i]
+diff --git a/node_modules/digitaljs/lib/cells/tribuf.js b/node_modules/digitaljs/lib/cells/tribuf.js
+new file mode 100644
+index 0000000..e25bd09
+--- /dev/null
++++ b/node_modules/digitaljs/lib/cells/tribuf.js
+@@ -0,0 +1,71 @@
++"use strict";
++
++Object.defineProperty(exports, "__esModule", {
++  value: true
++});
++exports.TribufView = exports.Tribuf = void 0;
++var _base = require("./base.js");
++var _vl = require("@twint/4vl");
++// Converted from yosys's $tribuf ("assign Y = EN ? A : 'bz;", per simlib.v):
++// EN high drives A through, EN low outputs high-Z, and EN unknown (x/z)
++// follows Verilog's 4-valued ternary rule for an unknown condition - since
++// the false branch is a constant z on every bit, that reduces to "keep z
++// where A is already z, x everywhere else".
++const Tribuf = exports.Tribuf = _base.Box.define('Tribuf', {
++  /* default properties */
++  bits: 1,
++  propagation: 0,
++  attrs: {
++    value: {
++      refX: .5,
++      refY: .5,
++      textAnchor: 'middle',
++      textVerticalAnchor: 'middle',
++      text: 'tribuf'
++    }
++  }
++}, {
++  initialize() {
++    const bits = this.get('bits');
++    this.get('ports').items = [{
++      id: 'in',
++      group: 'in',
++      dir: 'in',
++      bits: bits
++    }, {
++      id: 'en',
++      group: 'in',
++      dir: 'in',
++      bits: 1
++    }, {
++      id: 'out',
++      group: 'out',
++      dir: 'out',
++      bits: bits
++    }];
++    _base.Box.prototype.initialize.apply(this, arguments);
++  },
++  operation(data) {
++    const bits = this.get('bits');
++    const en = data.en.get(0);
++    if (en === 1) return {
++      out: data.in
++    };
++    if (en === -1) return {
++      out: _vl.Vector4vl.zes(bits)
++    };
++    const out = [];
++    for (let i = 0; i < bits; i++) out.push(data.in.get(i) === 2 ? 2 : 0);
++    return {
++      out: _vl.Vector4vl.fromArray(out)
++    };
++  },
++  markup: _base.Box.prototype.markup.concat([{
++    tagName: 'text',
++    className: 'value',
++    selector: 'value'
++  }])
++});
++const TribufView = exports.TribufView = _base.BoxView.extend({
++  _autoResizeBox: true
++});
+diff --git a/node_modules/digitaljs/lib/cells/trimerge.js b/node_modules/digitaljs/lib/cells/trimerge.js
+new file mode 100644
+index 0000000..fc60b2f
+--- /dev/null
++++ b/node_modules/digitaljs/lib/cells/trimerge.js
+@@ -0,0 +1,78 @@
++"use strict";
++
++Object.defineProperty(exports, "__esModule", {
++  value: true
++});
++exports.TriMergeView = exports.TriMerge = void 0;
++var _base = require("./base.js");
++var _vl = require("@twint/4vl");
++// Resolves N same-width drivers of one net into a single value: a real
++// (non-z) driver passes through, 2+ real drivers that agree pass that
++// value through, 2+ real drivers that disagree produce contention (x),
++// and all-z produces z. Synthesized purely during yosys2digitaljs's JSON
++// conversion for nets with more than one source; no yosys cell backs it.
++const TriMerge = exports.TriMerge = _base.Box.define('TriMerge', {
++  /* default properties */
++  inputs: 2,
++  bits: 1,
++  propagation: 0,
++  attrs: {
++    value: {
++      refX: .5,
++      refY: .5,
++      textAnchor: 'middle',
++      textVerticalAnchor: 'middle',
++      text: 'merge'
++    }
++  }
++}, {
++  initialize() {
++    const bits = this.get('bits');
++    const inputs = this.get('inputs');
++    const ports = [];
++    for (let i = 0; i < inputs; i++) ports.push({
++      id: 'in' + i,
++      group: 'in',
++      dir: 'in',
++      bits: bits
++    });
++    ports.push({
++      id: 'out',
++      group: 'out',
++      dir: 'out',
++      bits: bits
++    });
++    this.get('ports').items = ports;
++    _base.Box.prototype.initialize.apply(this, arguments);
++  },
++  operation(data) {
++    const inputs = this.get('inputs');
++    let ret = data.in0;
++    for (let i = 1; i < inputs; i++) ret = this._mergeTwo(ret, data['in' + i]);
++    return {
++      out: ret
++    };
++  },
++  _mergeTwo(a, b) {
++    const out = [];
++    for (let i = 0; i < a.bits; i++) {
++      const av = a.get(i),
++        bv = b.get(i);
++      // 0 here means 'x' (contention), per Vector4vl.fromArray's encoding
++      out.push(av === 2 ? bv : bv === 2 ? av : av === bv ? av : 0);
++    }
++    return _vl.Vector4vl.fromArray(out);
++  },
++  markup: _base.Box.prototype.markup.concat([{
++    tagName: 'text',
++    className: 'value',
++    selector: 'value'
++  }]),
++  _gateParams: _base.Box.prototype._gateParams.concat(['inputs']),
++  _unsupportedPropChanges: _base.Box.prototype._unsupportedPropChanges.concat(['inputs']),
++  _operationHelpers: _base.Box.prototype._operationHelpers.concat(['_mergeTwo']),
++  _gateKind: 'bus'
++});
++const TriMergeView = exports.TriMergeView = _base.BoxView.extend({
++  _autoResizeBox: true
++});
+diff --git a/node_modules/digitaljs/lib/circuit.js b/node_modules/digitaljs/lib/circuit.js
+index 4511409..4449097 100644
+--- a/node_modules/digitaljs/lib/circuit.js
++++ b/node_modules/digitaljs/lib/circuit.js
+@@ -7,7 +7,7 @@ exports.engines = exports.cells = exports.HeadlessCircuit = void 0;
+ exports.getCellType = getCellType;
+ exports.transform = exports.tools = void 0;
+ var joint = _interopRequireWildcard(require("@joint/core"));
+-var _vl = require("3vl");
++var _vl = require("@twint/4vl");
+ var cells = _interopRequireWildcard(require("./cells.js"));
+ exports.cells = cells;
+ var help = _interopRequireWildcard(require("./help.js"));
+@@ -84,8 +84,8 @@ class HeadlessCircuit {
+   } = {}) {
+     this._cells = Object.assign(cells, cellsNamespace);
+     this._defaultCombinationalPropagation = defaultCombinationalPropagation;
+-    this._display3vl = new _vl.Display3vl();
+-    this._display3vl.addDisplay(new help.Display3vlASCII());
++    this._display4vl = new _vl.Display4vl();
++    this._display4vl.addDisplay(new help.Display4vlASCII());
+     this._graph = this._makeGraph(data, data.subcircuits);
+     engineOptions.cells = this._cells;
+     this._engine = new engine(this._graph, engineOptions);
+@@ -95,7 +95,7 @@ class HeadlessCircuit {
+     });
+   }
+   addDisplay(display) {
+-    this._display3vl.addDisplay(display);
++    this._display4vl.addDisplay(display);
+     this.trigger('display:add', display);
+   }
+   shutdown() {
+@@ -110,7 +110,7 @@ class HeadlessCircuit {
+   _makeGraph(data, subcircuits, opt) {
+     opt = opt || {};
+     const graph = new joint.dia.Graph();
+-    graph._display3vl = this._display3vl;
++    graph._display4vl = this._display4vl;
+     graph._warnings = 0;
+     if (opt.nested) graph.set('subcircuit', true);
+     const changeWarnings = x => {
+@@ -323,7 +323,7 @@ class HeadlessCircuit {
+     return ret;
+   }
+   waitForWire(wire, trigger) {
+-    if (trigger instanceof _vl.Vector3vl) trigger = [trigger];
++    if (trigger instanceof _vl.Vector4vl) trigger = [trigger];
+     return new Promise(resolve => {
+       this.monitorWire(wire, (tick, sig) => {
+         resolve(tick);
+@@ -336,7 +336,7 @@ class HeadlessCircuit {
+     });
+   }
+   waitFor(cell, port, trigger) {
+-    if (trigger instanceof _vl.Vector3vl) trigger = [trigger];
++    if (trigger instanceof _vl.Vector4vl) trigger = [trigger];
+     return new Promise(resolve => {
+       this.monitor(cell, port, (tick, sig) => {
+         resolve(tick);
+diff --git a/node_modules/digitaljs/lib/engines/worker.js b/node_modules/digitaljs/lib/engines/worker.js
+index 1ea806b..c6bc51c 100644
+--- a/node_modules/digitaljs/lib/engines/worker.js
++++ b/node_modules/digitaljs/lib/engines/worker.js
+@@ -6,7 +6,7 @@ Object.defineProperty(exports, "__esModule", {
+ exports.WorkerEngine = void 0;
+ var _core = require("@joint/core");
+ var _base = require("./base.js");
+-var _vl = require("3vl");
++var _vl = require("@twint/4vl");
+ var cells = _interopRequireWildcard(require("../cells.js"));
+ var _webWorker = _interopRequireDefault(require("web-worker"));
+ function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
+@@ -296,7 +296,7 @@ class WorkerEngine extends _base.BaseEngine {
+       const gate = this._findGateByIds(graphId, gateId);
+       if (gate === undefined) continue;
+       const newOutputs = {};
+-      for (const [port, val] of Object.entries(vals)) newOutputs[port] = _vl.Vector3vl.fromClonable(val);
++      for (const [port, val] of Object.entries(vals)) newOutputs[port] = _vl.Vector4vl.fromClonable(val);
+       _core.util.defaults(newOutputs, gate.get('outputSignals'));
+       gate.set('outputSignals', newOutputs);
+     }
+@@ -310,7 +310,7 @@ class WorkerEngine extends _base.BaseEngine {
+     this.trigger('changeRunning');
+   }
+   _handle_gateTrigger(graphId, gateId, event, args) {
+-    if (event == "memChange") args[1] = _vl.Vector3vl.fromClonable(args[1]);
++    if (event == "memChange") args[1] = _vl.Vector4vl.fromClonable(args[1]);
+     const gate = this._findGateByIds(graphId, gateId);
+     if (gate === undefined) return;
+     gate.trigger(event, ...args);
+@@ -324,7 +324,7 @@ class WorkerEngine extends _base.BaseEngine {
+     const callback = this._monitors[monitorId];
+     if (callback == undefined) return;
+     if (oneShot) delete this._monitors[monitorId];
+-    const ret = callback(tick, _vl.Vector3vl.fromClonable(sig));
++    const ret = callback(tick, _vl.Vector4vl.fromClonable(sig));
+     if (stopped) {
+       if (ret) {
+         this._running = false;
+diff --git a/node_modules/digitaljs/lib/help.js b/node_modules/digitaljs/lib/help.js
+index 9fa0cc5..4149850 100644
+--- a/node_modules/digitaljs/lib/help.js
++++ b/node_modules/digitaljs/lib/help.js
+@@ -3,12 +3,12 @@
+ Object.defineProperty(exports, "__esModule", {
+   value: true
+ });
+-exports.Display3vlASCII = void 0;
++exports.Display4vlASCII = void 0;
+ exports.baseSelectMarkupHTML = baseSelectMarkupHTML;
+ exports.eqSigs = eqSigs;
+-var _vl = require("3vl");
++var _vl = require("@twint/4vl");
+ const controlCodes20 = ['NUL', 'SOH', 'STX', 'ETX', 'EOT', 'ENQ', 'ACK', 'BEL', 'BS', 'HT', 'LF', 'VT', 'FF', 'CR', 'SO', 'SI', 'DLE', 'DC1', 'DC2', 'DC3', 'DC4', 'NAK', 'SYN', 'ETB', 'CAN', 'EM', 'SUB', 'ESC', 'FS', 'GS', 'RS', 'US', 'SP', 'DEL'];
+-class Display3vlASCII extends _vl.Display3vlWithRegex {
++class Display4vlASCII extends _vl.Display4vlWithRegex {
+   constructor() {
+     super('[\x20-\x7e\xa0-\xff\ufffd\u2400-\u2421]|' + controlCodes20.join('|'));
+   }
+@@ -24,15 +24,15 @@ class Display3vlASCII extends _vl.Display3vlWithRegex {
+   read(data, bits) {
+     if (data.length == 1) {
+       const code = data.charCodeAt(0);
+-      if (code == 0xfffd) return _vl.Vector3vl.xes(bits);
+-      if (code == 0x2421) return _vl.Vector3vl.fromHex("7f", bits);
+-      if (code >= 0x2400 && code <= 0x2420) return _vl.Vector3vl.fromHex((code - 0x2400).toString(16), bits);
+-      return _vl.Vector3vl.fromHex(code.toString(16), bits);
++      if (code == 0xfffd) return _vl.Vector4vl.xes(bits);
++      if (code == 0x2421) return _vl.Vector4vl.fromHex("7f", bits);
++      if (code >= 0x2400 && code <= 0x2420) return _vl.Vector4vl.fromHex((code - 0x2400).toString(16), bits);
++      return _vl.Vector4vl.fromHex(code.toString(16), bits);
+     } else {
+       const code = controlCodes20.indexOf(data);
+-      if (code < 0) return _vl.Vector3vl.xes(bits);
+-      if (code == 0x21) return _vl.Vector3vl.fromHex("7f", bits);
+-      return _vl.Vector3vl.fromHex(code.toString(16), bits);
++      if (code < 0) return _vl.Vector4vl.xes(bits);
++      if (code == 0x21) return _vl.Vector4vl.fromHex("7f", bits);
++      return _vl.Vector4vl.fromHex(code.toString(16), bits);
+     }
+   }
+   show(data) {
+@@ -51,9 +51,9 @@ class Display3vlASCII extends _vl.Display3vlWithRegex {
+     return 1;
+   }
+ }
+-exports.Display3vlASCII = Display3vlASCII;
+-function baseSelectMarkupHTML(display3vl, bits, base) {
+-  const markup = display3vl.usableDisplays('read', bits).map(n => '<option value="' + n + '"' + (n == base ? ' selected="selected"' : '') + '>' + n + '</option>');
++exports.Display4vlASCII = Display4vlASCII;
++function baseSelectMarkupHTML(display4vl, bits, base) {
++  const markup = display4vl.usableDisplays('read', bits).map(n => '<option value="' + n + '"' + (n == base ? ' selected="selected"' : '') + '>' + n + '</option>');
+   return '<select name="base">' + markup.join("") + '</select>';
+ }
+ ;
+diff --git a/node_modules/digitaljs/lib/iopanel.js b/node_modules/digitaljs/lib/iopanel.js
+index 3aba3d7..f6f9472 100644
+--- a/node_modules/digitaljs/lib/iopanel.js
++++ b/node_modules/digitaljs/lib/iopanel.js
+@@ -7,7 +7,7 @@ exports.IOPanelView = void 0;
+ var joint = _interopRequireWildcard(require("@joint/core"));
+ var _jquery = _interopRequireDefault(require("jquery"));
+ var help = _interopRequireWildcard(require("./help.js"));
+-var _vl = require("3vl");
++var _vl = require("@twint/4vl");
+ function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
+ function _interopRequireWildcard(e, t) { if ("function" == typeof WeakMap) var r = new WeakMap(), n = new WeakMap(); return (_interopRequireWildcard = function (e, t) { if (!t && e && e.__esModule) return e; var o, i, f = { __proto__: null, default: e }; if (null === e || "object" != typeof e && "function" != typeof e) return f; if (o = t ? n : r) { if (o.has(e)) return o.get(e); o.set(e, f); } for (const t in e) "default" !== t && {}.hasOwnProperty.call(e, t) && ((i = (o = Object.defineProperty) && Object.getOwnPropertyDescriptor(e, t)) && (i.get || i.set) ? o(f, t, i) : f[t] = e[t]); return f; })(e, t); }
+ let uniq_cntr = 0;
+@@ -54,14 +54,14 @@ class IOPanelView extends joint.mvc.View {
+     return this._addLabel(row, cell).attr('for', this._id(cell.id));
+   }
+   _handleAddInput(cell) {
+-    const display3vl = this.model._display3vl;
++    const display4vl = this.model._display4vl;
+     const row = (0, _jquery.default)(this._rowMarkup).appendTo(this.$('div[data-iopanel="input"]'));
+     this._addLabelFor(row, cell);
+     const col = (0, _jquery.default)(this._colMarkup).appendTo(row);
+     if (cell.get('mode') == 1) {
+       const ui = (0, _jquery.default)(this._buttonMarkup).appendTo(col);
+       const inp = ui.find('input').addBack('input').attr('id', this._id(cell.id)).on('click', evt => {
+-        cell.setInput(_vl.Vector3vl.fromBool(evt.target.checked));
++        cell.setInput(_vl.Vector4vl.fromBool(evt.target.checked));
+       });
+       const updater = (cell, sigs) => {
+         inp.prop("checked", sigs.out.isHigh);
+@@ -71,28 +71,28 @@ class IOPanelView extends joint.mvc.View {
+     } else {
+       const ui = (0, _jquery.default)(this._inputMarkup).appendTo(col);
+       let base = 'hex';
+-      const base_sel = (0, _jquery.default)(this._baseSelectorMarkup(display3vl, cell.get('bits'), base)).appendTo(col);
+-      let sz = display3vl.size(base, cell.get('bits'));
++      const base_sel = (0, _jquery.default)(this._baseSelectorMarkup(display4vl, cell.get('bits'), base)).appendTo(col);
++      let sz = display4vl.size(base, cell.get('bits'));
+       const bits = cell.get('bits');
+-      const inp = ui.find('input').addBack('input').prop('size', sz).prop('maxlength', sz).prop('pattern', display3vl.pattern(base)).on('change', e => {
+-        if (!display3vl.validate(base, e.target.value, bits)) return;
+-        cell.setInput(display3vl.read(base, e.target.value, bits));
++      const inp = ui.find('input').addBack('input').prop('size', sz).prop('maxlength', sz).prop('pattern', display4vl.pattern(base)).on('change', e => {
++        if (!display4vl.validate(base, e.target.value, bits)) return;
++        cell.setInput(display4vl.read(base, e.target.value, bits));
+       });
+       const updater = (cell, sigs) => {
+-        ui.val(display3vl.show(base, sigs.out));
++        ui.val(display4vl.show(base, sigs.out));
+       };
+       this.listenTo(cell, 'change:outputSignals', updater);
+       updater(cell, cell.get('outputSignals'));
+       row.on('input', 'select[name=base]', e => {
+         base = e.target.value;
+-        sz = display3vl.size(base, cell.get('bits'));
+-        inp.prop('size', sz).prop('maxlength', sz).prop('pattern', display3vl.pattern(base));
++        sz = display4vl.size(base, cell.get('bits'));
++        inp.prop('size', sz).prop('maxlength', sz).prop('pattern', display4vl.pattern(base));
+         updater(cell, cell.get('outputSignals'));
+       });
+     }
+   }
+   _handleAddOutput(cell) {
+-    const display3vl = this.model._display3vl;
++    const display4vl = this.model._display4vl;
+     const row = (0, _jquery.default)(this._rowMarkup).appendTo(this.$('div[data-iopanel="input"]'));
+     this._addLabel(row, cell);
+     const col = (0, _jquery.default)(this._colMarkup).appendTo(row);
+@@ -109,20 +109,20 @@ class IOPanelView extends joint.mvc.View {
+     } else {
+       const ui = (0, _jquery.default)(this._inputMarkup).appendTo(col);
+       let base = 'hex';
+-      const base_sel = (0, _jquery.default)(this._baseSelectorMarkup(display3vl, cell.get('bits'), base)).appendTo(col);
+-      const sz = display3vl.size(base, cell.get('bits'));
++      const base_sel = (0, _jquery.default)(this._baseSelectorMarkup(display4vl, cell.get('bits'), base)).appendTo(col);
++      const sz = display4vl.size(base, cell.get('bits'));
+       const inp = ui.find('input').addBack('input').prop('disabled', true).prop('size', sz);
+       //                .prop('maxlength', sz)
+-      //                .prop('pattern', display3vl.pattern(base));
++      //                .prop('pattern', display4vl.pattern(base));
+       const updater = (cell, sigs) => {
+         const val = cell.getOutput();
+-        ui.val(display3vl.show(base, val));
++        ui.val(display4vl.show(base, val));
+       };
+       this.listenTo(cell, 'change:inputSignals', updater);
+       updater(cell, cell.get('inputSignals'));
+       row.on('input', 'select[name=base]', e => {
+         base = e.target.value;
+-        inp.prop('size', display3vl.size(base, cell.get('bits')));
++        inp.prop('size', display4vl.size(base, cell.get('bits')));
+         updater(cell, cell.get('inputSignals'));
+       });
+     }
+diff --git a/node_modules/digitaljs/lib/monitor.js b/node_modules/digitaljs/lib/monitor.js
+index 829fd07..f7a9f1d 100644
+--- a/node_modules/digitaljs/lib/monitor.js
++++ b/node_modules/digitaljs/lib/monitor.js
+@@ -7,7 +7,7 @@ exports.MonitorView = exports.Monitor = void 0;
+ var joint = _interopRequireWildcard(require("@joint/core"));
+ var _jquery = _interopRequireDefault(require("jquery"));
+ var help = _interopRequireWildcard(require("./help.js"));
+-var _vl = require("3vl");
++var _vl = require("@twint/4vl");
+ var _wavecanvas = require("wavecanvas");
+ function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
+ function _interopRequireWildcard(e, t) { if ("function" == typeof WeakMap) var r = new WeakMap(), n = new WeakMap(); return (_interopRequireWildcard = function (e, t) { if (!t && e && e.__esModule) return e; var o, i, f = { __proto__: null, default: e }; if (null === e || "object" != typeof e && "function" != typeof e) return f; if (o = t ? n : r) { if (o.has(e)) return o.get(e); o.set(e, f); } for (const t in e) "default" !== t && {}.hasOwnProperty.call(e, t) && ((i = (o = Object.defineProperty) && Object.getOwnPropertyDescriptor(e, t)) && (i.get || i.set) ? o(f, t, i) : f[t] = e[t]); return f; })(e, t); }
+@@ -133,7 +133,7 @@ class MonitorView extends joint.mvc.View {
+     function evt_wireid(e) {
+       return (0, _jquery.default)(e.target).closest('tr').attr('wireid');
+     }
+-    const display3vl = this.model._circuit._display3vl;
++    const display4vl = this.model._circuit._display4vl;
+     this.$el.on('click', 'button[name=remove]', e => {
+       this.model.removeWire(evt_wireid(e));
+     });
+@@ -143,8 +143,8 @@ class MonitorView extends joint.mvc.View {
+       settings.base = base;
+       const row = (0, _jquery.default)(e.target).closest('tr');
+       const trig = row.find('input[name=trigger]');
+-      trig.attr('pattern', display3vl.pattern(base));
+-      if (settings.trigger.length) trig.val(display3vl.show(base, settings.trigger[0]));
++      trig.attr('pattern', display4vl.pattern(base));
++      if (settings.trigger.length) trig.val(display4vl.show(base, settings.trigger[0]));
+       this.trigger('change');
+     });
+     const handleTrigger = () => {
+@@ -169,16 +169,16 @@ class MonitorView extends joint.mvc.View {
+       const wireid = evt_wireid(e);
+       switch (e.target.value) {
+         case 'rising':
+-          setTrigger(wireid, [_vl.Vector3vl.one]);
++          setTrigger(wireid, [_vl.Vector4vl.one]);
+           break;
+         case 'falling':
+-          setTrigger(wireid, [_vl.Vector3vl.zero]);
++          setTrigger(wireid, [_vl.Vector4vl.zero]);
+           break;
+         case 'risefall':
+-          setTrigger(wireid, [_vl.Vector3vl.one, _vl.Vector3vl.zero]);
++          setTrigger(wireid, [_vl.Vector4vl.one, _vl.Vector4vl.zero]);
+           break;
+         case 'undef':
+-          setTrigger(wireid, [_vl.Vector3vl.x]);
++          setTrigger(wireid, [_vl.Vector4vl.x]);
+           break;
+         default:
+           setTrigger(wireid, []);
+@@ -191,10 +191,10 @@ class MonitorView extends joint.mvc.View {
+       const bits = this.model._wires.get(wireid).waveform.bits;
+       if (e.target.value == "") {
+         setTrigger(wireid, []);
+-      } else if (display3vl.validate(base, e.target.value, bits)) {
+-        const val = display3vl.read(base, e.target.value, bits);
++      } else if (display4vl.validate(base, e.target.value, bits)) {
++        const val = display4vl.read(base, e.target.value, bits);
+         setTrigger(wireid, [val]);
+-        e.target.value = display3vl.show(base, val);
++        e.target.value = display4vl.show(base, val);
+       } else {
+         setTrigger(wireid, []);
+       }
+@@ -296,10 +296,10 @@ class MonitorView extends joint.mvc.View {
+     }
+   }
+   _draw(wireid) {
+-    const display3vl = this.model._circuit._display3vl;
++    const display4vl = this.model._circuit._display4vl;
+     const canvas = this.$('tr[wireid="' + wireid + '"]').find('canvas');
+     const waveform = this.model._wires.get(wireid).waveform;
+-    (0, _wavecanvas.drawWaveform)(waveform, canvas[0].getContext('2d'), this._settingsFor.get(wireid), display3vl);
++    (0, _wavecanvas.drawWaveform)(waveform, canvas[0].getContext('2d'), this._settingsFor.get(wireid), display4vl);
+   }
+   _handleAdd(wire) {
+     const wireid = getWireId(wire);
+@@ -320,8 +320,8 @@ class MonitorView extends joint.mvc.View {
+   _createRow(wire) {
+     const wireid = getWireId(wire);
+     const settings = this._settingsFor.get(wireid);
+-    const display3vl = this.model._circuit._display3vl;
+-    const base_sel = wire.get('bits') > 1 ? this._baseSelectorMarkup instanceof Function ? this._baseSelectorMarkup(display3vl, wire.get('bits'), settings.base) : this._baseSelectorMarkup : '';
++    const display4vl = this.model._circuit._display4vl;
++    const base_sel = wire.get('bits') > 1 ? this._baseSelectorMarkup instanceof Function ? this._baseSelectorMarkup(display4vl, wire.get('bits'), settings.base) : this._baseSelectorMarkup : '';
+     const trigger = wire.get('bits') > 1 ? this._busTriggerMarkup : this._bitTriggerMarkup;
+     const row = (0, _jquery.default)('<tr><td class="name"></td><td>' + base_sel + '</td><td>' + trigger + '</td><td>' + this._removeButtonMarkup + '</td><td><canvas class="wavecanvas" height="30" draggable="true"></canvas></td></tr>');
+     row.attr('wireid', wireid);
+diff --git a/node_modules/digitaljs/lib/transform.js b/node_modules/digitaljs/lib/transform.js
+index 7f0e172..81272f2 100644
+--- a/node_modules/digitaljs/lib/transform.js
++++ b/node_modules/digitaljs/lib/transform.js
+@@ -13,7 +13,7 @@ exports.removeRepeater = removeRepeater;
+ exports.transformCircuit = transformCircuit;
+ exports.transformations = void 0;
+ var _core = require("@joint/core");
+-var _vl = require("3vl");
++var _vl = require("@twint/4vl");
+ function removeRepeater(model, dev, id) {
+   if (dev.type != 'Repeater') return false;
+   const outConns = model.outputPortConnectors(id, "out");
+@@ -61,7 +61,7 @@ function integrateArithConstant(model, dev, id) {
+     const inId = inConnList[0].from.id;
+     const inDev = model.getDevice(inId);
+     if (inDev.type != 'Constant') return false;
+-    const val = _vl.Vector3vl.fromBin(inDev.constant, inDev.constant.length);
++    const val = _vl.Vector4vl.fromBin(inDev.constant, inDev.constant.length);
+     if (!val.isFullyDefined) return false;
+     const i = val.toBigInt(sgn);
+     if (i > 999 || i < -99) return false;
+@@ -214,7 +214,7 @@ function makeBinaryMuxes(model, dev, id) {
+     newDev.default_input = !muxInputs[0].every(conn => {
+       const inDev = model.getDevice(conn.from.id);
+       if (inDev.type != "Constant") return false;
+-      const val = _vl.Vector3vl.fromBin(inDev.constant, bits);
++      const val = _vl.Vector4vl.fromBin(inDev.constant, bits);
+       return val.xmask().isHigh;
+     });
+   }
+diff --git a/node_modules/digitaljs/src/cells.mjs b/node_modules/digitaljs/src/cells.mjs
+index 9b290fe..f818660 100644
+--- a/node_modules/digitaljs/src/cells.mjs
++++ b/node_modules/digitaljs/src/cells.mjs
+@@ -11,3 +11,5 @@ export * from "./cells/dff.mjs";
+ export * from "./cells/memory.mjs";
+ export * from "./cells/fsm.mjs";
+ export * from "./cells/display7.mjs";
++export * from "./cells/trimerge.mjs";
++export * from "./cells/tribuf.mjs";
+diff --git a/node_modules/digitaljs/src/cells/arith.mjs b/node_modules/digitaljs/src/cells/arith.mjs
+index ca5f960..23965f4 100644
+--- a/node_modules/digitaljs/src/cells/arith.mjs
++++ b/node_modules/digitaljs/src/cells/arith.mjs
+@@ -1,7 +1,7 @@
+ "use strict";
+ 
+ import { Gate, GateView } from './base.mjs';
+-import { Vector3vl } from '3vl';
++import { Vector4vl } from '@twint/4vl';
+ 
+ function isSafeInteger(v) {
+     return v <= Number.MAX_SAFE_INTEGER && v >= -Number.MAX_SAFE_INTEGER;
+@@ -61,9 +61,9 @@ export const Arith11 = Arith.define('Arith11', {
+     operation(data) {
+         const bits = this.get('bits');
+         if (!data.in.isFullyDefined)
+-            return { out: Vector3vl.xes(bits.out) };
++            return { out: Vector4vl.xes(bits.out) };
+         return {
+-            out: Vector3vl.fromNumber(this.arithop(data.in.toBigInt(this.get('signed'))), bits.out)
++            out: Vector4vl.fromNumber(this.arithop(data.in.toBigInt(this.get('signed'))), bits.out)
+         };
+     },
+     _operationHelpers: Arith.prototype._operationHelpers.concat(['arithop'])
+@@ -93,9 +93,9 @@ export const Arith21 = Arith.define('Arith21', {
+         const bits = this.get('bits');
+         const sgn = this.get('signed');
+         if (!data.in1.isFullyDefined || !data.in2.isFullyDefined)
+-            return { out: Vector3vl.xes(bits.out) };
++            return { out: Vector4vl.xes(bits.out) };
+         return {
+-            out: Vector3vl.fromNumber(this.arithop(
++            out: Vector4vl.fromNumber(this.arithop(
+                     data.in1.toBigInt(sgn.in1 && sgn.in2),
+                     data.in2.toBigInt(sgn.in1 && sgn.in2)), bits.out)
+         };
+@@ -105,12 +105,12 @@ export const Arith21 = Arith.define('Arith21', {
+ 
+ function shiftHelp(in1, am, bits_in, bits_out, sgn_in, sgn_out, fillx) {
+     const signbit = in1.get(in1.bits-1);
+-    const ext = Vector3vl.make(Math.max(0, bits_out - bits_in),
++    const ext = Vector4vl.make(Math.max(0, bits_out - bits_in),
+         fillx ? 0 : sgn_in ? signbit : -1);
+     const my_in = in1.concat(ext);
+     const out = am < 0
+-        ? Vector3vl.make(-am, fillx ? 0 : -1).concat(my_in)
+-        : my_in.slice(am).concat(Vector3vl.make(am, fillx ? 0 : sgn_out ? my_in.get(my_in.bits-1) : -1));
++        ? Vector4vl.make(-am, fillx ? 0 : -1).concat(my_in)
++        : my_in.slice(am).concat(Vector4vl.make(am, fillx ? 0 : sgn_out ? my_in.get(my_in.bits-1) : -1));
+     return out.slice(0, bits_out);
+ }
+ 
+@@ -140,7 +140,7 @@ export const Shift = Arith.define('Shift', {
+         const sgn = this.get('signed');
+         const fillx = this.get('fillx');
+         if (!data.in2.isFullyDefined)
+-            return { out: Vector3vl.xes(bits.out) };
++            return { out: Vector4vl.xes(bits.out) };
+         const am = data.in2.toNumber(sgn.in2) * this.shiftdir;
+         return { out: shiftHelp(data.in1, am, bits.in1, bits.out, sgn.in1, sgn.out, fillx) };
+     },
+@@ -177,9 +177,9 @@ export const Compare = BaseCompare.define('Compare', {}, {
+         const bits = this.get('bits');
+         const sgn = this.get('signed');
+         if (!data.in1.isFullyDefined || !data.in2.isFullyDefined)
+-            return { out: Vector3vl.xes(1) };
++            return { out: Vector4vl.xes(1) };
+         return {
+-            out: Vector3vl.fromBool(this.arithcomp(
++            out: Vector4vl.fromBool(this.arithcomp(
+                     data.in1.toBigInt(sgn.in1 && sgn.in2),
+                     data.in2.toBigInt(sgn.in1 && sgn.in2)))
+         };
+@@ -193,9 +193,9 @@ export const EqCompare = BaseCompare.define('EqCompare', {}, {
+         const bits = this.get('bits');
+         const sgn = this.get('signed');
+         const in1 = bits.in1 >= bits.in2 ? data.in1 : 
+-            data.in1.concat(Vector3vl.make(bits.in2 - bits.in1, sgn.in1 && sgn.in2 ? data.in1.msb : -1));
++            data.in1.concat(Vector4vl.make(bits.in2 - bits.in1, sgn.in1 && sgn.in2 ? data.in1.msb : -1));
+         const in2 = bits.in2 >= bits.in1 ? data.in2 : 
+-            data.in2.concat(Vector3vl.make(bits.in1 - bits.in2, sgn.in1 && sgn.in2 ? data.in2.msb : -1));
++            data.in2.concat(Vector4vl.make(bits.in1 - bits.in2, sgn.in1 && sgn.in2 ? data.in2.msb : -1));
+         return {
+             out: this.bincomp(in1, in2)
+         };
+@@ -429,16 +429,16 @@ export const ArithConst = OpConst.define('ArithConst', {
+         const sgn = this.get('signed');
+         const constant = this.get('constant');
+         if (!data.in.isFullyDefined)
+-            return { out: Vector3vl.xes(bits.out) };
++            return { out: Vector4vl.xes(bits.out) };
+         if (this.get('leftOp'))
+             return {
+-                out: Vector3vl.fromNumber(this.arithop(
++                out: Vector4vl.fromNumber(this.arithop(
+                     BigInt(constant),
+                     data.in.toBigInt(sgn.in)), bits.out)
+             }
+         else
+             return {
+-                out: Vector3vl.fromNumber(this.arithop(
++                out: Vector4vl.fromNumber(this.arithop(
+                     data.in.toBigInt(sgn.in), BigInt(constant)), bits.out)
+             };
+     },
+@@ -468,9 +468,9 @@ export const ShiftConst = OpConst.define('ShiftConst', {
+         const constant = this.get('constant');
+         if (this.get('leftOp')) {
+             if (!data.in.isFullyDefined)
+-                return { out: Vector3vl.xes(bits.out) };
++                return { out: Vector4vl.xes(bits.out) };
+             const am = data.in.toNumber(sgn.in);
+-            const sig = Vector3vl.fromNumber(constant);
++            const sig = Vector4vl.fromNumber(constant);
+             return { 
+                 out: shiftHelp(sig, am * this.shiftdir, sig.bits, bits.out, constant < 0, sgn.out, fillx) 
+             };
+@@ -509,16 +509,16 @@ export const CompareConst = BaseCompareConst.define('CompareConst', {}, {
+         const sgn = this.get('signed');
+         const constant = this.get('constant');
+         if (!data.in.isFullyDefined)
+-            return { out: Vector3vl.x };
++            return { out: Vector4vl.x };
+         if (this.get('leftOp'))
+             return {
+-                out: Vector3vl.fromBool(this.arithcomp(
++                out: Vector4vl.fromBool(this.arithcomp(
+                     BigInt(constant),
+                     data.in.toBigInt(sgn.in)))
+             }
+         else
+             return {
+-                out: Vector3vl.fromBool(this.arithcomp(
++                out: Vector4vl.fromBool(this.arithcomp(
+                     data.in.toBigInt(sgn.in), 
+                     BigInt(constant)))
+             };
+@@ -534,11 +534,11 @@ export const EqCompareConst = BaseCompareConst.define('EqCompareConst', {}, {
+         const constant = this.get('constant');
+         if (this.get('leftOp'))
+             return {
+-                out: this.bincomp(Vector3vl.fromNumber(constant, bits.in), data.in)
++                out: this.bincomp(Vector4vl.fromNumber(constant, bits.in), data.in)
+             };
+         else
+             return {
+-                out: this.bincomp(data.in, Vector3vl.fromNumber(constant, bits.in))
++                out: this.bincomp(data.in, Vector4vl.fromNumber(constant, bits.in))
+             };
+     },
+     _operationHelpers: BaseCompareConst.prototype._operationHelpers.concat(['bincomp'])
+diff --git a/node_modules/digitaljs/src/cells/base.mjs b/node_modules/digitaljs/src/cells/base.mjs
+index e0eebc9..7ca3aca 100644
+--- a/node_modules/digitaljs/src/cells/base.mjs
++++ b/node_modules/digitaljs/src/cells/base.mjs
+@@ -1,10 +1,21 @@
+ "use strict";
+ 
+ import * as joint from '@joint/core';
+-import { Vector3vl } from '3vl';
++import { Vector4vl } from '@twint/4vl';
+ import * as tools from '../tools.mjs';
+ import $ from 'jquery';
+ 
++// True iff every bit of the vector is z (fully floating/high-impedance),
++// as opposed to merely "not fully defined" (which also covers x and mixes
++// of x/z/defined bits) - used to give a floating net its own visual state
++// distinct from plain-undefined instead of lumping both into one grey bucket.
++export function isAllZ(v) {
++    for (let i = 0; i < v.bits; i++) {
++        if (v.get(i) !== 2) return false;
++    }
++    return true;
++}
++
+ export const portGroupAttrs = {
+     wire: {
+         stroke: '#4B4F6A',
+@@ -127,7 +138,7 @@ export const Gate = joint.dia.Element.define('Gate', {
+     },
+     _clearInput(port) {
+         const bits = this.getPort(port).bits;
+-        this._setInput(Vector3vl.xes(bits), port);
++        this._setInput(Vector4vl.xes(bits), port);
+     },
+     _preprocessPorts(ports) {
+         this._resetPortsSignals(ports);
+@@ -175,7 +186,7 @@ export const Gate = joint.dia.Element.define('Gate', {
+         return bits > 1 ? bits : '';
+     },
+     _resetPortValue(port) {
+-        return Vector3vl.xes(port.bits);
++        return Vector4vl.xes(port.bits);
+     },
+     _resetPortsSignals(ports) {
+         const signals = {
+@@ -308,6 +319,7 @@ export const GateView = joint.dia.ElementView.extend({
+             high: { port: { 'stroke': '#03c03c' } },
+             low: { port: { 'stroke': '#fc7c68' } },
+             def: { port: { 'stroke': '#779ecb' } },
++            highz: { port: { 'stroke': '#f39c12' } },
+             undef: { port: { 'stroke': '#999' } }
+         }
+     },
+@@ -335,7 +347,7 @@ export const GateView = joint.dia.ElementView.extend({
+         for (const port in signals) {
+             const signal = signals[port];
+             const attrs = this.attrs.signal[
+-                !signal.isDefined ? 'undef' :
++                !signal.isDefined ? (isAllZ(signal) ? 'highz' : 'undef') :
+                 signal.isHigh ? 'high' :
+                 signal.isLow ? 'low' : 'def'
+             ];
+@@ -375,7 +387,7 @@ export const Wire = joint.shapes.standard.Link.define('Wire', {
+         }
+     },
+ 
+-    signal: Vector3vl.xes(1),
++    signal: Vector4vl.xes(1),
+     bits: 1,
+     warning: false,
+ 
+@@ -441,7 +453,7 @@ export const Wire = joint.shapes.standard.Link.define('Wire', {
+             //set signal after checking connection to avoid false signal propagation
+             this.set('signal', source.get('outputSignals')[src.port]);
+         } else {
+-            this.set('signal', Vector3vl.xes(this.get('bits')));
++            this.set('signal', Vector4vl.xes(this.get('bits')));
+         }
+     },
+     _changeTarget(tar) {
+@@ -500,6 +512,7 @@ export const WireView = joint.dia.LinkView.extend({
+             high: { line: { 'stroke': '#03c03c' } },
+             low: { line: { 'stroke': '#fc7c68' } },
+             def: { line: { 'stroke': '#779ecb' } },
++            highz: { line: { 'stroke': '#f39c12' } },
+             undef: { line: { 'stroke': '#999' } }
+         },
+         bits: {
+@@ -552,7 +565,7 @@ export const WireView = joint.dia.LinkView.extend({
+     _updateSignal() {
+         const signal = this.model.get('signal');
+         const attrs = this.attrs.signal[
+-            !signal.isDefined ? 'undef' :
++            !signal.isDefined ? (isAllZ(signal) ? 'highz' : 'undef') :
+             signal.isHigh ? 'high' :
+             signal.isLow ? 'low' : 'def'
+         ];
+@@ -624,12 +637,12 @@ export const WireView = joint.dia.LinkView.extend({
+     _generateTextForTooltip() {
+         if (!this.wire_hover) return;
+         const sig = this.model.get('signal');
+-        const display3vl = this.model.graph._display3vl;
++        const display4vl = this.model.graph._display4vl;
+         const hovertext = [
+-            'Hex: ' + display3vl.show('hex', sig) + '<br>',
+-            'Dec: ' + display3vl.show('dec', sig) + '<br>',
+-            'Oct: ' + display3vl.show('oct', sig) + '<br>',
+-            'Bin: ' + display3vl.show('bin', sig)
++            'Hex: ' + display4vl.show('hex', sig) + '<br>',
++            'Dec: ' + display4vl.show('dec', sig) + '<br>',
++            'Oct: ' + display4vl.show('oct', sig) + '<br>',
++            'Bin: ' + display4vl.show('bin', sig)
+         ].join('');
+         this.wire_hover.html(hovertext);
+     },
+diff --git a/node_modules/digitaljs/src/cells/bus.mjs b/node_modules/digitaljs/src/cells/bus.mjs
+index 0664fc6..e383a7e 100644
+--- a/node_modules/digitaljs/src/cells/bus.mjs
++++ b/node_modules/digitaljs/src/cells/bus.mjs
+@@ -1,7 +1,7 @@
+ "use strict";
+ 
+ import { Box, BoxView } from './base.mjs';
+-import { Vector3vl } from '3vl';
++import { Vector4vl } from '@twint/4vl';
+ 
+ // Bit extending
+ export const BitExtend = Box.define('BitExtend', {
+@@ -32,7 +32,7 @@ export const BitExtend = Box.define('BitExtend', {
+     },
+     operation(data) {
+         const ex = this.get('extend');
+-        return { out: data.in.concat(Vector3vl.make(ex.output - ex.input, this._extBit(data.in))) };
++        return { out: data.in.concat(Vector4vl.make(ex.output - ex.input, this._extBit(data.in))) };
+     },
+     markup: Box.prototype.markup.concat([{
+             tagName: 'text',
+@@ -154,7 +154,7 @@ export const BusGroup = BusRegroup.define('BusGroup', {
+         for (const num of this.get('groups').keys()) {
+             outdata.push(data['in' + num]);
+         }
+-        return { out : Vector3vl.concat(...outdata) };
++        return { out : Vector4vl.concat(...outdata) };
+     }
+ });
+ export const BusGroupView = BusRegroupView;
+diff --git a/node_modules/digitaljs/src/cells/dff.mjs b/node_modules/digitaljs/src/cells/dff.mjs
+index 92dc8b8..ccda47e 100644
+--- a/node_modules/digitaljs/src/cells/dff.mjs
++++ b/node_modules/digitaljs/src/cells/dff.mjs
+@@ -1,7 +1,7 @@
+ "use strict";
+ 
+ import { Box, BoxView } from './base.mjs';
+-import { Vector3vl } from '3vl';
++import { Vector4vl } from '@twint/4vl';
+ 
+ // D flip-flops
+ export const Dff = Box.define('Dff', {
+@@ -77,7 +77,7 @@ export const Dff = Box.define('Dff', {
+     },
+     _resetPortValue(port) {
+         if (port.id == "out" && port.dir == "out")
+-            return Vector3vl.fromBin(this.get('initial'), port.bits);
++            return Vector4vl.fromBin(this.get('initial'), port.bits);
+         else return Box.prototype._resetPortValue.call(this, port);
+     },
+     operation(data) {
+@@ -90,7 +90,7 @@ export const Dff = Box.define('Dff', {
+             this.last_clk = data.clk.get(0);
+         }
+         if ('arst' in polarity && data.arst.get(0) == pol('arst'))
+-            return { out: Vector3vl.fromBin(this.get('arst_value'), this.get('bits')) };
++            return { out: Vector4vl.fromBin(this.get('arst_value'), this.get('bits')) };
+         if ('aload' in polarity && data.aload.get(0) == pol('aload'))
+             return { out: data.ain };
+         if ('set' in polarity) {
+@@ -98,7 +98,7 @@ export const Dff = Box.define('Dff', {
+             srbitmask = polarity.set ? data.set.not() : data.set;
+         }
+         if ('clr' in polarity) {
+-            srbits = srbits ? srbits : Vector3vl.zeros(this.get('bits'));
++            srbits = srbits ? srbits : Vector4vl.zeros(this.get('bits'));
+             const clrbitmask = polarity.clr ? data.clr.not() : data.clr;
+             srbitmask = srbitmask ? clrbitmask.and(srbitmask) : clrbitmask;
+         }
+@@ -106,7 +106,7 @@ export const Dff = Box.define('Dff', {
+             return apply_sr(this.get('outputSignals').out);
+         if (!('clock' in polarity) || data.clk.get(0) == pol('clock') && last_clk == -pol('clock')) {
+             if ('srst' in polarity && data.srst.get(0) == pol('srst'))
+-                return apply_sr(Vector3vl.fromBin(this.get('srst_value'), this.get('bits')));
++                return apply_sr(Vector4vl.fromBin(this.get('srst_value'), this.get('bits')));
+             if ('enable' in polarity && data.en.get(0) != pol('enable') && !this.get('enable_srst'))
+                 return apply_sr(this.get('outputSignals').out);
+             if (this.get('no_data'))
+diff --git a/node_modules/digitaljs/src/cells/fsm.mjs b/node_modules/digitaljs/src/cells/fsm.mjs
+index 78a39e8..04e8867 100644
+--- a/node_modules/digitaljs/src/cells/fsm.mjs
++++ b/node_modules/digitaljs/src/cells/fsm.mjs
+@@ -4,7 +4,7 @@ import $ from 'jquery';
+ import * as joint from '@joint/core';
+ import { DirectedGraph } from '@joint/layout-directed-graph';
+ import { Box, BoxView } from './base.mjs';
+-import { Vector3vl } from '3vl';
++import { Vector4vl } from '@twint/4vl';
+ 
+ export const FSM = Box.define('FSM', {
+     /* default properties */
+@@ -112,8 +112,8 @@ export const FSM = Box.define('FSM', {
+             this.transitions.get(tr.state_in).push({
+                 id: 'tr'+id,
+                 stateOut: tr.state_out,
+-                ctrlIn: Vector3vl.fromBin(tr.ctrl_in, bits.in),
+-                ctrlOut: Vector3vl.fromBin(tr.ctrl_out, bits.out)
++                ctrlIn: Vector4vl.fromBin(tr.ctrl_in, bits.in),
++                ctrlOut: Vector4vl.fromBin(tr.ctrl_out, bits.out)
+             });
+             id++;
+         };
+@@ -146,7 +146,7 @@ export const FSM = Box.define('FSM', {
+                 if (data.in.or(xmask).eq(ctrlIn.or(xmask)))
+                     results.push(trans.ctrlOut);
+             }
+-            const xes = Vector3vl.xes(bits.out);
++            const xes = Vector4vl.xes(bits.out);
+             if (results.length == 0) return xes;
+             while (results.length > 1) {
+                 const other = results.pop();
+diff --git a/node_modules/digitaljs/src/cells/io.mjs b/node_modules/digitaljs/src/cells/io.mjs
+index dc91963..777411f 100644
+--- a/node_modules/digitaljs/src/cells/io.mjs
++++ b/node_modules/digitaljs/src/cells/io.mjs
+@@ -1,9 +1,9 @@
+ "use strict";
+ 
+ import * as joint from '@joint/core';
+-import { Box, BoxView } from './base.mjs';
++import { Box, BoxView, isAllZ } from './base.mjs';
+ import $ from 'jquery';
+-import { Vector3vl } from '3vl';
++import { Vector4vl } from '@twint/4vl';
+ 
+ // Things with numbers
+ export const NumBase = Box.define('NumBase', {
+@@ -15,8 +15,8 @@ export const NumBase = Box.define('NumBase', {
+         Box.prototype.initialize.apply(this, arguments);
+ 
+         this.on('change:bits', (_, bits) => {
+-            const display3vl = this.graph._display3vl;
+-            const displays = display3vl.usableDisplays(this.numbaseType, this.get('bits'));
++            const display4vl = this.graph._display4vl;
++            const displays = display4vl.usableDisplays(this.numbaseType, this.get('bits'));
+             if (!displays.includes(this.get('numbase')))
+                 this.set('numbase', 'hex');
+         });
+@@ -71,8 +71,8 @@ export const NumBaseView = BoxView.extend({
+     _makeNumBaseSelector() {
+         this.$('select.numbase').empty();
+         const numbase = this.model.get('numbase');
+-        const display3vl = this.model.graph._display3vl;
+-        for (const base of display3vl.usableDisplays(this.model.numbaseType, this.model.get('bits'))) {
++        const display4vl = this.model.graph._display4vl;
++        for (const base of display4vl.usableDisplays(this.model.numbaseType, this.model.get('bits'))) {
+             const opt = $('<option>')
+                 .attr('value', base)
+                 .prop('selected', base == numbase)
+@@ -196,7 +196,7 @@ export const Input = IO.define('Input', {
+         if (port.id == "out" && port.dir == "out") {
+             const bits = this.get('bits');
+             const mode = this.get('mode');
+-            return mode == 1 ? Vector3vl.zeros(bits) : Vector3vl.xes(bits);
++            return mode == 1 ? Vector4vl.zeros(bits) : Vector4vl.xes(bits);
+         } else return IO.prototype._resetPortValue.call(this, port);
+     },
+     _checkMode() {
+@@ -263,8 +263,8 @@ export const InputView = IOView.extend({
+         this._applyAttrs(attrs);
+     },
+     _updateNumEntry() {
+-        const display3vl = this.model.graph._display3vl;
+-        this.$('input').val(display3vl.show(this.model.get('numbase'), this.model.get('outputSignals').out));
++        const display4vl = this.model.graph._display4vl;
++        this.$('input').val(display4vl.show(this.model.get('numbase'), this.model.get('outputSignals').out));
+         this.$('input').removeClass('invalid');
+     },
+     render() {
+@@ -288,9 +288,9 @@ export const InputView = IOView.extend({
+     _onNumEntry(evt) {
+         const numbase = this.model.get('numbase');
+         const bits = this.model.get('bits');
+-        const display3vl = this.model.graph._display3vl;
+-        if (display3vl.validate(numbase, evt.target.value, bits)) {
+-            const val = display3vl.read(numbase, evt.target.value, bits);
++        const display4vl = this.model.graph._display4vl;
++        if (display4vl.validate(numbase, evt.target.value, bits)) {
++            const val = display4vl.read(numbase, evt.target.value, bits);
+             this.model.setInput(val);
+         } else {
+             this.$('input').addClass('invalid');
+@@ -341,6 +341,7 @@ export const OutputView = IOView.extend({
+         lamp: {
+             high: { led: { 'fill': '#03c03c' } },
+             low: { led: { 'fill': '#fc7c68' } },
++            highz: { led: { 'fill': '#f39c12' } },
+             undef: { led: { 'fill': '#bfc5c6' } }
+         }
+     }, IOView.prototype.attrs),
+@@ -359,13 +360,14 @@ export const OutputView = IOView.extend({
+         const signal = this.model.get('inputSignals').in;
+         const attrs = this.attrs.lamp[
+             signal.isHigh ? 'high' :
+-            signal.isLow ? 'low' : 'undef'
++            signal.isLow ? 'low' :
++            isAllZ(signal) ? 'highz' : 'undef'
+         ];
+         this._applyAttrs(attrs);
+     },
+     _updateNumDisplay() {
+-        const display3vl = this.model.graph._display3vl;
+-        this.$('text.value tspan').text(display3vl.show(this.model.get('numbase'), this.model.get('inputSignals').in));
++        const display4vl = this.model.graph._display4vl;
++        this.$('text.value tspan').text(display4vl.show(this.model.get('numbase'), this.model.get('inputSignals').in));
+     },
+     render() {
+         IOView.prototype.render.apply(this, arguments);
+@@ -408,13 +410,13 @@ export const Constant = NumBase.define('Constant', {
+             const bits = constant.length;
+             this._setPortsBits({ out: bits });
+             this.set('bits', bits);
+-            this.set('constantCache', Vector3vl.fromBin(constant, bits));
++            this.set('constantCache', Vector4vl.fromBin(constant, bits));
+         });
+     },
+     prepare() {
+         const constant = this.get('constant');
+         const bits = constant.length;
+-        this.set('constantCache', Vector3vl.fromBin(constant, bits));
++        this.set('constantCache', Vector4vl.fromBin(constant, bits));
+     },
+     operation() {
+         return { out: this.get('constantCache') };
+@@ -438,8 +440,8 @@ export const ConstantView = NumBaseView.extend({
+             this.hasFlag(flags, 'NUMBASE')) this._showText();
+     },
+     _showText() {
+-        const display3vl = this.model.graph._display3vl;
+-        this.$('text.value tspan').text(display3vl.show(this.model.get('numbase'), this.model.get('constantCache')));
++        const display4vl = this.model.graph._display4vl;
++        this.$('text.value tspan').text(display4vl.show(this.model.get('numbase'), this.model.get('constantCache')));
+     },
+     update() {
+         NumBaseView.prototype.update.apply(this, arguments);
+@@ -462,7 +464,7 @@ export const Clock = Box.define('Clock', {
+ }, {
+     _resetPortValue(port) {
+         if (port.id == "out" && port.dir == "out") {
+-            return Vector3vl.zero;
++            return Vector4vl.zero;
+         } else return Box.prototype._resetPortValue(port);
+     },
+     operation() {
+diff --git a/node_modules/digitaljs/src/cells/memory.mjs b/node_modules/digitaljs/src/cells/memory.mjs
+index fb7f101..b69a1f4 100644
+--- a/node_modules/digitaljs/src/cells/memory.mjs
++++ b/node_modules/digitaljs/src/cells/memory.mjs
+@@ -3,7 +3,7 @@
+ import $ from 'jquery';
+ import { Box, BoxView } from './base.mjs';
+ import * as help from '../help.mjs';
+-import { Vector3vl, Mem3vl } from '3vl';
++import { Vector4vl, Mem4vl } from '@twint/4vl';
+ 
+ // Memory cell
+ export const Memory = Box.define('Memory', {
+@@ -109,7 +109,7 @@ export const Memory = Box.define('Memory', {
+             const res = /^rd([0-9]+)data$/.exec(port.id);
+             const portdata = res ? this.get('rdports')[res[1]] : {};
+             if ('init_value' in portdata)
+-                return Vector3vl.fromBin(portdata.init_value, port.bits);
++                return Vector4vl.fromBin(portdata.init_value, port.bits);
+         }
+         return Box.prototype._resetPortValue.call(this, port);
+     },
+@@ -123,9 +123,9 @@ export const Memory = Box.define('Memory', {
+             this.prop('words', words, { init: true });
+         }
+         if (memdata)
+-            this.memdata = Mem3vl.fromJSON(bits, memdata);
++            this.memdata = Mem4vl.fromJSON(bits, memdata);
+         else
+-            this.memdata = new Mem3vl(bits, words);
++            this.memdata = new Mem4vl(bits, words);
+         console.assert(this.memdata.words == words);
+         
+         this.last_clk = {};
+@@ -156,7 +156,7 @@ export const Memory = Box.define('Memory', {
+             if (valid_addr(addr))
+                 out[portname + 'data'] = this.memdata.get(addr);
+             else
+-                out[portname + 'data'] = Vector3vl.xes(bits);
++                out[portname + 'data'] = Vector4vl.xes(bits);
+         };
+         const write_value = (portname, port, oldval, val) => {
+             if (port.no_bit_enable || !('enable_polarity' in port))
+@@ -172,7 +172,7 @@ export const Memory = Box.define('Memory', {
+                 if ('transparent' in port && mask_ok(port.transparent, num) && port_active(wrportname, wrport) && is_enabled(wrportname, wrport) && data[portname + 'addr'] == data[wrportname + 'addr'])
+                     out[portname + 'data'] = write_value(wrportname, wrport, out[portname + 'data'], data[wrportname + 'data']);
+                 if ('collision' in port && mask_ok(port.collision, num) && port_active(wrportname, wrport) && is_enabled(wrportname, wrport) && data[portname + 'addr'] == data[wrportname + 'addr'])
+-                    out[portname + 'data'] = write_value(wrportname, wrport, out[portname + 'data'], Vector3vl.xes(bits));
++                    out[portname + 'data'] = write_value(wrportname, wrport, out[portname + 'data'], Vector4vl.xes(bits));
+             }
+ 
+         };
+@@ -190,14 +190,14 @@ export const Memory = Box.define('Memory', {
+         const do_srst = (portname, port) => {
+             if (data[portname + 'srst'].get(0) == pol(port, 'srst'))
+                 out[portname + 'data'] = 'srst_value' in port
+-                                       ? Vector3vl.fromBin(port.srst_value, bits)
+-                                       : Vector3vl.zeros(bits);
++                                       ? Vector4vl.fromBin(port.srst_value, bits)
++                                       : Vector4vl.zeros(bits);
+         };
+         const do_arst = (portname, port) => {
+             if (data[portname + 'arst'].get(0) == pol(port, 'arst'))
+                 out[portname + 'data'] = 'arst_value' in port
+-                                       ? Vector3vl.fromBin(port.arst_value, bits)
+-                                       : Vector3vl.zeros(bits);
++                                       ? Vector4vl.fromBin(port.arst_value, bits)
++                                       : Vector4vl.zeros(bits);
+         };
+         const update_last_clk = (portname, port) => {
+             if ('clock_polarity' in port) {
+@@ -271,7 +271,7 @@ export const MemoryView = BoxView.extend({
+     _displayEditor(evt) {
+         evt.stopPropagation();
+         const model = this.model;
+-        const display3vl = model.graph._display3vl;
++        const display4vl = model.graph._display4vl;
+         const div = $('<div>', {
+             title: "Memory contents: " + model.get('label')
+         }).appendTo('html > body');
+@@ -286,7 +286,7 @@ export const MemoryView = BoxView.extend({
+ //            '<button type="button" class="btn btn-secondary" title="Save contents">Save</button>' +
+ //            '</div>' + 
+             '<div class="input-group">' +
+-            help.baseSelectMarkupHTML(display3vl, model.get('bits'), 'hex') +
++            help.baseSelectMarkupHTML(display4vl, model.get('bits'), 'hex') +
+             '</div>' +
+             '</div>' +
+             '<table class="memeditor">' +
+@@ -332,7 +332,7 @@ export const MemoryView = BoxView.extend({
+                 col = col.next();
+                 for (let c = 0; c < columns; c++, col = col.next()) {
+                     if (address + r * columns + c >= words) break;
+-                    col.find('input').val(display3vl.show(numbase, memdata.get(address + r * columns + c)))
++                    col.find('input').val(display4vl.show(numbase, memdata.get(address + r * columns + c)))
+                                      .removeClass('invalid');
+                 }
+             }
+@@ -340,8 +340,8 @@ export const MemoryView = BoxView.extend({
+         };
+         const redraw = () => {
+             const numbase = get_numbase();
+-            const ptrn = display3vl.pattern(numbase);
+-            const ds = display3vl.size(numbase, model.get('bits')); 
++            const ptrn = display4vl.pattern(numbase);
++            const ds = display4vl.size(numbase, model.get('bits')); 
+             columns = Math.min(words, 16, Math.ceil(32/ds));
+             address = Math.max(0, Math.min(words - rows * columns, address));
+             const table = div.find('table');
+@@ -383,8 +383,8 @@ export const MemoryView = BoxView.extend({
+             const r = target.closest('tr').index();
+             const addr = address + r * columns + c;
+             const bits = model.get('bits');
+-            if (display3vl.validate(numbase, evt.target.value, bits)) {
+-                const val = display3vl.read(numbase, evt.target.value, bits);
++            if (display4vl.validate(numbase, evt.target.value, bits)) {
++                const val = display4vl.read(numbase, evt.target.value, bits);
+                 memdata.set(addr, val);
+                 model.trigger('manualMemChange', model, addr, val);
+                 target.removeClass('invalid');
+@@ -396,7 +396,7 @@ export const MemoryView = BoxView.extend({
+             if (addr < address || addr > address + rows * columns) return;
+             const numbase = get_numbase();
+             const z = getCell(addr)
+-                .val(display3vl.show(numbase, memdata.get(addr)))
++                .val(display4vl.show(numbase, memdata.get(addr)))
+                 .removeClass('invalid')
+                 .removeClass('flash');
+             setTimeout(() => { z.addClass('flash') }, 10);
+diff --git a/node_modules/digitaljs/src/cells/mux.mjs b/node_modules/digitaljs/src/cells/mux.mjs
+index a8e6a67..7a10722 100644
+--- a/node_modules/digitaljs/src/cells/mux.mjs
++++ b/node_modules/digitaljs/src/cells/mux.mjs
+@@ -2,7 +2,7 @@
+ 
+ import * as joint from '@joint/core';
+ import { Gate, GateView, portGroupAttrs } from './base.mjs';
+-import { Vector3vl } from '3vl';
++import { Vector4vl } from '@twint/4vl';
+ 
+ // add offset of 30pt to account for the top selection port and oversized box at layout time
+ const mux_pos_offset = 20;
+@@ -68,7 +68,7 @@ export const GenMux = Gate.define('GenMux', {
+     },
+     operation(data) {
+         const i = this.muxInput(data.sel);
+-        if (i === undefined) return { out: Vector3vl.xes(this.get('bits').in) };
++        if (i === undefined) return { out: Vector4vl.xes(this.get('bits').in) };
+         return { out: data['in' + i] };
+     },
+     getLayoutSize() {
+diff --git a/node_modules/digitaljs/src/cells/tribuf.mjs b/node_modules/digitaljs/src/cells/tribuf.mjs
+new file mode 100644
+index 0000000..7b4d508
+--- /dev/null
++++ b/node_modules/digitaljs/src/cells/tribuf.mjs
+@@ -0,0 +1,54 @@
++"use strict";
++
++import { Box, BoxView } from './base.mjs';
++import { Vector4vl } from '@twint/4vl';
++
++// Converted from yosys's $tribuf ("assign Y = EN ? A : 'bz;", per simlib.v):
++// EN high drives A through, EN low outputs high-Z, and EN unknown (x/z)
++// follows Verilog's 4-valued ternary rule for an unknown condition - since
++// the false branch is a constant z on every bit, that reduces to "keep z
++// where A is already z, x everywhere else".
++export const Tribuf = Box.define('Tribuf', {
++    /* default properties */
++    bits: 1,
++    propagation: 0,
++
++    attrs: {
++        value: {
++            refX: .5, refY: .5,
++            textAnchor: 'middle', textVerticalAnchor: 'middle',
++            text: 'tribuf'
++        }
++    }
++}, {
++    initialize() {
++        const bits = this.get('bits');
++        this.get('ports').items = [
++            { id: 'in', group: 'in', dir: 'in', bits: bits },
++            { id: 'en', group: 'in', dir: 'in', bits: 1 },
++            { id: 'out', group: 'out', dir: 'out', bits: bits }
++        ];
++
++        Box.prototype.initialize.apply(this, arguments);
++    },
++    operation(data) {
++        const bits = this.get('bits');
++        const en = data.en.get(0);
++        if (en === 1) return { out: data.in };
++        if (en === -1) return { out: Vector4vl.zes(bits) };
++        // en is x or z: per-bit ternary against a constant-z false branch
++        const out = [];
++        for (let i = 0; i < bits; i++)
++            out.push(data.in.get(i) === 2 ? 2 : 0);
++        return { out: Vector4vl.fromArray(out) };
++    },
++    markup: Box.prototype.markup.concat([{
++            tagName: 'text',
++            className: 'value',
++            selector: 'value'
++        }
++    ])
++});
++export const TribufView = BoxView.extend({
++    _autoResizeBox: true
++});
+diff --git a/node_modules/digitaljs/src/cells/trimerge.mjs b/node_modules/digitaljs/src/cells/trimerge.mjs
+new file mode 100644
+index 0000000..8a51ffc
+--- /dev/null
++++ b/node_modules/digitaljs/src/cells/trimerge.mjs
+@@ -0,0 +1,66 @@
++"use strict";
++
++import { Box, BoxView } from './base.mjs';
++import { Vector4vl } from '@twint/4vl';
++
++// Resolves N same-width drivers of one net into a single value: a real
++// (non-z) driver passes through, 2+ real drivers that agree pass that
++// value through, 2+ real drivers that disagree produce contention (x),
++// and all-z produces z. Synthesized purely during yosys2digitaljs's JSON
++// conversion for nets with more than one source; no yosys cell backs it.
++export const TriMerge = Box.define('TriMerge', {
++    /* default properties */
++    inputs: 2,
++    bits: 1,
++    propagation: 0,
++
++    attrs: {
++        value: {
++            refX: .5, refY: .5,
++            textAnchor: 'middle', textVerticalAnchor: 'middle',
++            text: 'merge'
++        }
++    }
++}, {
++    initialize() {
++        const bits = this.get('bits');
++        const inputs = this.get('inputs');
++
++        const ports = [];
++        for (let i = 0; i < inputs; i++)
++            ports.push({ id: 'in' + i, group: 'in', dir: 'in', bits: bits });
++        ports.push({ id: 'out', group: 'out', dir: 'out', bits: bits });
++        this.get('ports').items = ports;
++
++        Box.prototype.initialize.apply(this, arguments);
++    },
++    operation(data) {
++        const inputs = this.get('inputs');
++        let ret = data.in0;
++        for (let i = 1; i < inputs; i++)
++            ret = this._mergeTwo(ret, data['in' + i]);
++        return { out: ret };
++    },
++    _mergeTwo(a, b) {
++        const out = [];
++        for (let i = 0; i < a.bits; i++) {
++            const av = a.get(i), bv = b.get(i);
++            // 0 here means 'x' (contention), per Vector4vl.fromArray's encoding
++            out.push(av === 2 ? bv : bv === 2 ? av : av === bv ? av : 0);
++        }
++        return Vector4vl.fromArray(out);
++    },
++    markup: Box.prototype.markup.concat([{
++            tagName: 'text',
++            className: 'value',
++            selector: 'value'
++        }
++    ]),
++    _gateParams: Box.prototype._gateParams.concat(['inputs']),
++    _unsupportedPropChanges: Box.prototype._unsupportedPropChanges.concat(['inputs']),
++    _operationHelpers: Box.prototype._operationHelpers.concat(['_mergeTwo']),
++    _gateKind: 'bus'
++});
++export const TriMergeView = BoxView.extend({
++    _autoResizeBox: true
++});
+diff --git a/node_modules/digitaljs/src/circuit.mjs b/node_modules/digitaljs/src/circuit.mjs
+index 0692a9d..d316dd9 100644
+--- a/node_modules/digitaljs/src/circuit.mjs
++++ b/node_modules/digitaljs/src/circuit.mjs
+@@ -1,7 +1,7 @@
+ "use strict";
+ 
+ import * as joint from '@joint/core';
+-import { Vector3vl, Display3vl } from '3vl';
++import { Vector4vl, Display4vl } from '@twint/4vl';
+ import * as cells from './cells.mjs';
+ import * as help from './help.mjs';
+ import * as engines from './engines.mjs';
+@@ -73,8 +73,8 @@ export class HeadlessCircuit {
+     constructor(data, {cellsNamespace = {}, engine = SynchEngine, engineOptions = {}, defaultCombinationalPropagation} = {}) {
+         this._cells = Object.assign(cells, cellsNamespace);
+         this._defaultCombinationalPropagation = defaultCombinationalPropagation;
+-        this._display3vl = new Display3vl();
+-        this._display3vl.addDisplay(new help.Display3vlASCII());
++        this._display4vl = new Display4vl();
++        this._display4vl.addDisplay(new help.Display4vlASCII());
+         this._graph = this._makeGraph(data, data.subcircuits);
+         engineOptions.cells = this._cells;
+         this._engine = new engine(this._graph, engineOptions);
+@@ -84,7 +84,7 @@ export class HeadlessCircuit {
+         });
+     }
+     addDisplay(display) {
+-        this._display3vl.addDisplay(display);
++        this._display4vl.addDisplay(display);
+         this.trigger('display:add', display);
+     }
+     shutdown() {
+@@ -99,7 +99,7 @@ export class HeadlessCircuit {
+     _makeGraph(data, subcircuits, opt) {
+         opt = opt || {};
+         const graph = new joint.dia.Graph();
+-        graph._display3vl = this._display3vl;
++        graph._display4vl = this._display4vl;
+         graph._warnings = 0;
+         if (opt.nested) graph.set('subcircuit', true);
+         const changeWarnings = (x) => {
+@@ -313,7 +313,7 @@ export class HeadlessCircuit {
+         return ret;
+     }
+     waitForWire(wire, trigger) {
+-        if (trigger instanceof Vector3vl)
++        if (trigger instanceof Vector4vl)
+             trigger = [trigger];
+         return new Promise(resolve => {
+             this.monitorWire(wire, (tick, sig) => { resolve(tick) }, 
+@@ -321,7 +321,7 @@ export class HeadlessCircuit {
+         });
+     }
+     waitFor(cell, port, trigger) {
+-        if (trigger instanceof Vector3vl)
++        if (trigger instanceof Vector4vl)
+             trigger = [trigger];
+         return new Promise(resolve => {
+             this.monitor(cell, port, (tick, sig) => { resolve(tick) }, 
+diff --git a/node_modules/digitaljs/src/engines/worker-worker.mjs b/node_modules/digitaljs/src/engines/worker-worker.mjs
+index ec31c21..083f094 100644
+--- a/node_modules/digitaljs/src/engines/worker-worker.mjs
++++ b/node_modules/digitaljs/src/engines/worker-worker.mjs
+@@ -1,7 +1,7 @@
+ 
+ import * as cells from '../cells.mjs';
+ import FastPriorityQueue from 'fastpriorityqueue';
+-import { Vector3vl } from '3vl';
++import { Vector4vl } from '@twint/4vl';
+ 
+ const specialGates = new Set(['Subcircuit', 'Input', 'Output', 'Button', 'Lamp', 'NumEntry', 'NumDisplay']);
+ 
+@@ -36,9 +36,9 @@ class Gate {
+             this._ports[port.id] = port;
+             this._monitors[port.id] = new Set();
+             if (port.dir == "in")
+-                this._params.inputSignals[port.id] = Vector3vl.fromClonable(inputSignals[port.id]);
++                this._params.inputSignals[port.id] = Vector4vl.fromClonable(inputSignals[port.id]);
+             if (port.dir == "out") {
+-                this._params.outputSignals[port.id] = Vector3vl.fromClonable(outputSignals[port.id]);
++                this._params.outputSignals[port.id] = Vector4vl.fromClonable(outputSignals[port.id]);
+                 this._links_to[port.id] = new Set();
+             }
+         }
+@@ -280,7 +280,7 @@ class WorkerEngineWorker {
+         const link = graph.getLink(linkId);
+         graph.removeLink(linkId);
+         const targetGate = graph.getGate(link.target.id);
+-        const sig = Vector3vl.xes(targetGate.getPort(link.target.port).bits);
++        const sig = Vector4vl.xes(targetGate.getPort(link.target.port).bits);
+         this._setGateInputSignal(targetGate, link.target.port, sig);
+     }
+     removeGate(graphId, gateId) {
+@@ -299,7 +299,7 @@ class WorkerEngineWorker {
+     }
+     changeInput(graphId, gateId, sig) {
+         const gate = this._graphs[graphId].getGate(gateId);
+-        this._setGateOutputSignals(gate, { out: Vector3vl.fromClonable(sig) });
++        this._setGateOutputSignals(gate, { out: Vector4vl.fromClonable(sig) });
+     }
+     changeParam(graphId, gateId, paramName, val) {
+         const gate = this._graphs[graphId].getGate(gateId);
+@@ -307,13 +307,13 @@ class WorkerEngineWorker {
+     }
+     manualMemChange(graphId, gateId, addr, data) {
+         const gate = this._graphs[graphId].getGate(gateId);
+-        gate.memdata.set(addr, Vector3vl.fromClonable(data));
++        gate.memdata.set(addr, Vector4vl.fromClonable(data));
+         this._enqueue(gate);
+     }
+     monitor(graphId, gateId, port, monitorId, {triggerValues, stopOnTrigger, oneShot, synchronous }) {
+         if (triggerValues != undefined)
+             for (const k of triggerValues.keys())
+-                triggerValues[k] = Vector3vl.fromClonable(triggerValues[k]);
++                triggerValues[k] = Vector4vl.fromClonable(triggerValues[k]);
+         const gate = this._graphs[graphId].getGate(gateId);
+         this._monitors[monitorId] = { gate, port, triggerValues, stopOnTrigger, oneShot, synchronous };
+         gate.monitor(port, monitorId);
+diff --git a/node_modules/digitaljs/src/engines/worker.mjs b/node_modules/digitaljs/src/engines/worker.mjs
+index 35d0726..f7e2e0d 100644
+--- a/node_modules/digitaljs/src/engines/worker.mjs
++++ b/node_modules/digitaljs/src/engines/worker.mjs
+@@ -1,7 +1,7 @@
+ 
+ import { util } from '@joint/core';
+ import { BaseEngine } from './base.mjs';
+-import { Vector3vl } from '3vl';
++import { Vector4vl } from '@twint/4vl';
+ import * as cells from '../cells.mjs';
+ import Worker from 'web-worker';
+ 
+@@ -218,7 +218,7 @@ export class WorkerEngine extends BaseEngine {
+             if (gate === undefined) continue;
+             const newOutputs = {};
+             for (const [port, val] of Object.entries(vals))
+-                newOutputs[port] = Vector3vl.fromClonable(val);
++                newOutputs[port] = Vector4vl.fromClonable(val);
+             util.defaults(newOutputs, gate.get('outputSignals'));
+             gate.set('outputSignals', newOutputs);
+         }
+@@ -233,7 +233,7 @@ export class WorkerEngine extends BaseEngine {
+     }
+     _handle_gateTrigger(graphId, gateId, event, args) {
+         if (event == "memChange")
+-            args[1] = Vector3vl.fromClonable(args[1]);
++            args[1] = Vector4vl.fromClonable(args[1]);
+         const gate = this._findGateByIds(graphId, gateId);
+         if (gate === undefined) return;
+         gate.trigger(event, ...args);
+@@ -247,7 +247,7 @@ export class WorkerEngine extends BaseEngine {
+         const callback = this._monitors[monitorId];
+         if (callback == undefined) return;
+         if (oneShot) delete this._monitors[monitorId];
+-        const ret = callback(tick, Vector3vl.fromClonable(sig));
++        const ret = callback(tick, Vector4vl.fromClonable(sig));
+         if (stopped) {
+             if (ret) {
+                 this._running = false;
+diff --git a/node_modules/digitaljs/src/help.mjs b/node_modules/digitaljs/src/help.mjs
+index aa9e1d1..63f628f 100644
+--- a/node_modules/digitaljs/src/help.mjs
++++ b/node_modules/digitaljs/src/help.mjs
+@@ -1,6 +1,6 @@
+ "use strict";
+ 
+-import { Vector3vl, Display3vlWithRegex } from '3vl';
++import { Vector4vl, Display4vlWithRegex } from '@twint/4vl';
+ 
+ const controlCodes20 = [
+     'NUL', 'SOH', 'STX', 'ETX', 'EOT', 'ENQ', 'ACK', 'BEL', 
+@@ -9,7 +9,7 @@ const controlCodes20 = [
+     'CAN', 'EM',  'SUB', 'ESC', 'FS',  'GS',  'RS',  'US',
+     'SP',  'DEL'];
+ 
+-export class Display3vlASCII extends Display3vlWithRegex {
++export class Display4vlASCII extends Display4vlWithRegex {
+     constructor() {
+         super('[\x20-\x7e\xa0-\xff\ufffd\u2400-\u2421]|' + controlCodes20.join('|'))
+     }
+@@ -25,16 +25,16 @@ export class Display3vlASCII extends Display3vlWithRegex {
+     read(data, bits) {
+         if (data.length == 1) {
+             const code = data.charCodeAt(0);
+-            if (code == 0xfffd) return Vector3vl.xes(bits);
+-            if (code == 0x2421) return Vector3vl.fromHex("7f", bits);
++            if (code == 0xfffd) return Vector4vl.xes(bits);
++            if (code == 0x2421) return Vector4vl.fromHex("7f", bits);
+             if (code >= 0x2400 && code <= 0x2420) 
+-                return Vector3vl.fromHex((code - 0x2400).toString(16), bits);
+-            return Vector3vl.fromHex(code.toString(16), bits);
++                return Vector4vl.fromHex((code - 0x2400).toString(16), bits);
++            return Vector4vl.fromHex(code.toString(16), bits);
+         } else {
+             const code = controlCodes20.indexOf(data);
+-            if (code < 0) return Vector3vl.xes(bits);
+-            if (code == 0x21) return Vector3vl.fromHex("7f", bits);
+-            return Vector3vl.fromHex(code.toString(16), bits);
++            if (code < 0) return Vector4vl.xes(bits);
++            if (code == 0x21) return Vector4vl.fromHex("7f", bits);
++            return Vector4vl.fromHex(code.toString(16), bits);
+         }
+     }
+     show(data) {
+@@ -55,8 +55,8 @@ export class Display3vlASCII extends Display3vlWithRegex {
+ }
+ 
+         
+-export function baseSelectMarkupHTML(display3vl, bits, base) { 
+-    const markup = display3vl.usableDisplays('read', bits)
++export function baseSelectMarkupHTML(display4vl, bits, base) { 
++    const markup = display4vl.usableDisplays('read', bits)
+         .map(n => '<option value="' + n + '"' + (n == base ? ' selected="selected"' : '') +'>' + n + '</option>');
+     return '<select name="base">' + markup.join("") + '</select>';
+ };
+diff --git a/node_modules/digitaljs/src/iopanel.mjs b/node_modules/digitaljs/src/iopanel.mjs
+index 65a58c9..8dcade0 100644
+--- a/node_modules/digitaljs/src/iopanel.mjs
++++ b/node_modules/digitaljs/src/iopanel.mjs
+@@ -3,7 +3,7 @@
+ import * as joint from '@joint/core';
+ import $ from 'jquery';
+ import * as help from './help.mjs';
+-import { Vector3vl } from '3vl';
++import { Vector4vl } from '@twint/4vl';
+ 
+ let uniq_cntr = 0;
+ 
+@@ -54,7 +54,7 @@ export class IOPanelView extends joint.mvc.View {
+             .attr('for', this._id(cell.id));
+     }
+     _handleAddInput(cell) {
+-        const display3vl = this.model._display3vl;
++        const display4vl = this.model._display4vl;
+         const row = $(this._rowMarkup)
+             .appendTo(this.$('div[data-iopanel="input"]'));
+         this._addLabelFor(row, cell);
+@@ -66,7 +66,7 @@ export class IOPanelView extends joint.mvc.View {
+             const inp = ui.find('input').addBack('input')
+                 .attr('id', this._id(cell.id))
+                 .on('click', (evt) => {
+-                    cell.setInput(Vector3vl.fromBool(evt.target.checked));
++                    cell.setInput(Vector4vl.fromBool(evt.target.checked));
+                 });
+             const updater = (cell, sigs) => {
+                 inp.prop("checked", sigs.out.isHigh);
+@@ -77,35 +77,35 @@ export class IOPanelView extends joint.mvc.View {
+             const ui = $(this._inputMarkup)
+                 .appendTo(col);
+             let base = 'hex';
+-            const base_sel = $(this._baseSelectorMarkup(display3vl, cell.get('bits'), base))
++            const base_sel = $(this._baseSelectorMarkup(display4vl, cell.get('bits'), base))
+                 .appendTo(col);
+-            let sz = display3vl.size(base, cell.get('bits'));
++            let sz = display4vl.size(base, cell.get('bits'));
+             const bits = cell.get('bits');
+             const inp = ui.find('input').addBack('input')
+                 .prop('size', sz)
+                 .prop('maxlength', sz)
+-                .prop('pattern', display3vl.pattern(base))
++                .prop('pattern', display4vl.pattern(base))
+                 .on('change', (e) => {
+-                    if (!display3vl.validate(base, e.target.value, bits)) return;
+-                    cell.setInput(display3vl.read(base, e.target.value, bits));
++                    if (!display4vl.validate(base, e.target.value, bits)) return;
++                    cell.setInput(display4vl.read(base, e.target.value, bits));
+                 });
+             const updater = (cell, sigs) => {
+-                ui.val(display3vl.show(base, sigs.out));
++                ui.val(display4vl.show(base, sigs.out));
+             };
+             this.listenTo(cell, 'change:outputSignals', updater);
+             updater(cell, cell.get('outputSignals'));
+             row.on('input', 'select[name=base]', (e) => {
+                 base = e.target.value;
+-                sz = display3vl.size(base, cell.get('bits'));
++                sz = display4vl.size(base, cell.get('bits'));
+                 inp.prop('size', sz)
+                    .prop('maxlength', sz)
+-                   .prop('pattern', display3vl.pattern(base));
++                   .prop('pattern', display4vl.pattern(base));
+                 updater(cell, cell.get('outputSignals'));
+             });
+         }
+     }
+     _handleAddOutput(cell) {
+-        const display3vl = this.model._display3vl;
++        const display4vl = this.model._display4vl;
+         const row = $(this._rowMarkup)
+             .appendTo(this.$('div[data-iopanel="input"]'));
+         this._addLabel(row, cell);
+@@ -127,23 +127,23 @@ export class IOPanelView extends joint.mvc.View {
+             const ui = $(this._inputMarkup)
+                 .appendTo(col);
+             let base = 'hex';
+-            const base_sel = $(this._baseSelectorMarkup(display3vl, cell.get('bits'), base))
++            const base_sel = $(this._baseSelectorMarkup(display4vl, cell.get('bits'), base))
+                 .appendTo(col);
+-            const sz = display3vl.size(base, cell.get('bits'));
++            const sz = display4vl.size(base, cell.get('bits'));
+             const inp = ui.find('input').addBack('input')
+                 .prop('disabled', true)
+                 .prop('size', sz);
+ //                .prop('maxlength', sz)
+-//                .prop('pattern', display3vl.pattern(base));
++//                .prop('pattern', display4vl.pattern(base));
+             const updater = (cell, sigs) => {
+                 const val = cell.getOutput();
+-                ui.val(display3vl.show(base, val));
++                ui.val(display4vl.show(base, val));
+             };
+             this.listenTo(cell, 'change:inputSignals', updater);
+             updater(cell, cell.get('inputSignals'));
+             row.on('input', 'select[name=base]', (e) => {
+                 base = e.target.value;
+-                inp.prop('size', display3vl.size(base, cell.get('bits')));
++                inp.prop('size', display4vl.size(base, cell.get('bits')));
+                 updater(cell, cell.get('inputSignals'));
+             });
+         }
+diff --git a/node_modules/digitaljs/src/monitor.mjs b/node_modules/digitaljs/src/monitor.mjs
+index 74fe6a1..0eb8cd1 100644
+--- a/node_modules/digitaljs/src/monitor.mjs
++++ b/node_modules/digitaljs/src/monitor.mjs
+@@ -3,7 +3,7 @@
+ import * as joint from '@joint/core';
+ import $ from 'jquery';
+ import * as help from './help.mjs';
+-import { Vector3vl } from '3vl';
++import { Vector4vl } from '@twint/4vl';
+ import { Waveform, drawWaveform, defaultSettings, extendSettings, calcGridStep } from 'wavecanvas';
+ 
+ function getWireId(wire) {
+@@ -120,7 +120,7 @@ export class MonitorView extends joint.mvc.View {
+         function evt_wireid(e) {
+             return $(e.target).closest('tr').attr('wireid');
+         }
+-        const display3vl = this.model._circuit._display3vl;
++        const display4vl = this.model._circuit._display4vl;
+         this.$el.on('click', 'button[name=remove]', (e) => { this.model.removeWire(evt_wireid(e)); });
+         this.$el.on('input', 'select[name=base]', (e) => { 
+             const base = e.target.value;
+@@ -128,9 +128,9 @@ export class MonitorView extends joint.mvc.View {
+             settings.base = base;
+             const row = $(e.target).closest('tr');
+             const trig = row.find('input[name=trigger]');
+-            trig.attr('pattern', display3vl.pattern(base));
++            trig.attr('pattern', display4vl.pattern(base));
+             if (settings.trigger.length)
+-                trig.val(display3vl.show(base, settings.trigger[0]));
++                trig.val(display4vl.show(base, settings.trigger[0]));
+             this.trigger('change');
+         });
+         const handleTrigger = () => {
+@@ -151,10 +151,10 @@ export class MonitorView extends joint.mvc.View {
+         this.$el.on('input', 'select[name=trigger]', (e) => {
+             const wireid = evt_wireid(e);
+             switch (e.target.value) {
+-                case 'rising': setTrigger(wireid, [Vector3vl.one]); break;
+-                case 'falling': setTrigger(wireid, [Vector3vl.zero]); break;
+-                case 'risefall': setTrigger(wireid, [Vector3vl.one, Vector3vl.zero]); break;
+-                case 'undef': setTrigger(wireid, [Vector3vl.x]); break;
++                case 'rising': setTrigger(wireid, [Vector4vl.one]); break;
++                case 'falling': setTrigger(wireid, [Vector4vl.zero]); break;
++                case 'risefall': setTrigger(wireid, [Vector4vl.one, Vector4vl.zero]); break;
++                case 'undef': setTrigger(wireid, [Vector4vl.x]); break;
+                 default: setTrigger(wireid, []);
+             }
+         });
+@@ -165,10 +165,10 @@ export class MonitorView extends joint.mvc.View {
+             const bits = this.model._wires.get(wireid).waveform.bits;
+             if (e.target.value == "") {
+                 setTrigger(wireid, []);
+-            } else if (display3vl.validate(base, e.target.value, bits)) {
+-                const val = display3vl.read(base, e.target.value, bits);
++            } else if (display4vl.validate(base, e.target.value, bits)) {
++                const val = display4vl.read(base, e.target.value, bits);
+                 setTrigger(wireid, [val]);
+-                e.target.value = display3vl.show(base, val);
++                e.target.value = display4vl.show(base, val);
+             } else {
+                 setTrigger(wireid, []);
+             }
+@@ -269,10 +269,10 @@ export class MonitorView extends joint.mvc.View {
+         }
+     }
+     _draw(wireid) {
+-        const display3vl = this.model._circuit._display3vl;
++        const display4vl = this.model._circuit._display4vl;
+         const canvas = this.$('tr[wireid="'+wireid+'"]').find('canvas');
+         const waveform = this.model._wires.get(wireid).waveform;
+-        drawWaveform(waveform, canvas[0].getContext('2d'), this._settingsFor.get(wireid), display3vl);
++        drawWaveform(waveform, canvas[0].getContext('2d'), this._settingsFor.get(wireid), display4vl);
+     }
+     _handleAdd(wire) {
+         const wireid = getWireId(wire);
+@@ -290,9 +290,9 @@ export class MonitorView extends joint.mvc.View {
+     _createRow(wire) {
+         const wireid = getWireId(wire);
+         const settings = this._settingsFor.get(wireid);
+-        const display3vl = this.model._circuit._display3vl;
++        const display4vl = this.model._circuit._display4vl;
+         const base_sel = wire.get('bits') > 1 
+-            ? (this._baseSelectorMarkup instanceof Function ? this._baseSelectorMarkup(display3vl, wire.get('bits'), settings.base) : this._baseSelectorMarkup) 
++            ? (this._baseSelectorMarkup instanceof Function ? this._baseSelectorMarkup(display4vl, wire.get('bits'), settings.base) : this._baseSelectorMarkup) 
+             : '';
+         const trigger = wire.get('bits') > 1 ? this._busTriggerMarkup : this._bitTriggerMarkup;
+         const row = $('<tr><td class="name"></td><td>'+base_sel+'</td><td>'+trigger+'</td><td>'+this._removeButtonMarkup+'</td><td><canvas class="wavecanvas" height="30" draggable="true"></canvas></td></tr>');
 diff --git a/node_modules/digitaljs/src/transform.mjs b/node_modules/digitaljs/src/transform.mjs
-index 7da66bc..49044cc 100644
+index 7da66bc..dfe2cf5 100644
 --- a/node_modules/digitaljs/src/transform.mjs
 +++ b/node_modules/digitaljs/src/transform.mjs
-@@ -248,7 +248,7 @@ export function makeBinaryMuxes(model, dev, id)
+@@ -1,7 +1,7 @@
+ "use strict";
+ 
+ import { util } from '@joint/core';
+-import { Vector3vl } from '3vl';
++import { Vector4vl } from '@twint/4vl';
+ 
+ export function removeRepeater(model, dev, id) {
+     if (dev.type != 'Repeater') return false;
+@@ -74,7 +74,7 @@ export function integrateArithConstant(model, dev, id) {
+         const inId = inConnList[0].from.id;
+         const inDev = model.getDevice(inId);
+         if (inDev.type != 'Constant') return false;
+-        const val = Vector3vl.fromBin(inDev.constant, inDev.constant.length);
++        const val = Vector4vl.fromBin(inDev.constant, inDev.constant.length);
+         if (!val.isFullyDefined) return false;
+         const i = val.toBigInt(sgn);
+         if (i > 999 || i < -99) return false;
+@@ -248,11 +248,11 @@ export function makeBinaryMuxes(model, dev, id)
      newDev.bits.sel = bits;
      newDev.type = sparse ? "MuxSparse" : "Mux";
      if (sparse) {
@@ -11,3 +2451,8 @@ index 7da66bc..49044cc 100644
          newDev.default_input = !muxInputs[0].every(conn => {
              const inDev = model.getDevice(conn.from.id);
              if (inDev.type != "Constant") return false;
+-            const val = Vector3vl.fromBin(inDev.constant, bits);
++            const val = Vector4vl.fromBin(inDev.constant, bits);
+             return val.xmask().isHigh;
+         });
+     }

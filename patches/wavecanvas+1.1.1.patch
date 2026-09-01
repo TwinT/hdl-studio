@@ -1,0 +1,54 @@
+diff --git a/node_modules/wavecanvas/dist/index.js b/node_modules/wavecanvas/dist/index.js
+index e63842b..b8ae5f8 100644
+--- a/node_modules/wavecanvas/dist/index.js
++++ b/node_modules/wavecanvas/dist/index.js
+@@ -1,8 +1,8 @@
+ "use strict";
+ Object.defineProperty(exports, "__esModule", { value: true });
+-exports.drawWaveform = exports.calcGridStep = exports.extendSettings = exports.defaultSettings = exports.Waveform = exports.Vector3vl = void 0;
+-const _3vl_1 = require("3vl");
+-Object.defineProperty(exports, "Vector3vl", { enumerable: true, get: function () { return _3vl_1.Vector3vl; } });
++exports.drawWaveform = exports.calcGridStep = exports.extendSettings = exports.defaultSettings = exports.Waveform = exports.Vector4vl = void 0;
++const _4vl_1 = require("@twint/4vl");
++Object.defineProperty(exports, "Vector4vl", { enumerable: true, get: function () { return _4vl_1.Vector4vl; } });
+ class Waveform {
+     constructor(_bits, _data = []) {
+         this._bits = _bits;
+@@ -68,7 +68,7 @@ exports.Waveform = Waveform;
+ exports.defaultSettings = {
+     start: 0,
+     pixelsPerTick: 10,
+-    bitColors: ['#fc7c68', '#999', '#03c03c', '#779ecb'],
++    bitColors: ['#fc7c68', '#999', '#03c03c', '#779ecb', '#f39c12'],
+     gapScale: 0.2,
+     heightFill: 0.8,
+     base: 'hex',
+@@ -104,7 +104,7 @@ function calcGridStep(s) {
+     return gridStep;
+ }
+ exports.calcGridStep = calcGridStep;
+-function drawWaveform(w, c, s, disp = new _3vl_1.Display3vl()) {
++function drawWaveform(w, c, s, disp = new _4vl_1.Display4vl()) {
+     c.clearRect(0, 0, c.canvas.width, c.canvas.height);
+     const span = c.canvas.width / s.pixelsPerTick;
+     if ('present' in s)
+@@ -116,9 +116,16 @@ function drawWaveform(w, c, s, disp = new _3vl_1.Display3vl()) {
+     const xy = 0.5 * c.canvas.height;
+     const hy = (0.5 - s.heightFill / 2) * c.canvas.height;
+     const ly = (0.5 + s.heightFill / 2) * c.canvas.height;
+-    const b2y = (b) => [ly, xy, hy][b + 1];
+-    const b2c = (b) => s.bitColors[b + 1];
+-    const w2c = (w) => s.bitColors[!w.isDefined ? 1 : w.isLow ? 0 : w.isHigh ? 2 : 3];
++    const b2y = (b) => [ly, xy, hy, xy][b + 1];
++    const isAllZ = (w) => {
++        for (let i = 0; i < w.bits; i++) {
++            if (w.get(i) !== 2)
++                return false;
++        }
++        return true;
++    };
++    const b2c = (b) => b === 2 ? s.bitColors[4] : s.bitColors[b + 1];
++    const w2c = (w) => s.bitColors[!w.isDefined ? (isAllZ(w) ? 4 : 1) : w.isLow ? 0 : w.isHigh ? 2 : 3];
+     const grad = c.createLinearGradient(0, ly, 0, hy);
+     grad.addColorStop(0, s.bitColors[0]);
+     grad.addColorStop(0.5, s.bitColors[1]);
