@@ -675,6 +675,8 @@ class DigitalJS {
             if (!positions)
                 return;
             for (const pos of positions) {
+                if (!pos.from || !pos.to)
+                    continue;
                 const marker = {name: pos.name,
                                 from_line: pos.from.line - 1, from_col: pos.from.column - 1,
                                 to_line: pos.to.line - 1, to_col: pos.to.column - 1};
