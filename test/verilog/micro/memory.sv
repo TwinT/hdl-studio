@@ -17,10 +17,27 @@ module memory #(
     logic [31:0] mem [DEPTH];
     logic [31:0] mar;
 
+    // Multi-cycle reset: a counter clears one word per cycle instead of the
+    // whole array at once. A memory array can't express "clear every word
+    // in one clock edge" as a single write port - a straight per-word reset
+    // loop forces yosys to unroll DEPTH separate write ports into the
+    // inferred $mem_v2 instead of 1 (confirmed: this is what was making
+    // synthesis hang at DEPTH=1024). See register_file.sv for the same
+    // problem at a smaller scale.
+    logic resetting;
+    logic [AWIDTH-1:0] reset_addr;
+
     always_ff @(posedge clk) begin
         if (rst) begin
-            mar <= 32'd0;
-            for (int i = 0; i < DEPTH; i++) mem[i] <= 32'd0;
+            resetting  <= 1'b1;
+            reset_addr <= '0;
+            mar        <= 32'd0;
+        end else if (resetting) begin
+            mem[reset_addr] <= 32'd0;
+            if (reset_addr == AWIDTH'(DEPTH - 1))
+                resetting <= 1'b0;
+            else
+                reset_addr <= reset_addr + 1'b1;
         end else begin
             if (addr_ld) mar <= bus_in;
             if (we) begin
