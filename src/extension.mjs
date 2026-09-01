@@ -335,6 +335,9 @@ class DigitalJS {
     async doSynth() {
         if (this.#document) {
             await this.#document.doSynth();
+        } else {
+            vscode.window.showErrorMessage(
+                'No active circuit to synthesize. Click into the circuit editor tab and try again.');
         }
     }
     set image_exts(exts) {
