@@ -38,12 +38,12 @@ export function build_yosys_script(files, opts = {}) {
     }
 
     cmds.push('proc');
-    // yosys2digitaljs has no $tribuf cell type, so a tri-state output
-    // (`assign x = en ? val : 'z;`) fails synthesis outright. `-formal`
-    // converts every tristate buffer - including ones driving output ports -
-    // into plain non-tristate logic (0 when disabled), which is all
-    // digitaljs can represent anyway (it has no floating/shared-bus net).
-    cmds.push('tribuf -formal');
+    // Converts tri-state muxes (`assign x = en ? val : 'z;`) into $tribuf
+    // cells with a genuine enable + high-Z output, instead of leaving them
+    // as an inferred mux. yosys2digitaljs converts $tribuf directly (native
+    // Z/4vl support), and a net with more than one driver - the norm for a
+    // shared bus - gets merged via a synthesized TriMerge device.
+    cmds.push('tribuf');
     cmds.push(opts.optimize ? 'opt' : 'opt_clean');
 
     if (opts.fsm && opts.fsm !== 'no') {
@@ -57,13 +57,14 @@ export function build_yosys_script(files, opts = {}) {
 
     if (opts.techmap) {
         // Decompose complex cells into basic logic gates, then clean up.
-        // Exclude flip-flops, latches and memories: techmap would lower them to
-        // gate-level primitives ($_DFF_P_, $_DLATCH_P_, ...) that yosys2digitaljs
-        // cannot render. Keeping them coarse leaves them as Dff/Dlatch/Memory.
+        // Exclude flip-flops, latches, memories and tri-state buffers: techmap
+        // would lower them to gate-level primitives ($_DFF_P_, $_DLATCH_P_,
+        // $_TBUF_, ...) that yosys2digitaljs cannot render. Keeping them coarse
+        // leaves them as Dff/Dlatch/Memory/Tribuf.
         cmds.push('select *');
         cmds.push('select -del t:$dff t:$dffe t:$adff t:$adffe t:$aldff t:$aldffe ' +
                   't:$sdff t:$sdffe t:$sdffce t:$dffsr t:$dffsre ' +
-                  't:$dlatch t:$adlatch t:$dlatchsr t:$sr t:$mem t:$mem_v2');
+                  't:$dlatch t:$adlatch t:$dlatchsr t:$sr t:$mem t:$mem_v2 t:$tribuf');
         cmds.push('techmap');
         cmds.push('select -clear');
         cmds.push(opts.optimize ? 'opt -full' : 'opt_clean');
