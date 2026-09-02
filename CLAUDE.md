@@ -102,6 +102,36 @@ Top-module port → widget by name + width: 1-bit input `clk`/`clock` → Clock 
 other 1-bit input → Button; multi-bit input → NumEntry; 1-bit output → Lamp; multi-bit
 output → NumDisplay; 8-bit output `display7`/`display7_*` → 7-segment Display7.
 
+## Patching digitaljs & friends (patch-package)
+
+`digitaljs` is patched (`patches/digitaljs+0.14.2.patch`) for native
+4-valued (0/1/x/z) logic via `@twint/4vl` (replacing the stock `3vl`), the
+`Tribuf`/`TriMerge` cells for tri-state bus merging, and assorted bug fixes
+(e.g. the Wire per-link routing fix above). `yosys2digitaljs`,
+`digitaljs_lua`, and `wavecanvas` each have their own
+`patches/<pkg>+<ver>.patch` too; all are applied automatically via the
+`postinstall: patch-package` script (`package.json`).
+
+- **Dual-tree gotcha**: `digitaljs`'s package `exports` map resolves the
+  **`browser`** condition (`src/index.mjs`) for webpack's default browser
+  target — both the main-thread bundle and the Web Worker bundle
+  (`webpack.config.js`'s worker config imports `src/engines/worker-worker.mjs`
+  directly by path) load the **`src/*.mjs`** tree, never `lib/*.js`. So
+  `lib/*.js` is unreachable dead code for every bundle this project ships,
+  but must still stay syntactically valid (other resolution conditions and
+  plain `require()` still use it). **Any patch touching `digitaljs` must
+  mirror the edit in both `lib/<file>.js` and `src/<file>.mjs`** — and
+  `npm run compile`/`test:pipeline`/`lint` give **zero** coverage for a
+  `lib/`-only break. Only `node --check node_modules/digitaljs/lib/<file>.js`,
+  run right after a fresh `npm install`, catches it.
+- **Trailing-newline trap**: `npx patch-package <pkg>` can silently drop a
+  patched file's last line on regeneration/application if that file lacks a
+  trailing newline. Rule: before regenerating a patch, confirm every file it
+  touches ends in `\n` (not just the ones edited this round —
+  `patch-package` re-diffs the whole package), then run `node --check` on
+  the touched `lib/*.js` files after a fresh install regardless of how small
+  the edit looks.
+
 ## Misc
 
 - Yosys errors: on failure the script + yosys stdout/stderr are dumped to the

@@ -279,12 +279,11 @@ describe('yosys2digitaljs net merging (multiple sources per net)', function () {
     });
 });
 
-// digitaljs's cell operation() logic for z-input safety - step 4 of
-// 4VL_INTEGRATION_PLAN.md. Loads the compiled lib/ tree (CJS) directly:
-// proven to construct real cell instances and call operation() in plain
-// Node without a DOM, unlike importing the ESM src/ tree (base.mjs pulls in
-// @joint/core + tools.mjs, which need a real browser DOM - see step 2's
-// notes). Locks in two representative patterns confirmed safe by direct
+// digitaljs's cell operation() logic for z-input safety. Loads the compiled
+// lib/ tree (CJS) directly: proven to construct real cell instances and call
+// operation() in plain Node without a DOM, unlike importing the ESM src/
+// tree (base.mjs pulls in @joint/core + tools.mjs, which need a real browser
+// DOM). Locks in two representative patterns confirmed safe by direct
 // source audit: numeric-conversion cells guard isFullyDefined before
 // toBigInt()/toNumber() (so z, like x, falls back to an all-x output
 // instead of throwing), and mux select logic degrades a z select to the
@@ -375,10 +374,81 @@ describe('digitaljs cell operation() z-input safety', function () {
     });
 });
 
-// step 5 of 4VL_INTEGRATION_PLAN.md - a 4th visual state for Z in wire/lamp/
-// waveform coloring. The coloring code itself lives in View classes that need
-// a real DOM (see step 2's finding), so it can't be exercised directly here;
-// this locks in the pure helper each patched ternary is keyed on instead.
+// Regression: digitaljs's paper-wide defaultRouter (index.js) assumes every
+// wire leaves its source on the right and enters its target on the left -
+// true for ordinary left-in/right-out gates, but wrong for a port whose own
+// group sits on a different side, like Tribuf's bottom 'en' or Mux's top
+// 'sel'. That mismatch forced an artificial elbow right at the port, which
+// the paper's 'rounded' connector then rendered as a visible curve/loop.
+// Wire._updateRouting() (cells/base.js) now sets a per-link router only when
+// a port's side deviates from the default, leaving ordinary wiring alone.
+describe('Wire per-link routing for non-default-side ports', function () {
+    const require = createRequire(import.meta.url);
+    const { HeadlessCircuit } = require('../node_modules/digitaljs/lib/circuit.js');
+
+    it('routes a Tribuf en wire and Mux sel wire per their real port side, leaves ordinary wiring on the paper default', function () {
+        const data = {
+            devices: {
+                d_in: { type: 'Not', bits: 4 }, d_en: { type: 'Not', bits: 1 },
+                t1: { type: 'Tribuf', bits: 4 }, d_out: { type: 'Not', bits: 4 },
+                d_sel: { type: 'Not', bits: 1 }, d_i0: { type: 'Not', bits: 4 },
+                d_i1: { type: 'Not', bits: 4 }, m1: { type: 'Mux', bits: { in: 4, sel: 1 } }
+            },
+            connectors: [
+                { from: { id: 'd_in', port: 'out' }, to: { id: 't1', port: 'in' } },
+                { from: { id: 'd_en', port: 'out' }, to: { id: 't1', port: 'en' } },
+                { from: { id: 't1', port: 'out' }, to: { id: 'd_out', port: 'in' } },
+                { from: { id: 'd_sel', port: 'out' }, to: { id: 'm1', port: 'sel' } },
+                { from: { id: 'd_i0', port: 'out' }, to: { id: 'm1', port: 'in0' } },
+                { from: { id: 'd_i1', port: 'out' }, to: { id: 'm1', port: 'in1' } }
+            ]
+        };
+        const circuit = new HeadlessCircuit(data);
+        const wireTo = (id, port) => circuit._graph.getCells()
+            .find((c) => c.isLink() && c.get('target').id === id && c.get('target').port === port);
+
+        assert.strictEqual(wireTo('t1', 'in').router(), null,
+            'ordinary left-entering wire must keep the paper default');
+        assert.strictEqual(wireTo('d_out', 'in').router(), null,
+            'ordinary left-entering wire must keep the paper default');
+        assert.deepStrictEqual(wireTo('t1', 'en').router(),
+            { name: 'metro', args: { startDirections: ['right'], endDirections: ['bottom'], maximumLoops: 200, step: 2.5 } });
+        assert.deepStrictEqual(wireTo('m1', 'sel').router(),
+            { name: 'metro', args: { startDirections: ['right'], endDirections: ['top'], maximumLoops: 200, step: 2.5 } });
+    });
+});
+
+// Regression: Input._resetPortValue (cells/io.mjs) used to default a
+// multi-bit NumEntry widget's initial value to Vector4vl.xes(bits) ('x'),
+// while a single-bit Button already defaulted to Vector4vl.zeros(bits) ('0')
+// - an inconsistency with no functional reason. Both now default to 0.
+describe('Input widget (Button/NumEntry) initial value', function () {
+    const require = createRequire(import.meta.url);
+    const { HeadlessCircuit } = require('../node_modules/digitaljs/lib/circuit.js');
+
+    it('a multi-bit NumEntry starts at all-zero, not all-x', function () {
+        const circuit = new HeadlessCircuit({
+            devices: { n1: { type: 'NumEntry', bits: 4, net: 'n1' } },
+            connectors: []
+        });
+        const dev = circuit._graph.getCell('n1');
+        assert.strictEqual(dev.get('outputSignals').out.toBin(), '0000');
+    });
+
+    it('a single-bit Button still starts at 0 (unchanged behavior)', function () {
+        const circuit = new HeadlessCircuit({
+            devices: { b1: { type: 'Button', bits: 1, net: 'b1' } },
+            connectors: []
+        });
+        const dev = circuit._graph.getCell('b1');
+        assert.strictEqual(dev.get('outputSignals').out.toBin(), '0');
+    });
+});
+
+// A 4th visual state for Z in wire/lamp/waveform coloring. The coloring code
+// itself lives in View classes that need a real DOM, so it can't be
+// exercised directly here; this locks in the pure helper each patched
+// ternary is keyed on instead.
 describe('z-state visual helpers (digitaljs isAllZ, wavecanvas bitColors)', function () {
     const require = createRequire(import.meta.url);
     const { isAllZ } = require('../node_modules/digitaljs/lib/cells/base.js');
