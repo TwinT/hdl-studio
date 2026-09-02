@@ -1,5 +1,5 @@
 diff --git a/node_modules/digitaljs/lib/cells.js b/node_modules/digitaljs/lib/cells.js
-index 2cd5a5d..6f4d3e4 100644
+index 2cd5a5d..047c3be 100644
 --- a/node_modules/digitaljs/lib/cells.js
 +++ b/node_modules/digitaljs/lib/cells.js
 @@ -124,3 +124,25 @@ Object.keys(_display).forEach(function (key) {
@@ -28,7 +28,6 @@ index 2cd5a5d..6f4d3e4 100644
 +    }
 +  });
 +});
-\ No newline at end of file
 diff --git a/node_modules/digitaljs/lib/cells/arith.js b/node_modules/digitaljs/lib/cells/arith.js
 index 82c329f..563dab4 100644
 --- a/node_modules/digitaljs/lib/cells/arith.js
@@ -400,6 +399,24 @@ index ec13773..4944f89 100644
        if (results.length == 0) return xes;
        while (results.length > 1) {
          const other = results.pop();
+diff --git a/node_modules/digitaljs/lib/cells/gates.js b/node_modules/digitaljs/lib/cells/gates.js
+index 7424f83..5176b79 100644
+--- a/node_modules/digitaljs/lib/cells/gates.js
++++ b/node_modules/digitaljs/lib/cells/gates.js
+@@ -3,11 +3,12 @@
+ Object.defineProperty(exports, "__esModule", {
+   value: true
+ });
++exports.buf_path = void 0;
+ exports.XorView = exports.XorReduceView = exports.XorReduce = exports.Xor = exports.XnorView = exports.XnorReduceView = exports.XnorReduce = exports.Xnor = exports.RepeaterView = exports.Repeater = exports.OrView = exports.OrReduceView = exports.OrReduce = exports.Or = exports.NotView = exports.Not = exports.NorView = exports.NorReduceView = exports.NorReduce = exports.Nor = exports.NandView = exports.NandReduceView = exports.NandReduce = exports.Nand = exports.GateX1 = exports.GateSVG = exports.GateReduce = exports.Gate11 = exports.AndView = exports.AndReduceView = exports.AndReduce = exports.And = void 0;
+ var _base = require("./base.js");
+ const and_path = "M19 0v32h16c9 0 16-7 16-16S44 0 35 0H20z";
+ const or_path = "M14.3 0l1.6 2s4.5 5.6 4.5 14s-4.5 14-4.5 14l-1.6 2H28c3.8 0 16.6-.5 25-16h0A28 28 0 0028 0H16.8z";
+-const buf_path = "M18-2v36l2-1 32-17h0L20-1z";
++const buf_path = exports.buf_path = "M18-2v36l2-1 32-17h0L20-1z";
+ const xor_arc_path = "M6.8-1.2 10 2.7S14.2 8 14.2 16S10 29.3 10 29.3l-3.2 3.9H10l1.7-2.4s4.8-6 4.8-14.8c0-8.9-4.8-14.8-4.8-14.8l-1.7-2.4z";
+ const xor_arc_path_markup = {
+   tagName: 'path',
 diff --git a/node_modules/digitaljs/lib/cells/io.js b/node_modules/digitaljs/lib/cells/io.js
 index 30675da..0ca6685 100644
 --- a/node_modules/digitaljs/lib/cells/io.js
@@ -693,56 +710,101 @@ index 1db63cf..df7474e 100644
    _gateParams: GenMux.prototype._gateParams.concat(['inputs', 'default_input']),
 diff --git a/node_modules/digitaljs/lib/cells/tribuf.js b/node_modules/digitaljs/lib/cells/tribuf.js
 new file mode 100644
-index 0000000..8fcbd34
+index 0000000..c9a5d55
 --- /dev/null
 +++ b/node_modules/digitaljs/lib/cells/tribuf.js
-@@ -0,0 +1,73 @@
+@@ -0,0 +1,109 @@
 +"use strict";
 +
 +Object.defineProperty(exports, "__esModule", {
 +  value: true
 +});
 +exports.TribufView = exports.Tribuf = void 0;
++var joint = _interopRequireWildcard(require("@joint/core"));
 +var _base = require("./base.js");
++var _gates = require("./gates.js");
 +var _vl = require("@twint/4vl");
++function _interopRequireWildcard(e, t) { if ("function" == typeof WeakMap) var r = new WeakMap(), n = new WeakMap(); return (_interopRequireWildcard = function (e, t) { if (!t && e && e.__esModule) return e; var o, i, f = { __proto__: null, default: e }; if (null === e || "object" != typeof e && "function" != typeof e) return f; if (o = t ? n : r) { if (o.has(e)) return o.get(e); o.set(e, f); } for (const t in e) "default" !== t && {}.hasOwnProperty.call(e, t) && ((i = (o = Object.defineProperty) && Object.getOwnPropertyDescriptor(e, t)) && (i.get || i.set) ? o(f, t, i) : f[t] = e[t]); return f; })(e, t); }
++
++// Classic tri-state buffer symbol: the same buffer triangle as Repeater/Not,
++// with EN entering from below into the triangle's vertical center. The box
++// is taller than the triangle (TRIBUF_HEIGHT vs. the triangle's natural
++// ~32px) so EN gets a lead-wire below the shape without its port dot
++// overhanging past the model's own `size` - unlike Mux's top `sel` port,
++// that keeps ELK's layout footprint accurate with no
++// getLayoutSize/setLayoutPosition offset dance needed.
++const TRIBUF_HEIGHT = 52;
++const TRIBUF_CENTER_Y = 16; // buf_path's fixed vertical center
++const TRIBUF_CENTER_X = 35; // buf_path's bounding-box horizontal center (x: 18..52)
++
 +// Converted from yosys's $tribuf ("assign Y = EN ? A : 'bz;", per simlib.v):
 +// EN high drives A through, EN low outputs high-Z, and EN unknown (x/z)
 +// follows Verilog's 4-valued ternary rule for an unknown condition - since
 +// the false branch is a constant z on every bit, that reduces to "keep z
 +// where A is already z, x everywhere else".
-+const Tribuf = exports.Tribuf = _base.Box.define('Tribuf', {
++const Tribuf = exports.Tribuf = _gates.GateSVG.define('Tribuf', {
 +  /* default properties */
 +  bits: 1,
 +  propagation: 0,
++  size: {
++    width: 60,
++    height: TRIBUF_HEIGHT
++  },
 +  attrs: {
-+    value: {
-+      refX: .5,
-+      refY: .5,
-+      textAnchor: 'middle',
-+      textVerticalAnchor: 'middle',
-+      text: 'tribuf'
++    gate: {
++      d: _gates.buf_path
++    }
++  },
++  ports: {
++    groups: {
++      'en': {
++        position: {
++          name: 'bottom'
++        },
++        attrs: joint.util.merge({}, _base.portGroupAttrs, {
++          wire: {
++            x2: 0,
++            y2: -(TRIBUF_HEIGHT - TRIBUF_CENTER_Y)
++          },
++          port: {
++            magnet: 'passive'
++          }
++        }),
++        z: -1
++      }
 +    }
 +  }
 +}, {
 +  initialize() {
 +    const bits = this.get('bits');
++    const dy = TRIBUF_CENTER_Y - TRIBUF_HEIGHT / 2;
++    const enDx = TRIBUF_CENTER_X - this.get('size').width / 2;
 +    this.get('ports').items = [{
 +      id: 'in',
 +      group: 'in',
 +      dir: 'in',
-+      bits: bits
++      bits: bits,
++      args: { dy }
 +    }, {
 +      id: 'en',
-+      group: 'in',
++      group: 'en',
 +      dir: 'in',
-+      bits: 1
++      bits: 1,
++      args: { dx: enDx }
 +    }, {
 +      id: 'out',
 +      group: 'out',
 +      dir: 'out',
-+      bits: bits
++      bits: bits,
++      args: { dy }
 +    }];
-+    _base.Box.prototype.initialize.apply(this, arguments);
++    _gates.GateSVG.prototype.initialize.apply(this, arguments);
++    this.on('change:bits', (_, bits) => {
++      this._setPortsBits({
++        in: bits,
++        out: bits
++      });
++    });
 +  },
 +  operation(data) {
 +    const bits = this.get('bits');
@@ -758,24 +820,15 @@ index 0000000..8fcbd34
 +    return {
 +      out: _vl.Vector4vl.fromArray(out)
 +    };
-+  },
-+  _gateParams: _base.Box.prototype._gateParams.concat(['bits']),
-+  _unsupportedPropChanges: _base.Box.prototype._unsupportedPropChanges.concat(['bits']),
-+  markup: _base.Box.prototype.markup.concat([{
-+    tagName: 'text',
-+    className: 'value',
-+    selector: 'value'
-+  }])
++  }
 +});
-+const TribufView = exports.TribufView = _base.BoxView.extend({
-+  _autoResizeBox: true
-+});
++const TribufView = exports.TribufView = _base.GateView;
 diff --git a/node_modules/digitaljs/lib/cells/trimerge.js b/node_modules/digitaljs/lib/cells/trimerge.js
 new file mode 100644
-index 0000000..fc60b2f
+index 0000000..d5a06fe
 --- /dev/null
 +++ b/node_modules/digitaljs/lib/cells/trimerge.js
-@@ -0,0 +1,78 @@
+@@ -0,0 +1,71 @@
 +"use strict";
 +
 +Object.defineProperty(exports, "__esModule", {
@@ -789,24 +842,24 @@ index 0000000..fc60b2f
 +// value through, 2+ real drivers that disagree produce contention (x),
 +// and all-z produces z. Synthesized purely during yosys2digitaljs's JSON
 +// conversion for nets with more than one source; no yosys cell backs it.
++//
++// Rendered as a plain vertical bar - a bus-junction glyph where the inputs
++// converge on the left and a single output continues out the right, no
++// text label needed.
 +const TriMerge = exports.TriMerge = _base.Box.define('TriMerge', {
 +  /* default properties */
 +  inputs: 2,
 +  bits: 1,
 +  propagation: 0,
-+  attrs: {
-+    value: {
-+      refX: .5,
-+      refY: .5,
-+      textAnchor: 'middle',
-+      textVerticalAnchor: 'middle',
-+      text: 'merge'
-+    }
++  size: {
++    width: 10,
++    height: undefined
 +  }
 +}, {
 +  initialize() {
 +    const bits = this.get('bits');
 +    const inputs = this.get('inputs');
++    this.get('size').height = inputs * 16 + 8;
 +    const ports = [];
 +    for (let i = 0; i < inputs; i++) ports.push({
 +      id: 'in' + i,
@@ -841,19 +894,12 @@ index 0000000..fc60b2f
 +    }
 +    return _vl.Vector4vl.fromArray(out);
 +  },
-+  markup: _base.Box.prototype.markup.concat([{
-+    tagName: 'text',
-+    className: 'value',
-+    selector: 'value'
-+  }]),
 +  _gateParams: _base.Box.prototype._gateParams.concat(['inputs']),
 +  _unsupportedPropChanges: _base.Box.prototype._unsupportedPropChanges.concat(['inputs']),
 +  _operationHelpers: _base.Box.prototype._operationHelpers.concat(['_mergeTwo']),
 +  _gateKind: 'bus'
 +});
-+const TriMergeView = exports.TriMergeView = _base.BoxView.extend({
-+  _autoResizeBox: true
-+});
++const TriMergeView = exports.TriMergeView = _base.BoxView;
 diff --git a/node_modules/digitaljs/lib/circuit.js b/node_modules/digitaljs/lib/circuit.js
 index 4511409..4449097 100644
 --- a/node_modules/digitaljs/lib/circuit.js
@@ -914,6 +960,43 @@ index 4511409..4449097 100644
      return new Promise(resolve => {
        this.monitor(cell, port, (tick, sig) => {
          resolve(tick);
+diff --git a/node_modules/digitaljs/lib/elkjs.js b/node_modules/digitaljs/lib/elkjs.js
+index bdb9b09..206ba26 100644
+--- a/node_modules/digitaljs/lib/elkjs.js
++++ b/node_modules/digitaljs/lib/elkjs.js
+@@ -7,6 +7,23 @@ exports.elk_layout = elk_layout;
+ var _elkBundled = _interopRequireDefault(require("elkjs/lib/elk.bundled.js"));
+ var _io = require("./cells/io.js");
+ function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
++const PORT_SIDE_BY_POSITION = {
++  left: 'WEST',
++  right: 'EAST',
++  top: 'NORTH',
++  bottom: 'SOUTH'
++};
++
++// Port side for ELK's layered router, derived from the port's own group
++// position (left/right/top/bottom) instead of hardcoding group names - a
++// group like Tribuf's bottom-entering `en` isn't named "in"/"out"/"in2" but
++// still needs ELK to route its wire from the correct side.
++function portGroupSide(cell, groupName) {
++  const group = (cell.get('ports').groups || {})[groupName];
++  const pos = group && group.position;
++  const name = typeof pos === 'string' ? pos : pos && pos.name;
++  return PORT_SIDE_BY_POSITION[name] || 'EAST';
++}
+ function to_elkjs(graph) {
+   const elkGraph = {
+     id: "root",
+@@ -39,7 +56,7 @@ function to_elkjs(graph) {
+           x: ppos[p.group][p.id].x,
+           y: ppos[p.group][p.id].y,
+           properties: {
+-            'port.side': p.group == "in" ? "WEST" : p.group == "in2" ? "NORTH" : "EAST",
++            'port.side': portGroupSide(cell, p.group),
+             'port.borderOffset': 30,
+             'port.index': -i
+           }
 diff --git a/node_modules/digitaljs/lib/engines/worker.js b/node_modules/digitaljs/lib/engines/worker.js
 index 1ea806b..c6bc51c 100644
 --- a/node_modules/digitaljs/lib/engines/worker.js
@@ -1617,6 +1700,19 @@ index 78a39e8..04e8867 100644
              if (results.length == 0) return xes;
              while (results.length > 1) {
                  const other = results.pop();
+diff --git a/node_modules/digitaljs/src/cells/gates.mjs b/node_modules/digitaljs/src/cells/gates.mjs
+index 78d1464..13ed75e 100644
+--- a/node_modules/digitaljs/src/cells/gates.mjs
++++ b/node_modules/digitaljs/src/cells/gates.mjs
+@@ -4,7 +4,7 @@ import { Gate, GateView } from './base.mjs';
+ 
+ const and_path = "M19 0v32h16c9 0 16-7 16-16S44 0 35 0H20z";
+ const or_path = "M14.3 0l1.6 2s4.5 5.6 4.5 14s-4.5 14-4.5 14l-1.6 2H28c3.8 0 16.6-.5 25-16h0A28 28 0 0028 0H16.8z";
+-const buf_path = "M18-2v36l2-1 32-17h0L20-1z";
++export const buf_path = "M18-2v36l2-1 32-17h0L20-1z";
+ const xor_arc_path = "M6.8-1.2 10 2.7S14.2 8 14.2 16S10 29.3 10 29.3l-3.2 3.9H10l1.7-2.4s4.8-6 4.8-14.8c0-8.9-4.8-14.8-4.8-14.8l-1.7-2.4z";
+     
+ const xor_arc_path_markup = {
 diff --git a/node_modules/digitaljs/src/cells/io.mjs b/node_modules/digitaljs/src/cells/io.mjs
 index dc91963..777411f 100644
 --- a/node_modules/digitaljs/src/cells/io.mjs
@@ -1923,42 +2019,74 @@ index a8e6a67..2302ada 100644
      _gateParams: GenMux.prototype._gateParams.concat(['inputs', 'default_input']),
 diff --git a/node_modules/digitaljs/src/cells/tribuf.mjs b/node_modules/digitaljs/src/cells/tribuf.mjs
 new file mode 100644
-index 0000000..66fbf33
+index 0000000..34891a3
 --- /dev/null
 +++ b/node_modules/digitaljs/src/cells/tribuf.mjs
-@@ -0,0 +1,56 @@
+@@ -0,0 +1,78 @@
 +"use strict";
 +
-+import { Box, BoxView } from './base.mjs';
++import * as joint from '@joint/core';
++import { portGroupAttrs, GateView } from './base.mjs';
++import { GateSVG, buf_path } from './gates.mjs';
 +import { Vector4vl } from '@twint/4vl';
++
++// Classic tri-state buffer symbol: the same buffer triangle as Repeater/Not,
++// with EN entering from below into the triangle's vertical center. The box
++// is taller than the triangle (TRIBUF_HEIGHT vs. the triangle's natural
++// ~32px) so EN gets a lead-wire below the shape without its port dot
++// overhanging past the model's own `size` - unlike Mux's top `sel` port,
++// that keeps ELK's layout footprint accurate with no
++// getLayoutSize/setLayoutPosition offset dance needed.
++const TRIBUF_HEIGHT = 52;
++const TRIBUF_CENTER_Y = 16; // buf_path's fixed vertical center
++const TRIBUF_CENTER_X = 35; // buf_path's bounding-box horizontal center (x: 18..52)
 +
 +// Converted from yosys's $tribuf ("assign Y = EN ? A : 'bz;", per simlib.v):
 +// EN high drives A through, EN low outputs high-Z, and EN unknown (x/z)
 +// follows Verilog's 4-valued ternary rule for an unknown condition - since
 +// the false branch is a constant z on every bit, that reduces to "keep z
 +// where A is already z, x everywhere else".
-+export const Tribuf = Box.define('Tribuf', {
++export const Tribuf = GateSVG.define('Tribuf', {
 +    /* default properties */
 +    bits: 1,
 +    propagation: 0,
 +
-+    attrs: {
-+        value: {
-+            refX: .5, refY: .5,
-+            textAnchor: 'middle', textVerticalAnchor: 'middle',
-+            text: 'tribuf'
++    size: { width: 60, height: TRIBUF_HEIGHT },
++    attrs: { gate: { d: buf_path } },
++    ports: {
++        groups: {
++            'en': {
++                position: { name: 'bottom' },
++                attrs: joint.util.merge({}, portGroupAttrs, {
++                    wire: { x2: 0, y2: -(TRIBUF_HEIGHT - TRIBUF_CENTER_Y) },
++                    port: { magnet: 'passive' }
++                }),
++                z: -1
++            }
 +        }
 +    }
 +}, {
 +    initialize() {
 +        const bits = this.get('bits');
++        // GateSVG's in/out groups auto-center at size.height/2; buf_path's
++        // artwork doesn't scale with size, so re-pin them to the triangle's
++        // fixed center instead of letting them drift down with the taller box.
++        const dy = TRIBUF_CENTER_Y - TRIBUF_HEIGHT / 2;
++        // 'bottom' auto-centers en at the box's own width/2 (30); buf_path's
++        // artwork isn't centered in the box (it spans x:18..52), so re-pin
++        // it to the triangle's true horizontal center instead.
++        const enDx = TRIBUF_CENTER_X - this.get('size').width / 2;
 +        this.get('ports').items = [
-+            { id: 'in', group: 'in', dir: 'in', bits: bits },
-+            { id: 'en', group: 'in', dir: 'in', bits: 1 },
-+            { id: 'out', group: 'out', dir: 'out', bits: bits }
++            { id: 'in', group: 'in', dir: 'in', bits: bits, args: { dy } },
++            { id: 'en', group: 'en', dir: 'in', bits: 1, args: { dx: enDx } },
++            { id: 'out', group: 'out', dir: 'out', bits: bits, args: { dy } }
 +        ];
 +
-+        Box.prototype.initialize.apply(this, arguments);
++        GateSVG.prototype.initialize.apply(this, arguments);
++
++        this.on('change:bits', (_, bits) => {
++            this._setPortsBits({ in: bits, out: bits });
++        });
 +    },
 +    operation(data) {
 +        const bits = this.get('bits');
@@ -1970,25 +2098,15 @@ index 0000000..66fbf33
 +        for (let i = 0; i < bits; i++)
 +            out.push(data.in.get(i) === 2 ? 2 : 0);
 +        return { out: Vector4vl.fromArray(out) };
-+    },
-+    _gateParams: Box.prototype._gateParams.concat(['bits']),
-+    _unsupportedPropChanges: Box.prototype._unsupportedPropChanges.concat(['bits']),
-+    markup: Box.prototype.markup.concat([{
-+            tagName: 'text',
-+            className: 'value',
-+            selector: 'value'
-+        }
-+    ])
++    }
 +});
-+export const TribufView = BoxView.extend({
-+    _autoResizeBox: true
-+});
++export const TribufView = GateView;
 diff --git a/node_modules/digitaljs/src/cells/trimerge.mjs b/node_modules/digitaljs/src/cells/trimerge.mjs
 new file mode 100644
-index 0000000..8a51ffc
+index 0000000..c8201d5
 --- /dev/null
 +++ b/node_modules/digitaljs/src/cells/trimerge.mjs
-@@ -0,0 +1,66 @@
+@@ -0,0 +1,58 @@
 +"use strict";
 +
 +import { Box, BoxView } from './base.mjs';
@@ -1999,23 +2117,23 @@ index 0000000..8a51ffc
 +// value through, 2+ real drivers that disagree produce contention (x),
 +// and all-z produces z. Synthesized purely during yosys2digitaljs's JSON
 +// conversion for nets with more than one source; no yosys cell backs it.
++//
++// Rendered as a plain vertical bar - a bus-junction glyph where the inputs
++// converge on the left and a single output continues out the right, no
++// text label needed.
 +export const TriMerge = Box.define('TriMerge', {
 +    /* default properties */
 +    inputs: 2,
 +    bits: 1,
 +    propagation: 0,
 +
-+    attrs: {
-+        value: {
-+            refX: .5, refY: .5,
-+            textAnchor: 'middle', textVerticalAnchor: 'middle',
-+            text: 'merge'
-+        }
-+    }
++    size: { width: 10, height: undefined }
 +}, {
 +    initialize() {
 +        const bits = this.get('bits');
 +        const inputs = this.get('inputs');
++
++        this.get('size').height = inputs * 16 + 8;
 +
 +        const ports = [];
 +        for (let i = 0; i < inputs; i++)
@@ -2041,20 +2159,12 @@ index 0000000..8a51ffc
 +        }
 +        return Vector4vl.fromArray(out);
 +    },
-+    markup: Box.prototype.markup.concat([{
-+            tagName: 'text',
-+            className: 'value',
-+            selector: 'value'
-+        }
-+    ]),
 +    _gateParams: Box.prototype._gateParams.concat(['inputs']),
 +    _unsupportedPropChanges: Box.prototype._unsupportedPropChanges.concat(['inputs']),
 +    _operationHelpers: Box.prototype._operationHelpers.concat(['_mergeTwo']),
 +    _gateKind: 'bus'
 +});
-+export const TriMergeView = BoxView.extend({
-+    _autoResizeBox: true
-+});
++export const TriMergeView = BoxView;
 diff --git a/node_modules/digitaljs/src/circuit.mjs b/node_modules/digitaljs/src/circuit.mjs
 index 0692a9d..d316dd9 100644
 --- a/node_modules/digitaljs/src/circuit.mjs
@@ -2115,6 +2225,39 @@ index 0692a9d..d316dd9 100644
              trigger = [trigger];
          return new Promise(resolve => {
              this.monitor(cell, port, (tick, sig) => { resolve(tick) }, 
+diff --git a/node_modules/digitaljs/src/elkjs.mjs b/node_modules/digitaljs/src/elkjs.mjs
+index 7987cda..b7f9de0 100644
+--- a/node_modules/digitaljs/src/elkjs.mjs
++++ b/node_modules/digitaljs/src/elkjs.mjs
+@@ -2,6 +2,19 @@
+ import elkjs from 'elkjs/lib/elk.bundled.js';
+ import { Clock, Input, Output } from "./cells/io.mjs";
+ 
++const PORT_SIDE_BY_POSITION = { left: 'WEST', right: 'EAST', top: 'NORTH', bottom: 'SOUTH' };
++
++// Port side for ELK's layered router, derived from the port's own group
++// position (left/right/top/bottom) instead of hardcoding group names - a
++// group like Tribuf's bottom-entering `en` isn't named "in"/"out"/"in2" but
++// still needs ELK to route its wire from the correct side.
++function portGroupSide(cell, groupName) {
++    const group = (cell.get('ports').groups || {})[groupName];
++    const pos = group && group.position;
++    const name = typeof pos === 'string' ? pos : pos && pos.name;
++    return PORT_SIDE_BY_POSITION[name] || 'EAST';
++}
++
+ function to_elkjs(graph) {
+     const elkGraph = {
+         id: "root",
+@@ -38,7 +51,7 @@ function to_elkjs(graph) {
+                     x: ppos[p.group][p.id].x,
+                     y: ppos[p.group][p.id].y,
+                     properties: {
+-                        'port.side': p.group == "in" ? "WEST" : p.group == "in2" ? "NORTH" : "EAST",
++                        'port.side': portGroupSide(cell, p.group),
+                         'port.borderOffset': 30,
+                         'port.index': -i
+                     }
 diff --git a/node_modules/digitaljs/src/engines/worker-worker.mjs b/node_modules/digitaljs/src/engines/worker-worker.mjs
 index ec31c21..083f094 100644
 --- a/node_modules/digitaljs/src/engines/worker-worker.mjs

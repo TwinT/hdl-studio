@@ -11,7 +11,7 @@
 
 ## Improvements and Refactorization 🛠️
 - [X] "Show HDL Studio Panel" button should not display when the file is not supported.
-- [ ] Tribuf/TriMerge symbols: replace with something more standard/nicer-looking.
+- [X] Tribuf/TriMerge symbols: replace with something more standard/nicer-looking.
 - [ ] Signal input widgets should start at 0, not x.
 
 ## Known Bugs 🐛
