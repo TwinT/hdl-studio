@@ -224,6 +224,7 @@ class LuaRunner {
     #runners
     #repl_runner
     #repl_queue = []
+    #switching = false
     constructor(djs) {
         this.#djs = djs;
         this.#runners = {};
@@ -245,6 +246,12 @@ class LuaRunner {
         runner.djs_label = label;
         runner.on('thread:stop', (pid) => {
             vscode.postMessage({ command: "luastop", name: runner.djs_name, isrepl });
+            if (!this.#switching) {
+                const has_queued = isrepl && this.#repl_queue.length > 0;
+                if (!has_queued)
+                    this.#djs.pauseSim();
+                this.#djs.updateRunStates();
+            }
             if (!isrepl || this.#repl_queue.length <= 0)
                 return;
             const { name, script, label } = this.#repl_queue[0];
@@ -277,14 +284,33 @@ class LuaRunner {
                 }
             }
         }
-        else {
-            this.stop(name);
+        // Only one Lua execution (script or REPL) may drive the circuit's
+        // inputs at a time. #switching suppresses the natural-completion
+        // pause/broadcast below while we're about to immediately start a
+        // replacement execution.
+        this.#switching = true;
+        try {
+            for (const other_name of Object.keys(this.#runners))
+                this.stop(other_name);
+            if (!isrepl)
+                this.stop(undefined, true, false);
+        } finally {
+            this.#switching = false;
         }
         this.#run(name, script, isrepl, label);
+    }
+    get active() {
+        if (this.#repl_queue.length > 0) return true;
+        const isBusy = (r) => r && r.running_pid !== undefined && r.isThreadRunning(r.running_pid);
+        return isBusy(this.#repl_runner) || Object.values(this.#runners).some(isBusy);
     }
     #run(name, script, isrepl, label) {
         label = label || name;
         const runner = this.#getRunner(name, isrepl, label);
+        // A script's sim.sleep/sim.wait resumption only fires while the
+        // circuit is ticking; ensure it's running (no state reset).
+        if (!this.#djs.circuit.running)
+            this.#djs.startSim();
         let pid;
         try {
             // A `@` prefixed chunk name is interpreted as filename by lua
@@ -557,7 +583,7 @@ class DigitalJS {
                 track: 1
             }]
         });
-        this.#updateRunStates();
+        this.updateRunStates();
         $('#monitorbox vscode-button').prop('disabled', true).off();
 
         // When we got a click in the webview, vscode will not handle this event
@@ -596,10 +622,10 @@ class DigitalJS {
                 this.#mkCircuit(message.circuit, message.opts);
                 return;
             case 'pausesim':
-                this.#pauseSim();
+                this.pauseSim();
                 return;
             case 'startsim':
-                this.#startSim();
+                this.startSim();
                 return;
             case 'singlestepsim':
                 this.#singleStepSim();
@@ -615,11 +641,6 @@ class DigitalJS {
                 return;
             case 'stoplua':
                 this.#lua.stop(message.name, message.isrepl, message.quit);
-                // A script's own sim.sleep/sim.wait resumption only fires while
-                // the circuit is ticking, so running one requires the simulation
-                // to be playing. Stopping the script should fully kill that too,
-                // not leave the clock running with nothing left to drive it.
-                if (!message.isrepl) this.#pauseSim();
                 return;
             case 'exportimage': {
                 const post_reply = (data, base64) => {
@@ -1304,12 +1325,12 @@ class DigitalJS {
         this.#registerPaper(this.#paper);
         this.circuit.on('new:paper', (paper) => { this.#registerPaper(paper); });
         this.circuit.on('userChange', () => {
-            this.#updateRunStates();
+            this.updateRunStates();
         });
         this.circuit.on('changeRunning', () => {
-            this.#updateRunStates();
+            this.updateRunStates();
         });
-        this.#updateRunStates();
+        this.updateRunStates();
         const live_btn = $('#monitorbox vscode-button[name=live]');
         const live_btn_icon = live_btn.find('i.codicon');
         const set_live = (live) => {
@@ -1359,16 +1380,17 @@ class DigitalJS {
         this.#restoreStates(old_states, opts.keep);
     }
 
-    #updateRunStates() {
+    updateRunStates() {
         const circuit = this.circuit;
         if (circuit === undefined) {
             vscode.postMessage({ command: "runstate", hascircuit: false,
-                                 running: false, pendingEvents: false });
+                                 running: false, pendingEvents: false, luaActive: false });
             return;
         }
         vscode.postMessage({ command: "runstate", hascircuit: true,
                              running: circuit.running,
-                             pendingEvents: circuit.hasPendingEvents });
+                             pendingEvents: circuit.hasPendingEvents,
+                             luaActive: this.#lua.active });
         this.#monitorview.autoredraw = !circuit.running;
     }
     #destroyCircuit() {
@@ -1406,27 +1428,27 @@ class DigitalJS {
             this.#iopanel = undefined;
         }
         this.#lua.shutdown();
-        this.#updateRunStates();
+        this.updateRunStates();
         $('#monitorbox vscode-button').prop('disabled', true).off();
         $('#paper').empty();
     }
-    #pauseSim() {
+    pauseSim() {
         this.circuit.stop();
     }
-    #startSim() {
+    startSim() {
         this.circuit.start();
     }
     #singleStepSim() {
         this.circuit.updateGates();
-        this.#updateRunStates();
+        this.updateRunStates();
     }
     #nextEventSim() {
         this.circuit.updateGatesNext();
-        this.#updateRunStates();
+        this.updateRunStates();
     }
     #fastForwardSim() {
         this.circuit.startFast();
-        this.#updateRunStates();
+        this.updateRunStates();
     }
 }
 

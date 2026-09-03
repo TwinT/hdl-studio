@@ -144,7 +144,9 @@ class Status {
 </tr>`);
         widget.find('span.djs-io-name').text(view.label);
         const checkbox = widget.find('vscode-checkbox');
-        const updater = (bin) => {
+        let bin = view.value;
+        const updater = (new_bin) => {
+            bin = new_bin;
             const value = Vector4vl.fromBin(bin, 1);
             if (!is_input)
                 checkbox.prop('indeterminate', !value.isDefined);
@@ -153,8 +155,11 @@ class Status {
         updater(view.value);
         if (is_input) {
             checkbox.change(() => {
-                vscode.postMessage({ command: 'iopanel:update', id,
-                                     value: checkbox.prop('checked') ? '1' : '0' });
+                const new_bin = checkbox.prop('checked') ? '1' : '0';
+                if (new_bin == bin)
+                    return;
+                bin = new_bin;
+                vscode.postMessage({ command: 'iopanel:update', id, value: new_bin });
             });
         }
         return { widget, updater };
@@ -262,11 +267,12 @@ class Status {
                 const ele_enabled = (ele, enable) => {
                     ele.attr('disabled', enable ? null : true);
                 };
-                ele_enabled(this.#start_btn, !state.running);
-                ele_enabled(this.#pause_btn, state.running);
-                ele_enabled(this.#fast_forward_btn, !state.running);
-                ele_enabled(this.#single_step_btn, !state.running);
-                ele_enabled(this.#next_event_btn, !state.running && state.pendingEvents);
+                const active = !state.luaActive;
+                ele_enabled(this.#start_btn, active && !state.running);
+                ele_enabled(this.#pause_btn, active && state.running);
+                ele_enabled(this.#fast_forward_btn, active && !state.running);
+                ele_enabled(this.#single_step_btn, active && !state.running);
+                ele_enabled(this.#next_event_btn, active && !state.running && state.pendingEvents);
                 return;
             }
             case 'iopanel:view':

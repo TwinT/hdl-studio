@@ -466,7 +466,7 @@ index 7424f83..5176b79 100644
  const xor_arc_path_markup = {
    tagName: 'path',
 diff --git a/node_modules/digitaljs/lib/cells/io.js b/node_modules/digitaljs/lib/cells/io.js
-index 30675da..1284eb0 100644
+index 30675da..959c2cc 100644
 --- a/node_modules/digitaljs/lib/cells/io.js
 +++ b/node_modules/digitaljs/lib/cells/io.js
 @@ -7,7 +7,7 @@ exports.OutputView = exports.Output = exports.NumEntryView = exports.NumEntry =
@@ -1068,8 +1068,30 @@ index bdb9b09..206ba26 100644
              'port.borderOffset': 30,
              'port.index': -i
            }
+diff --git a/node_modules/digitaljs/lib/engines/worker-worker.js b/node_modules/digitaljs/lib/engines/worker-worker.js
+index e0fc9ce..f48f7b6 100644
+--- a/node_modules/digitaljs/lib/engines/worker-worker.js
++++ b/node_modules/digitaljs/lib/engines/worker-worker.js
+@@ -339,7 +339,16 @@ class WorkerEngineWorker {
+     stopOnAlarm,
+     synchronous
+   }) {
+-    if (tick <= this._tick) return;
++    // The main thread computes `tick` from its own cached view of the
++    // current tick (updated asynchronously via postMessage), which can be
++    // stale by the time this registration actually reaches the worker -
++    // especially right after a burst of synchronous main-thread work
++    // (e.g. several sim.setinput calls before a sim.sleep). A target that
++    // has already passed (or lands exactly now) must still fire -
++    // clamping to the very next tick instead of dropping it is what keeps
++    // a script's own sim.sleep/sim.wait from hanging forever waiting on
++    // an alarm that will never come.
++    if (tick <= this._tick) tick = this._tick + 1;
+     this._alarms[alarmId] = {
+       tick,
+       stopOnAlarm,
 diff --git a/node_modules/digitaljs/lib/engines/worker.js b/node_modules/digitaljs/lib/engines/worker.js
-index 1ea806b..c6bc51c 100644
+index 1ea806b..09e6768 100644
 --- a/node_modules/digitaljs/lib/engines/worker.js
 +++ b/node_modules/digitaljs/lib/engines/worker.js
 @@ -6,7 +6,7 @@ Object.defineProperty(exports, "__esModule", {
@@ -1099,15 +1121,56 @@ index 1ea806b..c6bc51c 100644
      const gate = this._findGateByIds(graphId, gateId);
      if (gate === undefined) return;
      gate.trigger(event, ...args);
-@@ -324,7 +324,7 @@ class WorkerEngine extends _base.BaseEngine {
+@@ -324,29 +324,33 @@ class WorkerEngine extends _base.BaseEngine {
      const callback = this._monitors[monitorId];
      if (callback == undefined) return;
      if (oneShot) delete this._monitors[monitorId];
 -    const ret = callback(tick, _vl.Vector3vl.fromClonable(sig));
+-    if (stopped) {
+-      if (ret) {
+-        this._running = false;
+-        this.trigger('changeRunning');
+-      } else if (this._running) this._worker.postMessage({
+-        type: this._running == 'fast' ? 'startFast' : 'start'
+-      });
+-    }
 +    const ret = callback(tick, _vl.Vector4vl.fromClonable(sig));
-     if (stopped) {
-       if (ret) {
-         this._running = false;
++    this._resumeAfterCallback(stopped, ret);
+   }
+   _handle_alarmReached(alarmId, tick, stopped) {
+     const callback = this._alarms[alarmId];
+     if (callback == undefined) return;
+     delete this._alarms[alarmId];
+     const ret = callback();
+-    if (stopped) {
+-      if (ret) {
+-        this._running = false;
+-        this.trigger('changeRunning');
+-      } else if (this._running) this._worker.postMessage({
+-        type: this._running == 'fast' ? 'startFast' : 'start'
+-      });
++    this._resumeAfterCallback(stopped, ret);
++  }
++  // `stopped` means the worker's tick loop halted itself to deliver this
++  // alarm/monitor callback synchronously. A truthy return means the
++  // callback wants to stay stopped. Otherwise resume ticking - but
++  // re-read `this._running` here, not a value captured before `callback`
++  // ran: if the callback itself synchronously called stop() (e.g. a Lua
++  // script's own completion handler pausing the sim), that must stick
++  // instead of being silently overridden by an unconditional restart.
++  _resumeAfterCallback(stopped, ret) {
++    if (!stopped) return;
++    if (ret) {
++      this._running = false;
++      this.trigger('changeRunning');
++      return;
+     }
++    if (this._running) this._worker.postMessage({
++      type: this._running == 'fast' ? 'startFast' : 'start'
++    });
+   }
+   _handle_ack(reqid, response) {
+     this._resolvePromise(reqid, response);
 diff --git a/node_modules/digitaljs/lib/help.js b/node_modules/digitaljs/lib/help.js
 index 9fa0cc5..4149850 100644
 --- a/node_modules/digitaljs/lib/help.js
@@ -2401,7 +2464,7 @@ index 7987cda..b7f9de0 100644
                          'port.index': -i
                      }
 diff --git a/node_modules/digitaljs/src/engines/worker-worker.mjs b/node_modules/digitaljs/src/engines/worker-worker.mjs
-index ec31c21..083f094 100644
+index ec31c21..7badf14 100644
 --- a/node_modules/digitaljs/src/engines/worker-worker.mjs
 +++ b/node_modules/digitaljs/src/engines/worker-worker.mjs
 @@ -1,7 +1,7 @@
@@ -2459,8 +2522,27 @@ index ec31c21..083f094 100644
          const gate = this._graphs[graphId].getGate(gateId);
          this._monitors[monitorId] = { gate, port, triggerValues, stopOnTrigger, oneShot, synchronous };
          gate.monitor(port, monitorId);
+@@ -328,7 +328,17 @@ class WorkerEngineWorker {
+         delete this._monitorChecks[monitorId];
+     }
+     alarm(tick, alarmId, {stopOnAlarm, synchronous}) {
+-        if (tick <= this._tick) return;
++        // The main thread computes `tick` from its own cached view of the
++        // current tick (updated asynchronously via postMessage), which can
++        // be stale by the time this registration actually reaches the
++        // worker - especially right after a burst of synchronous main-
++        // thread work (e.g. several sim.setinput calls before a
++        // sim.sleep). A target that has already passed (or lands exactly
++        // now) must still fire - clamping to the very next tick instead of
++        // dropping it is what keeps a script's own sim.sleep/sim.wait from
++        // hanging forever waiting on an alarm that will never come.
++        if (tick <= this._tick)
++            tick = this._tick + 1;
+         this._alarms[alarmId] = { tick, stopOnAlarm, synchronous };
+         if (!this._alarmQueue.has(tick))
+             this._alarmQueue.set(tick, new Set());
 diff --git a/node_modules/digitaljs/src/engines/worker.mjs b/node_modules/digitaljs/src/engines/worker.mjs
-index 35d0726..f7e2e0d 100644
+index 35d0726..3331e76 100644
 --- a/node_modules/digitaljs/src/engines/worker.mjs
 +++ b/node_modules/digitaljs/src/engines/worker.mjs
 @@ -1,7 +1,7 @@
@@ -2490,15 +2572,53 @@ index 35d0726..f7e2e0d 100644
          const gate = this._findGateByIds(graphId, gateId);
          if (gate === undefined) return;
          gate.trigger(event, ...args);
-@@ -247,7 +247,7 @@ export class WorkerEngine extends BaseEngine {
+@@ -247,27 +247,32 @@ export class WorkerEngine extends BaseEngine {
          const callback = this._monitors[monitorId];
          if (callback == undefined) return;
          if (oneShot) delete this._monitors[monitorId];
 -        const ret = callback(tick, Vector3vl.fromClonable(sig));
+-        if (stopped) {
+-            if (ret) {
+-                this._running = false;
+-                this.trigger('changeRunning');
+-            } else if (this._running)
+-                this._worker.postMessage({ type: this._running == 'fast' ? 'startFast' : 'start' });
+-        }
 +        const ret = callback(tick, Vector4vl.fromClonable(sig));
-         if (stopped) {
-             if (ret) {
-                 this._running = false;
++        this._resumeAfterCallback(stopped, ret);
+     }
+     _handle_alarmReached(alarmId, tick, stopped) {
+         const callback = this._alarms[alarmId];
+         if (callback == undefined) return;
+         delete this._alarms[alarmId];
+         const ret = callback();
+-        if (stopped) {
+-            if (ret) {
+-                this._running = false;
+-                this.trigger('changeRunning');
+-            } else if (this._running)
+-                this._worker.postMessage({ type: this._running == 'fast' ? 'startFast' : 'start' });
++        this._resumeAfterCallback(stopped, ret);
++    }
++    // `stopped` means the worker's tick loop halted itself to deliver this
++    // alarm/monitor callback synchronously. A truthy return means the
++    // callback wants to stay stopped. Otherwise resume ticking - but
++    // re-read `this._running` here, not a value captured before `callback`
++    // ran: if the callback itself synchronously called stop() (e.g. a Lua
++    // script's own completion handler pausing the sim), that must stick
++    // instead of being silently overridden by an unconditional restart.
++    _resumeAfterCallback(stopped, ret) {
++        if (!stopped) return;
++        if (ret) {
++            this._running = false;
++            this.trigger('changeRunning');
++            return;
+         }
++        if (this._running)
++            this._worker.postMessage({ type: this._running == 'fast' ? 'startFast' : 'start' });
+     }
+     _handle_ack(reqid, response) {
+         this._resolvePromise(reqid, response);
 diff --git a/node_modules/digitaljs/src/help.mjs b/node_modules/digitaljs/src/help.mjs
 index aa9e1d1..63f628f 100644
 --- a/node_modules/digitaljs/src/help.mjs

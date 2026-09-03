@@ -14,7 +14,7 @@ local function drive(oe_a, val_a, oe_b, val_b)
     sim.setinput("val_a", val_a);
     sim.setinput("oe_b", oe_b);
     sim.setinput("val_b", val_b);
-    sim.sleep(2);
+    sim.sleep(20);
     print(string.format("oe_a=%d val_a=%d oe_b=%d val_b=%d -> bus=%s\n",
         oe_a and 1 or 0, val_a, oe_b and 1 or 0, val_b,
         sim.getoutput("bus"):tobin()));

@@ -33,7 +33,7 @@ export class Document {
     #tick = 0
     #iopanelViews = []
     #iopanelViewIndices = {}
-    #runStates = { hascircuit: false, running: false, pendingEvents: false }
+    #runStates = { hascircuit: false, running: false, pendingEvents: false, luaActive: false }
 
     #doc_id
 
@@ -416,7 +416,8 @@ export class Document {
             case 'runstate':
                 this.#runStates = { hascircuit: message.hascircuit,
                                     running: message.running,
-                                    pendingEvents: message.pendingEvents };
+                                    pendingEvents: message.pendingEvents,
+                                    luaActive: message.luaActive };
                 this.#runStatesUpdated.fire(this.#runStates);
                 return;
             case 'luastarted':

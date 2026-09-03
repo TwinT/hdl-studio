@@ -132,83 +132,129 @@ output → NumDisplay; 8-bit output `display7`/`display7_*` → 7-segment Displa
   the touched `lib/*.js` files after a fresh install regardless of how small
   the edit looks.
 
-## IN PROGRESS: Lua-driven simulation gives stale/wrong values in the real webview
+## Lua script execution lifecycle
 
-Not fixed yet — mid-investigation, picking back up another day. Full history
-in the plan file this was built from (ask to resume it), condensed here:
+Root cause of the earlier "stale/wrong values in the real webview" bug (a Lua
+script driving a shared tri-state bus printed the same value 5 times instead
+of 5 distinct ones): **multiple Lua executions could run concurrently against
+the same circuit**. `LuaRunner.run()` (`view/main.mjs`) only stopped a runner
+with the *same name* before starting a new one; a different named script, or
+a REPL submission, got its own `digitaljs_lua.LuaRunner` bound to the same
+circuit with zero exclusion — two runners fighting over the same input is
+what produced the "no se entiende si hay uno o varios scripts corriendo"
+toggling.
 
-**Symptom**: a Lua script that paces itself with `sim.sleep()` and drives a
-shared tri-state bus (`test/verilog/tribuf_bus2/tribuf_bus2_sim.lua`) prints
-wrong values in the real VS Code webview — e.g. all prints showing the same
-(only-first-combination-correct) bus value instead of 5 distinct ones.
+Fixed by making `LuaRunner` (`view/main.mjs`) enforce single-active-execution
+and tie the circuit clock's lifecycle to script lifecycle:
+- `run()` stops *every other* runner (script or REPL) before starting a new
+  one, not just a same-named one.
+- Starting a script ensures the clock is running (`circuit.start()` if not
+  already) — cheap "ensure ticking", not a state reset; no such reset API
+  exists in `digitaljs`.
+- `digitaljs_lua`'s `'thread:stop'` event (fires for natural completion *and*
+  explicit stop alike) now also pauses the sim (`circuit.stop()`) and
+  broadcasts an added `luaActive` flag through the existing `runstate` pipe
+  (`view/main.mjs` → `src/document.mjs` → `src/status_provider.mjs` /
+  `view/status_view.mjs`), which disables the control panel's
+  Start/Pause/Step/Fast-forward/Next-event buttons while any Lua execution is
+  active — so the user can't manually pause/step the clock a running script
+  depends on.
+- `_handle_alarmReached`/`_handle_monitorValue`
+  (`node_modules/digitaljs/src/engines/worker.mjs` +
+  `lib/engines/worker.js`, patched) were refactored into one
+  `_resumeAfterCallback` helper that re-reads `_running` *after* the
+  callback runs, so a script's own synchronous `stop()` (triggered by the
+  `thread:stop` handler above) can't be silently overridden by the
+  auto-restart-on-falsy-return behavior — this was already true of the
+  pre-existing code given `digitaljs_lua`'s events are synchronous
+  (`Backbone.Events`), so the patch is a documented hardening/dedup, not a
+  behavior change.
 
-**Confirmed, not theory** (empirically tested, not just read):
-- `digitaljs_lua`'s `sim.sleep`/alarm/setinput/getoutput logic and
-  Tribuf/TriMerge's combinational logic are all correct — a headless
-  `HeadlessCircuit` + default `SynchEngine` run (no Worker at all) of the
-  exact same script against the exact same synthesized circuit produces all
-  5 correct, distinct values. **The bug is 100% specific to the real
-  webview's `WorkerEngine` path** (`node_modules/digitaljs/src/engines/worker.mjs`
-  + `worker-worker.mjs`), not a generic logic bug.
-  - Reproduction script (gone now, not saved — was a throwaway in `/tmp`):
-    build via `test/pipeline.spec.mjs`'s `synth()` helper pattern, bind a
-    `digitaljs_lua.LuaRunner` to a `HeadlessCircuit`, drive ticks via
-    `circuit.updateGates({synchronous: true})` in a loop (same pattern
-    `digitaljs_lua`'s own `tests/index.test.mjs` uses). Needed a custom ESM
-    loader hook to work around `digitaljs_lua/src/index.mjs`'s `import {
-    lauxlib, ... } from "fengari-web"` failing under plain Node ESM (Node's
-    `cjs-module-lexer` can't statically detect fengari-web's CJS bundle's
-    named exports at all — `import * as fw from 'fengari-web'` in plain node
-    only yields `{default, 'module.exports'}`, nothing else — even though
-    the properties genuinely exist at runtime via `require()`). The `luaconf`
-    name in that import is dead/unused, safe to shim as `undefined`.
-  - `_postMonitors()` (`worker-worker.mjs:361-385`) calls `_sendUpdates()`
-    **before** posting `alarmReached` for `synchronous:true` alarms (which
-    `digitaljs_lua` always uses) — the "async race between tick-reached and
-    signal-updated" theory is refuted, don't re-chase it.
-- **The circuit auto-starts ticking immediately on synthesis/load**, before
-  anything touches the Play button or runs any script — a fact nobody had
-  confirmed until tonight's live console capture. Revisit any earlier
-  assumption of "the script requires Play pressed separately" — it doesn't;
-  it's already ticking.
-- **A confirmed, separate, unfixed bug**: `_handle_alarmReached`
-  (`worker.mjs:259-271`) auto-restarts the worker's tick loop after every
-  alarm whenever the callback's return value is falsy and the main thread's
-  `_running` flag is still true. `digitaljs_lua`'s alarm callback
-  (`_enqueue`, `node_modules/digitaljs_lua/src/index.mjs:526-532`) never
-  returns anything → always falsy → the clock never naturally settles once
-  a `sim.sleep`-using script has run, even after it finishes. Independently
-  fixable, not yet done.
-- **Two more confirmed, separate, unfixed latent bugs found along the way**
-  (neither is this bug's mechanism, just worth a one-line fix eventually):
-  `alarm()`'s `this._pq.add(tick-1)` (`worker-worker.mjs:336`, and the same
-  in `synch.mjs`) is unguarded against a duplicate entry at that tick,
-  unlike `_enqueue()`'s own guarded version — a collision would silently
-  orphan-freeze all future combinational recomputation. And
-  `HeadlessCircuit.unobserveGraph` (`circuit.mjs:346-347`) calls
-  `observeGraph` instead of `unobserveGraph` — a real typo/leak.
-- **Tonight's live-console capture is contaminated, not clean signal**: with
-  temporary `console.log`s added at `changeInput`, `_updateGates`, and
-  `_sendUpdates` in `node_modules/digitaljs/src/engines/worker-worker.mjs`
-  (see below), a real run showed `changeInput` firing repeatedly for the
-  same gate (`dev0`) toggling `1`/`0` back and forth **at the same tick**,
-  many times in a row — looks like multiple overlapping Lua thread/script
-  runs (or the circuit's own auto-restart) fighting over the same input,
-  not a single clean script execution. Consistent with the user's own
-  read: "no se entiende si hay uno o varios scripts corriendo." **Before
-  reading more into the logs, get a clean trace**: fresh window reload,
-  click a script's run button exactly once, don't stop/restart it, and
-  capture from there — the run/stop/run/Play sequence used for earlier
-  reports stacks multiple things at once and muddies the trace.
+**Regression caught right after the fix above**: the exclusion loop in
+`LuaRunner.run()` originally read
+`for (const other_name of Object.keys(this.#runners)) { if (!isrepl &&
+other_name === name) continue; this.stop(other_name); }` — deliberately
+*skipping* the same-named runner, on the mistaken assumption that
+`#getRunner()` overwriting `this.#runners[name]` was enough. It isn't:
+`#getRunner()` just creates a new `digitaljs_lua.LuaRunner` and orphans the
+old one without stopping it, so re-triggering the *same* script while an
+earlier run of it was still active (e.g. a stuck first attempt, or a
+double-fired Run command) spun up a second runner in parallel on the same
+circuit — reproducing the exact original bug (duplicate/interleaved prints,
+`oe_a` toggling). Confirmed headlessly against a real `WorkerEngine` (see
+below) and fixed by simply not special-casing same-name: stop *every*
+tracked runner unconditionally before starting the new one.
 
-**State left mid-debug**: the 3 `console.log`s above are still live in
-`node_modules/digitaljs/src/engines/worker-worker.mjs` (only the `src/*.mjs`
-copy, not `lib/`) and `npm run compile` has been run with them in — the
-built `dist/digitaljs-sym-worker.js` currently has them baked in. They are
-**not** in `patches/digitaljs+0.14.2.patch` (deliberately — throwaway
-diagnostic, not a real fix) and will vanish on the next `npm install`. If
-that happens before this is picked back up, they're easy to re-add (search
-this note for the 3 call sites) — no need to preserve them at all costs.
+**Headless `WorkerEngine` reproduction recipe** (useful for any future
+webview-specific circuit/engine bug, not just this one): a `HeadlessCircuit`
+can be constructed with the real `WorkerEngine` — `new HeadlessCircuit(data,
+{engine: WorkerEngine})` — giving a fully scriptable, non-interactive
+reproduction of bugs that only manifest through the actual worker-thread
+tick loop (unlike the default `SynchEngine`, which sidesteps that entire
+code path). Needs two things Node's plain ESM loader doesn't support out of
+the box, both worked around with a small `--experimental-loader` hook (not
+checked in, was thrown away after use — regenerate if needed): (1) the
+`fengari-web` named-export issue described above, and (2) the same issue for
+`@joint/core`, whose CJS bundle likewise isn't statically analyzable by
+`cjs-module-lexer` (`import { mvc } from '@joint/core'` fails the same way).
+A generic loader that `require()`s the CJS build and re-exports its own
+enumerable keys as named ESM bindings fixes both. Import `HeadlessCircuit`/
+`WorkerEngine` by absolute `file://` path into `src/circuit.mjs` and
+`src/engines/worker.mjs` (not the bare `digitaljs` specifier) to bypass the
+package's `exports` map, which otherwise blocks deep imports outside of
+package resolution.
+
+**Second bug, found live after the above (headless testing never hit it):**
+`sim.sleep`/`sim.wait` (`digitaljs_lua/src/index.mjs`'s `_enqueue`) schedule
+their wakeup via `this.#circuit.tick + delay`, where `circuit.tick` is the
+*main thread's cached* tick (`WorkerEngine`'s `_tickCache`, refreshed only
+asynchronously via `update`/`stopped` postMessages from the worker thread).
+`worker-worker.mjs`'s `alarm(tick, alarmId, {...})` used to silently drop
+the registration (`if (tick <= this._tick) return;`, no error, callback
+never fires) whenever that cached tick was stale enough that the real
+worker-thread tick had already reached or passed the target by the time the
+`alarm` message crossed the thread boundary — leaving the Lua coroutine
+permanently suspended (the original "solo aparece el header, nada más"
+hang). This never reproduced in 90+ headless `WorkerEngine` runs (varied
+timing, sequential re-runs, double-click) built for the first bug above —
+apparently the Node.js `web-worker` polyfill doesn't have enough real
+cross-thread postMessage latency to expose the race; it only showed up live,
+confirmed via a stack-trace + tick-comparison console capture. Fixed by
+clamping instead of dropping — `if (tick <= this._tick) tick = this._tick +
+1;` — so a stale wakeup request fires on the very next tick instead of
+vanishing. Patched in both `src/engines/worker-worker.mjs` and
+`lib/engines/worker-worker.js`.
+
+**Third bug, independent of Lua entirely:** an echo loop between the
+circuit's `RemoteIOPanel` (`view/iopanel.mjs`) and the control panel's input
+widgets (`view/status_view.mjs`). `iopanel.mjs`'s `_addInput` both applies
+incoming `iopanel:update` messages via `cell.setInput(...)` *and* relays
+*any* `change:outputSignals` on that cell (including one its own `setInput`
+call just caused) back out as another `iopanel:update`. `status_view.mjs`'s
+`#newBitWidget` received that and called `checkbox.prop('checked', ...)` on
+a `<vscode-checkbox>` (`@vscode/webview-ui-toolkit`, FAST/Lit-based) —
+unlike a native checkbox, this custom element re-fires its own `change`
+event on a *programmatic* property set, not just a real click, and the
+widget's `change` handler posted an `iopanel:update` right back with no
+value-changed guard, closing the loop. Purely message-passing (each hop is
+a separate `postMessage` turn across the extension host), which is why the
+symptom looks like continuous rapid toggling with the simulator unresponsive
+rather than a hard freeze. `#newNumberWidget` and `#newClockWidget` in the
+same file already guarded their own `change` handlers against exactly this
+(`if (new_bin == bin) return;` / `if (new_value == value) return;`) —
+`#newBitWidget` was just missing the same guard; fixed by adding it. Since
+nothing about steps 2-4 of the loop cares what triggered the *initial*
+`change:outputSignals`, this bug was reachable by a single real user click
+on a control-panel checkbox too, not just by a Lua script.
+
+**Still-unfixed, unrelated latent bugs found along the way** (neither is the
+above bug's mechanism, just worth a one-line fix eventually): `alarm()`'s
+`this._pq.add(tick-1)` (`worker-worker.mjs:336`, and the same in `synch.mjs`)
+is unguarded against a duplicate entry at that tick, unlike `_enqueue()`'s
+own guarded version — a collision would silently orphan-freeze all future
+combinational recomputation. And `HeadlessCircuit.unobserveGraph`
+(`circuit.mjs:346-347`) calls `observeGraph` instead of `unobserveGraph` — a
+real typo/leak.
 
 ## Misc
 
