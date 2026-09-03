@@ -132,6 +132,84 @@ output → NumDisplay; 8-bit output `display7`/`display7_*` → 7-segment Displa
   the touched `lib/*.js` files after a fresh install regardless of how small
   the edit looks.
 
+## IN PROGRESS: Lua-driven simulation gives stale/wrong values in the real webview
+
+Not fixed yet — mid-investigation, picking back up another day. Full history
+in the plan file this was built from (ask to resume it), condensed here:
+
+**Symptom**: a Lua script that paces itself with `sim.sleep()` and drives a
+shared tri-state bus (`test/verilog/tribuf_bus2/tribuf_bus2_sim.lua`) prints
+wrong values in the real VS Code webview — e.g. all prints showing the same
+(only-first-combination-correct) bus value instead of 5 distinct ones.
+
+**Confirmed, not theory** (empirically tested, not just read):
+- `digitaljs_lua`'s `sim.sleep`/alarm/setinput/getoutput logic and
+  Tribuf/TriMerge's combinational logic are all correct — a headless
+  `HeadlessCircuit` + default `SynchEngine` run (no Worker at all) of the
+  exact same script against the exact same synthesized circuit produces all
+  5 correct, distinct values. **The bug is 100% specific to the real
+  webview's `WorkerEngine` path** (`node_modules/digitaljs/src/engines/worker.mjs`
+  + `worker-worker.mjs`), not a generic logic bug.
+  - Reproduction script (gone now, not saved — was a throwaway in `/tmp`):
+    build via `test/pipeline.spec.mjs`'s `synth()` helper pattern, bind a
+    `digitaljs_lua.LuaRunner` to a `HeadlessCircuit`, drive ticks via
+    `circuit.updateGates({synchronous: true})` in a loop (same pattern
+    `digitaljs_lua`'s own `tests/index.test.mjs` uses). Needed a custom ESM
+    loader hook to work around `digitaljs_lua/src/index.mjs`'s `import {
+    lauxlib, ... } from "fengari-web"` failing under plain Node ESM (Node's
+    `cjs-module-lexer` can't statically detect fengari-web's CJS bundle's
+    named exports at all — `import * as fw from 'fengari-web'` in plain node
+    only yields `{default, 'module.exports'}`, nothing else — even though
+    the properties genuinely exist at runtime via `require()`). The `luaconf`
+    name in that import is dead/unused, safe to shim as `undefined`.
+  - `_postMonitors()` (`worker-worker.mjs:361-385`) calls `_sendUpdates()`
+    **before** posting `alarmReached` for `synchronous:true` alarms (which
+    `digitaljs_lua` always uses) — the "async race between tick-reached and
+    signal-updated" theory is refuted, don't re-chase it.
+- **The circuit auto-starts ticking immediately on synthesis/load**, before
+  anything touches the Play button or runs any script — a fact nobody had
+  confirmed until tonight's live console capture. Revisit any earlier
+  assumption of "the script requires Play pressed separately" — it doesn't;
+  it's already ticking.
+- **A confirmed, separate, unfixed bug**: `_handle_alarmReached`
+  (`worker.mjs:259-271`) auto-restarts the worker's tick loop after every
+  alarm whenever the callback's return value is falsy and the main thread's
+  `_running` flag is still true. `digitaljs_lua`'s alarm callback
+  (`_enqueue`, `node_modules/digitaljs_lua/src/index.mjs:526-532`) never
+  returns anything → always falsy → the clock never naturally settles once
+  a `sim.sleep`-using script has run, even after it finishes. Independently
+  fixable, not yet done.
+- **Two more confirmed, separate, unfixed latent bugs found along the way**
+  (neither is this bug's mechanism, just worth a one-line fix eventually):
+  `alarm()`'s `this._pq.add(tick-1)` (`worker-worker.mjs:336`, and the same
+  in `synch.mjs`) is unguarded against a duplicate entry at that tick,
+  unlike `_enqueue()`'s own guarded version — a collision would silently
+  orphan-freeze all future combinational recomputation. And
+  `HeadlessCircuit.unobserveGraph` (`circuit.mjs:346-347`) calls
+  `observeGraph` instead of `unobserveGraph` — a real typo/leak.
+- **Tonight's live-console capture is contaminated, not clean signal**: with
+  temporary `console.log`s added at `changeInput`, `_updateGates`, and
+  `_sendUpdates` in `node_modules/digitaljs/src/engines/worker-worker.mjs`
+  (see below), a real run showed `changeInput` firing repeatedly for the
+  same gate (`dev0`) toggling `1`/`0` back and forth **at the same tick**,
+  many times in a row — looks like multiple overlapping Lua thread/script
+  runs (or the circuit's own auto-restart) fighting over the same input,
+  not a single clean script execution. Consistent with the user's own
+  read: "no se entiende si hay uno o varios scripts corriendo." **Before
+  reading more into the logs, get a clean trace**: fresh window reload,
+  click a script's run button exactly once, don't stop/restart it, and
+  capture from there — the run/stop/run/Play sequence used for earlier
+  reports stacks multiple things at once and muddies the trace.
+
+**State left mid-debug**: the 3 `console.log`s above are still live in
+`node_modules/digitaljs/src/engines/worker-worker.mjs` (only the `src/*.mjs`
+copy, not `lib/`) and `npm run compile` has been run with them in — the
+built `dist/digitaljs-sym-worker.js` currently has them baked in. They are
+**not** in `patches/digitaljs+0.14.2.patch` (deliberately — throwaway
+diagnostic, not a real fix) and will vanish on the next `npm install`. If
+that happens before this is picked back up, they're easy to re-add (search
+this note for the 3 call sites) — no need to preserve them at all costs.
+
 ## Misc
 
 - Yosys errors: on failure the script + yosys stdout/stderr are dumped to the
