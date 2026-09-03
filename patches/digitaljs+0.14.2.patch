@@ -414,6 +414,21 @@ index a940148..a318ff2 100644
        if ('enable' in polarity && data.en.get(0) != pol('enable') && !this.get('enable_srst')) return apply_sr(this.get('outputSignals').out);
        if (this.get('no_data')) return apply_sr(this.get('outputSignals').out);
        return apply_sr(data.in);
+diff --git a/node_modules/digitaljs/lib/cells/display7.js b/node_modules/digitaljs/lib/cells/display7.js
+index 4c6d747..f404221 100644
+--- a/node_modules/digitaljs/lib/cells/display7.js
++++ b/node_modules/digitaljs/lib/cells/display7.js
+@@ -6,8 +6,8 @@ Object.defineProperty(exports, "__esModule", {
+ exports.Display7View = exports.Display7 = void 0;
+ var _io = require("./io.js");
+ var _base = require("./base.js");
+-const highColor = '#03c03c';
+-const lowColor = '#3c3c3c';
++const highColor = '#ff3b30';
++const lowColor = '#dddddd';
+ 
+ /*
+  * This is a standard 7-segment display element.
 diff --git a/node_modules/digitaljs/lib/cells/fsm.js b/node_modules/digitaljs/lib/cells/fsm.js
 index ec13773..4944f89 100644
 --- a/node_modules/digitaljs/lib/cells/fsm.js
@@ -1849,6 +1864,21 @@ index 92dc8b8..ccda47e 100644
              if ('enable' in polarity && data.en.get(0) != pol('enable') && !this.get('enable_srst'))
                  return apply_sr(this.get('outputSignals').out);
              if (this.get('no_data'))
+diff --git a/node_modules/digitaljs/src/cells/display7.mjs b/node_modules/digitaljs/src/cells/display7.mjs
+index fac4176..b63fea4 100644
+--- a/node_modules/digitaljs/src/cells/display7.mjs
++++ b/node_modules/digitaljs/src/cells/display7.mjs
+@@ -1,8 +1,8 @@
+ import { IO, IOView, NumBase } from './io.mjs';
+ import { BoxView } from './base.mjs';
+ 
+-const highColor = '#03c03c';
+-const lowColor = '#3c3c3c';
++const highColor = '#ff3b30';
++const lowColor = '#dddddd';
+ 
+ /*
+  * This is a standard 7-segment display element.
 diff --git a/node_modules/digitaljs/src/cells/fsm.mjs b/node_modules/digitaljs/src/cells/fsm.mjs
 index 78a39e8..04e8867 100644
 --- a/node_modules/digitaljs/src/cells/fsm.mjs
