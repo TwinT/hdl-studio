@@ -15,5 +15,6 @@
 - [X] Signal input widgets should start at 0, not x.
 
 ## Known Bugs 🐛
-- [ ] Lua scripts (digitaljs_lua) keep running after being stopped — no way
-      to fully kill them.
+- [X] Lua scripts (digitaljs_lua) keep running after being stopped — no way
+      to fully kill them. (Was the circuit simulation, not the script itself,
+      staying on — stopping a script now also pauses the simulation.)

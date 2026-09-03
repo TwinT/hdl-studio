@@ -615,6 +615,11 @@ class DigitalJS {
                 return;
             case 'stoplua':
                 this.#lua.stop(message.name, message.isrepl, message.quit);
+                // A script's own sim.sleep/sim.wait resumption only fires while
+                // the circuit is ticking, so running one requires the simulation
+                // to be playing. Stopping the script should fully kill that too,
+                // not leave the clock running with nothing left to drive it.
+                if (!message.isrepl) this.#pauseSim();
                 return;
             case 'exportimage': {
                 const post_reply = (data, base64) => {
