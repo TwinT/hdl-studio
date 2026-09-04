@@ -5,6 +5,69 @@ All notable changes to HDL Studio will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0] - 2026-09-04
+
+### Added
+- Native tri-state (high-impedance) bus support: a shared bus with multiple
+  drivers (e.g. `assign x = en ? val : 'z;`), including across submodule
+  boundaries, now synthesizes and simulates correctly instead of failing or
+  silently misbehaving. Backed by a new 4-valued-logic dependency
+  (`@twint/4vl`, replacing `3vl`) and two new circuit cells: `Tribuf` (a
+  tri-state buffer, rendered as the standard schematic triangle glyph) and
+  `TriMerge` (resolves multiple drivers sharing one net, rendered as a plain
+  merge bar). Wires, ports, lamps, and the waveform monitor gained a 4th
+  visual state (amber) for a fully floating signal, distinct from ordinary
+  "undefined".
+- New **LED matrix** widget: a configurable rows × cols grid of individually
+  addressable LEDs, set via `led_matrix_rows`/`led_matrix_cols` attributes on
+  a Verilog output port. Sized once from rows/cols so adding more LEDs means
+  finer resolution, not a bigger widget.
+- The 7-segment display widget is now styled as red LEDs (previously green),
+  with a lighter, less prominent off state.
+- Synthesis now supports the `$bmux` yosys cell (dynamically-indexed reads),
+  letting a design build e.g. a register file from real per-register module
+  instances instead of forcing one large multi-port Memory device.
+- Signal input widgets (NumEntry) gain scroll-wheel increment/decrement,
+  matching Button's existing click-to-toggle convenience.
+- New example circuits: a BCD-to-7-segment decoder, a configurable LED-matrix
+  chase pattern, a `$bmux`-based register file, four tri-state bus fixtures,
+  and a full multi-module educational CPU (ALU, control unit, datapath,
+  decoder, register file, memory, program counter, and load/store/branch
+  units) demonstrating hierarchical module instantiation at a larger scale.
+
+### Fixed
+- Three independent bugs that could leave a Lua script's driven inputs
+  toggling forever with the simulation unresponsive: overlapping script/REPL
+  runs fighting over the same circuit, a timing race that could silently
+  drop a script's wakeup and hang it forever, and an echo loop between the
+  control panel and the circuit view (this last one could also be triggered
+  by a plain user click, independent of any script).
+- Stopping a Lua script now also pauses the circuit simulation, instead of
+  leaving the clock running with nothing left to drive it.
+- NumEntry input widgets now default to 0 instead of x, matching Button's
+  existing behavior.
+- A tri-state enable wire (or a mux select wire) entering a cell from a
+  non-default side no longer renders with a spurious curved elbow.
+- A synthesized circuit with a wide `case`/dispatch ("sparse mux") no longer
+  crashes when saved, auto-laid-out, or edited - a second, independent
+  source of the BigInt-serialization crash whose initial-render case was
+  fixed in 0.4.0.
+- Hovering a cell whose source-position data is malformed no longer crashes
+  the whole webview.
+- Adding a wire to the Waveform Monitor, or opening a Memory cell's contents
+  editor, no longer crashes (a leftover stale property name from the
+  tri-state migration).
+- A top module with no output ports (e.g. a CPU datapath whose only effect
+  is internal register/memory state) no longer renders an unrelated,
+  arbitrary submodule in its place.
+- Clicking Synthesize with no active circuit now shows an error instead of
+  silently doing nothing.
+- A memory array whose reset loop yosys unrolled into thousands of discrete
+  write ports at large depths no longer hangs synthesis indefinitely.
+
+### Changed
+- Extension logo colors updated.
+
 ## [0.4.1] - 2026-08-31
 
 ### Fixed
