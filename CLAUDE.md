@@ -102,6 +102,36 @@ Top-module port → widget by name + width: 1-bit input `clk`/`clock` → Clock 
 other 1-bit input → Button; multi-bit input → NumEntry; 1-bit output → Lamp; multi-bit
 output → NumDisplay; 8-bit output `display7`/`display7_*` → 7-segment Display7.
 
+**LEDMatrix** (rows × cols grid of LEDs, one bit per LED, `test/verilog/10_led_matrix/`)
+is the one exception that isn't inferred from name/width alone: a single port width
+can't recover two independent dimensions (16 bits could be 4×4 or 2×8). Instead it
+reads a pair of Verilog attributes on the port —
+`(* led_matrix_rows = R, led_matrix_cols = C *)` — required to satisfy `R*C ==` the
+port's bit width, else it falls through to the ordinary NumDisplay/Display7 rules.
+Ports have no `attributes` field of their own in yosys's JSON schema, but their
+backing wire (same name, in `netnames`) does, and custom attributes survive this
+project's synthesis pass sequence onto it (confirmed empirically) — the same
+technique `core.js` already used for a `Dff`'s `.initial` value, extended in this
+project's patch to the "Add inputs/outputs" loop. The `LEDMatrix` cell itself
+(`node_modules/digitaljs/src/cells/ledmatrix.mjs`, patched) computes its LED pitch
+**once** from rows/cols at creation, clamped to a roughly-fixed footprint — more
+LEDs means smaller LEDs, not a bigger widget. There's no interactive resize (see
+"Misc" below).
+
+**Gotcha for any design driving a wide bus through a variable shift** (not
+LEDMatrix-specific, but this is where it first bit): digitaljs's
+`Shift`/`ShiftLeft`/`ShiftRight` cells (`cells/arith.mjs`) convert the shift
+*amount* operand to a plain JS number via `Vector4vl.toNumber()`, which
+asserts `bits < 32` — loosening that assertion in `@twint/4vl` would risk
+silently wrong results elsewhere (JS's bitwise ops truncate past 32 bits),
+so don't. If a shift amount's own signal ends up as wide as the bus it's
+indexing into (e.g. a `pos` register sized to match a 1024-bit `matrix`
+instead of `$clog2(1024)`), yosys can't narrow it — the value could
+legitimately exceed the "in range" count — and `toNumber()` throws
+`"... called on a too wide vector"` at simulation time. Size any such
+counter/index with `$clog2(N)`, not to match the bus it addresses (see
+`test/verilog/10_led_matrix/10_led_matrix.sv`'s `POSW` for the pattern).
+
 ## Patching digitaljs & friends (patch-package)
 
 `digitaljs` is patched (`patches/digitaljs+0.14.2.patch`) for native
@@ -262,3 +292,10 @@ real typo/leak.
   "HDL Studio (Yosys)" OutputChannel and revealed (`src/requests.mjs`).
 - Known cosmetic limitation: `<vscode-checkbox>` with slotted text stacks its label
   under the box in this toolkit version; not fixable from outside CSS. Left as-is.
+- digitaljs has **no interactive resize tool at all** for cell boxes on the paper
+  today — confirmed by checking both digitaljs's own `Box`/`BoxView`
+  (`cells/base.mjs`, only ever auto-sizes width once from content, never the other
+  way) and this project's `@joint/core` fork's `elementTools/` (only ships
+  `HoverConnect`, no `Control`/`Boundary`-style resize handles). Relevant if
+  `LEDMatrix` ever grows manual resize (see `TODO.md`) — would need a resize tool
+  built from scratch, not just a flag to flip.

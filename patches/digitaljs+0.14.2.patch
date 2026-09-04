@@ -1,11 +1,22 @@
 diff --git a/node_modules/digitaljs/lib/cells.js b/node_modules/digitaljs/lib/cells.js
-index 2cd5a5d..047c3be 100644
+index 2cd5a5d..495f8db 100644
 --- a/node_modules/digitaljs/lib/cells.js
 +++ b/node_modules/digitaljs/lib/cells.js
-@@ -124,3 +124,25 @@ Object.keys(_display).forEach(function (key) {
+@@ -124,3 +124,36 @@ Object.keys(_display).forEach(function (key) {
      }
    });
  });
++var _ledmatrix = require("./cells/ledmatrix.js");
++Object.keys(_ledmatrix).forEach(function (key) {
++  if (key === "default" || key === "__esModule") return;
++  if (key in exports && exports[key] === _ledmatrix[key]) return;
++  Object.defineProperty(exports, key, {
++    enumerable: true,
++    get: function () {
++      return _ledmatrix[key];
++    }
++  });
++});
 +var _trimerge = require("./cells/trimerge.js");
 +Object.keys(_trimerge).forEach(function (key) {
 +  if (key === "default" || key === "__esModule") return;
@@ -635,6 +646,136 @@ index 30675da..959c2cc 100644
      } else return _base.Box.prototype._resetPortValue(port);
    },
    operation() {
+diff --git a/node_modules/digitaljs/lib/cells/ledmatrix.js b/node_modules/digitaljs/lib/cells/ledmatrix.js
+new file mode 100644
+index 0000000..e1af6d2
+--- /dev/null
++++ b/node_modules/digitaljs/lib/cells/ledmatrix.js
+@@ -0,0 +1,124 @@
++"use strict";
++
++Object.defineProperty(exports, "__esModule", {
++  value: true
++});
++exports.LEDMatrixView = exports.LEDMatrix = void 0;
++var _io = require("./io.js");
++var _base = require("./base.js");
++const onColor = '#ff3b30';
++const offColor = '#dddddd';
++
++// Default LED pitch (center-to-center spacing) for a small grid, and the
++// max total footprint (width/height) a grid is allowed to grow to before
++// the pitch itself starts shrinking - this is what makes "more LEDs" mean
++// "higher resolution", not "a bigger widget": the footprint is capped, the
++// per-LED size is what gives way as rows/cols grow.
++const BASE_PITCH = 14;
++const MAX_DIM = 140;
++const MIN_PITCH = 3;
++const MARGIN = 8;
++function computeLayout(rows, cols) {
++  const cellsAcross = Math.max(rows, cols);
++  const pitch = Math.max(MIN_PITCH, Math.min(BASE_PITCH, (MAX_DIM - 2 * MARGIN) / cellsAcross));
++  const radius = pitch * 0.35;
++  return {
++    pitch,
++    radius,
++    width: cols * pitch + 2 * MARGIN,
++    height: rows * pitch + 2 * MARGIN
++  };
++}
++
++/*
++ * A rows x cols grid of individually-addressable LEDs, one bit per LED.
++ * Configured via a pair of Verilog attributes on the output port -
++ * `led_matrix_rows`/`led_matrix_cols` - since a single port width can't
++ * recover two independent dimensions on its own (see yosys2digitaljs's
++ * io_ui(), which requires rows*cols == the port's bit width).
++ *
++ * Bit-to-LED mapping is row-major, least-significant-bit first: bit 0 is
++ * the top-left LED, bit (cols-1) the top-right one, bit cols the start of
++ * the second row, and so on.
++ *
++ * The LED pitch (and so the widget's overall size) is computed once from
++ * rows/cols when the cell is created - more LEDs means a finer pitch, not
++ * a bigger widget (see computeLayout() above). There is no interactive
++ * resize yet (digitaljs has no such tool at all currently); revisit this
++ * file's initialize() if that's added later.
++ */
++const LEDMatrix = exports.LEDMatrix = _io.IO.define('LEDMatrix', {
++  rows: 1,
++  cols: 1,
++  attrs: {
++    body: {
++      height: 'calc(h)',
++      width: 'calc(w)',
++      stroke: '#222222',
++      fill: '#333333'
++    }
++  }
++}, {
++  isOutput: true,
++  _portDirection: 'in',
++  initialize() {
++    const rows = this.get('rows');
++    const cols = this.get('cols');
++    const {
++      pitch,
++      radius,
++      width,
++      height
++    } = computeLayout(rows, cols);
++    this.get('size').width = width;
++    this.get('size').height = height;
++    const ledAttrs = this.get('attrs');
++    const ledMarkup = [];
++    for (let r = 0; r < rows; r++) {
++      for (let c = 0; c < cols; c++) {
++        const selector = `led${r}_${c}`;
++        ledMarkup.push({
++          tagName: 'circle',
++          selector
++        });
++        ledAttrs[selector] = {
++          cx: MARGIN + pitch * (c + 0.5),
++          cy: MARGIN + pitch * (r + 0.5),
++          r: radius,
++          fill: offColor
++        };
++      }
++    }
++    // Based on NumBase's plain box markup (body rect + label), not
++    // IO.prototype.markupBus, to skip the numeric-base-picker tooltip
++    // that doesn't make sense for an LED grid - same choice Display7
++    // makes for the same reason.
++    this.markupBus = _io.NumBase.prototype.markup.concat(ledMarkup);
++    _io.IO.prototype.initialize.apply(this, arguments);
++  },
++  getOutput() {
++    return this.get('inputSignals').in;
++  }
++});
++const LEDMatrixView = exports.LEDMatrixView = _io.IOView.extend({
++  _autoResizeBox: false,
++  confirmUpdate(flags) {
++    _base.BoxView.prototype.confirmUpdate.apply(this, arguments);
++    this._updateDisplay();
++  },
++  _updateDisplay() {
++    const inputSignal = this.model.getOutput();
++    const rows = this.model.get('rows');
++    const cols = this.model.get('cols');
++    const newAttrs = {};
++    for (let r = 0; r < rows; r++) {
++      for (let c = 0; c < cols; c++) {
++        const bit = r * cols + c;
++        newAttrs[`led${r}_${c}`] = {
++          fill: inputSignal.get(bit) === 1 ? onColor : offColor
++        };
++      }
++    }
++    this._applyAttrs(newAttrs);
++  }
++});
 diff --git a/node_modules/digitaljs/lib/cells/memory.js b/node_modules/digitaljs/lib/cells/memory.js
 index 5ade418..e8c1847 100644
 --- a/node_modules/digitaljs/lib/cells/memory.js
@@ -987,7 +1128,7 @@ index 0000000..d5a06fe
 +});
 +const TriMergeView = exports.TriMergeView = _base.BoxView;
 diff --git a/node_modules/digitaljs/lib/circuit.js b/node_modules/digitaljs/lib/circuit.js
-index 4511409..4449097 100644
+index 4511409..36b1cc2 100644
 --- a/node_modules/digitaljs/lib/circuit.js
 +++ b/node_modules/digitaljs/lib/circuit.js
 @@ -7,7 +7,7 @@ exports.engines = exports.cells = exports.HeadlessCircuit = void 0;
@@ -999,7 +1140,17 @@ index 4511409..4449097 100644
  var cells = _interopRequireWildcard(require("./cells.js"));
  exports.cells = cells;
  var help = _interopRequireWildcard(require("./help.js"));
-@@ -84,8 +84,8 @@ class HeadlessCircuit {
+@@ -71,7 +71,8 @@ function getCellType(tp) {
+     '$busslice': cells.BusSlice,
+     '$zeroextend': cells.ZeroExtend,
+     '$signextend': cells.SignExtend,
+-    '$display7': cells.Display7
++    '$display7': cells.Display7,
++    '$ledmatrix': cells.LEDMatrix
+   };
+   if (tp in types) return types[tp];else return cells.Subcircuit;
+ }
+@@ -84,8 +85,8 @@ class HeadlessCircuit {
    } = {}) {
      this._cells = Object.assign(cells, cellsNamespace);
      this._defaultCombinationalPropagation = defaultCombinationalPropagation;
@@ -1010,7 +1161,7 @@ index 4511409..4449097 100644
      this._graph = this._makeGraph(data, data.subcircuits);
      engineOptions.cells = this._cells;
      this._engine = new engine(this._graph, engineOptions);
-@@ -95,7 +95,7 @@ class HeadlessCircuit {
+@@ -95,7 +96,7 @@ class HeadlessCircuit {
      });
    }
    addDisplay(display) {
@@ -1019,7 +1170,7 @@ index 4511409..4449097 100644
      this.trigger('display:add', display);
    }
    shutdown() {
-@@ -110,7 +110,7 @@ class HeadlessCircuit {
+@@ -110,7 +111,7 @@ class HeadlessCircuit {
    _makeGraph(data, subcircuits, opt) {
      opt = opt || {};
      const graph = new joint.dia.Graph();
@@ -1028,7 +1179,7 @@ index 4511409..4449097 100644
      graph._warnings = 0;
      if (opt.nested) graph.set('subcircuit', true);
      const changeWarnings = x => {
-@@ -323,7 +323,7 @@ class HeadlessCircuit {
+@@ -323,7 +324,7 @@ class HeadlessCircuit {
      return ret;
    }
    waitForWire(wire, trigger) {
@@ -1037,7 +1188,7 @@ index 4511409..4449097 100644
      return new Promise(resolve => {
        this.monitorWire(wire, (tick, sig) => {
          resolve(tick);
-@@ -336,7 +336,7 @@ class HeadlessCircuit {
+@@ -336,7 +337,7 @@ class HeadlessCircuit {
      });
    }
    waitFor(cell, port, trigger) {
@@ -1460,13 +1611,14 @@ index 7f0e172..81272f2 100644
      });
    }
 diff --git a/node_modules/digitaljs/src/cells.mjs b/node_modules/digitaljs/src/cells.mjs
-index 9b290fe..f818660 100644
+index 9b290fe..9fa4f29 100644
 --- a/node_modules/digitaljs/src/cells.mjs
 +++ b/node_modules/digitaljs/src/cells.mjs
-@@ -11,3 +11,5 @@ export * from "./cells/dff.mjs";
+@@ -11,3 +11,6 @@ export * from "./cells/dff.mjs";
  export * from "./cells/memory.mjs";
  export * from "./cells/fsm.mjs";
  export * from "./cells/display7.mjs";
++export * from "./cells/ledmatrix.mjs";
 +export * from "./cells/trimerge.mjs";
 +export * from "./cells/tribuf.mjs";
 diff --git a/node_modules/digitaljs/src/cells/arith.mjs b/node_modules/digitaljs/src/cells/arith.mjs
@@ -2081,6 +2233,130 @@ index dc91963..b931aa9 100644
          } else return Box.prototype._resetPortValue(port);
      },
      operation() {
+diff --git a/node_modules/digitaljs/src/cells/ledmatrix.mjs b/node_modules/digitaljs/src/cells/ledmatrix.mjs
+new file mode 100644
+index 0000000..5d2b14d
+--- /dev/null
++++ b/node_modules/digitaljs/src/cells/ledmatrix.mjs
+@@ -0,0 +1,118 @@
++import { IO, IOView, NumBase } from './io.mjs';
++import { BoxView } from './base.mjs';
++
++const onColor = '#ff3b30';
++const offColor = '#dddddd';
++
++// Default LED pitch (center-to-center spacing) for a small grid, and the
++// max total footprint (width/height) a grid is allowed to grow to before
++// the pitch itself starts shrinking - this is what makes "more LEDs" mean
++// "higher resolution", not "a bigger widget": the footprint is capped, the
++// per-LED size is what gives way as rows/cols grow.
++const BASE_PITCH = 14;
++const MAX_DIM = 140;
++const MIN_PITCH = 3;
++const MARGIN = 8;
++
++function computeLayout(rows, cols) {
++    const cellsAcross = Math.max(rows, cols);
++    const pitch = Math.max(MIN_PITCH, Math.min(BASE_PITCH, (MAX_DIM - 2 * MARGIN) / cellsAcross));
++    const radius = pitch * 0.35;
++    return {
++        pitch,
++        radius,
++        width: cols * pitch + 2 * MARGIN,
++        height: rows * pitch + 2 * MARGIN
++    };
++}
++
++/*
++ * A rows x cols grid of individually-addressable LEDs, one bit per LED.
++ * Configured via a pair of Verilog attributes on the output port -
++ * `led_matrix_rows`/`led_matrix_cols` - since a single port width can't
++ * recover two independent dimensions on its own (see yosys2digitaljs's
++ * io_ui(), which requires rows*cols == the port's bit width).
++ *
++ * Bit-to-LED mapping is row-major, least-significant-bit first: bit 0 is
++ * the top-left LED, bit (cols-1) the top-right one, bit cols the start of
++ * the second row, and so on.
++ *
++ * The LED pitch (and so the widget's overall size) is computed once from
++ * rows/cols when the cell is created - more LEDs means a finer pitch, not
++ * a bigger widget (see computeLayout() above). There is no interactive
++ * resize yet (digitaljs has no such tool at all currently); revisit this
++ * file's initialize() if that's added later.
++ */
++export const LEDMatrix = IO.define('LEDMatrix',
++{
++    rows: 1,
++    cols: 1,
++    attrs: {
++        body: {
++            height: 'calc(h)',
++            width: 'calc(w)',
++            stroke: '#222222',
++            fill: '#333333',
++        }
++    }
++}, {
++    isOutput: true,
++    _portDirection: 'in',
++
++    initialize() {
++        const rows = this.get('rows');
++        const cols = this.get('cols');
++        const { pitch, radius, width, height } = computeLayout(rows, cols);
++
++        this.get('size').width = width;
++        this.get('size').height = height;
++
++        const ledAttrs = this.get('attrs');
++        const ledMarkup = [];
++        for (let r = 0; r < rows; r++) {
++            for (let c = 0; c < cols; c++) {
++                const selector = `led${r}_${c}`;
++                ledMarkup.push({ tagName: 'circle', selector });
++                ledAttrs[selector] = {
++                    cx: MARGIN + pitch * (c + 0.5),
++                    cy: MARGIN + pitch * (r + 0.5),
++                    r: radius,
++                    fill: offColor
++                };
++            }
++        }
++        // Based on NumBase's plain box markup (body rect + label), not
++        // IO.prototype.markupBus, to skip the numeric-base-picker tooltip
++        // that doesn't make sense for an LED grid - same choice Display7
++        // makes for the same reason.
++        this.markupBus = NumBase.prototype.markup.concat(ledMarkup);
++
++        IO.prototype.initialize.apply(this, arguments);
++    },
++
++    getOutput() {
++        return this.get('inputSignals').in;
++    },
++});
++
++export const LEDMatrixView = IOView.extend({
++    _autoResizeBox: false,
++
++    confirmUpdate(flags) {
++        BoxView.prototype.confirmUpdate.apply(this, arguments);
++        this._updateDisplay();
++    },
++    _updateDisplay() {
++        const inputSignal = this.model.getOutput();
++        const rows = this.model.get('rows');
++        const cols = this.model.get('cols');
++        const newAttrs = {};
++        for (let r = 0; r < rows; r++) {
++            for (let c = 0; c < cols; c++) {
++                const bit = r * cols + c;
++                newAttrs[`led${r}_${c}`] = { fill: inputSignal.get(bit) === 1 ? onColor : offColor };
++            }
++        }
++        this._applyAttrs(newAttrs);
++    },
++});
 diff --git a/node_modules/digitaljs/src/cells/memory.mjs b/node_modules/digitaljs/src/cells/memory.mjs
 index fb7f101..b69a1f4 100644
 --- a/node_modules/digitaljs/src/cells/memory.mjs
@@ -2401,7 +2677,7 @@ index 0000000..c8201d5
 +});
 +export const TriMergeView = BoxView;
 diff --git a/node_modules/digitaljs/src/circuit.mjs b/node_modules/digitaljs/src/circuit.mjs
-index 0692a9d..d316dd9 100644
+index 0692a9d..4c45156 100644
 --- a/node_modules/digitaljs/src/circuit.mjs
 +++ b/node_modules/digitaljs/src/circuit.mjs
 @@ -1,7 +1,7 @@
@@ -2413,7 +2689,15 @@ index 0692a9d..d316dd9 100644
  import * as cells from './cells.mjs';
  import * as help from './help.mjs';
  import * as engines from './engines.mjs';
-@@ -73,8 +73,8 @@ export class HeadlessCircuit {
+@@ -64,6 +64,7 @@ export function getCellType(tp) {
+         '$zeroextend': cells.ZeroExtend,
+         '$signextend': cells.SignExtend,
+         '$display7': cells.Display7,
++        '$ledmatrix': cells.LEDMatrix,
+     };
+     if (tp in types) return types[tp];
+     else return cells.Subcircuit;
+@@ -73,8 +74,8 @@ export class HeadlessCircuit {
      constructor(data, {cellsNamespace = {}, engine = SynchEngine, engineOptions = {}, defaultCombinationalPropagation} = {}) {
          this._cells = Object.assign(cells, cellsNamespace);
          this._defaultCombinationalPropagation = defaultCombinationalPropagation;
@@ -2424,7 +2708,7 @@ index 0692a9d..d316dd9 100644
          this._graph = this._makeGraph(data, data.subcircuits);
          engineOptions.cells = this._cells;
          this._engine = new engine(this._graph, engineOptions);
-@@ -84,7 +84,7 @@ export class HeadlessCircuit {
+@@ -84,7 +85,7 @@ export class HeadlessCircuit {
          });
      }
      addDisplay(display) {
@@ -2433,7 +2717,7 @@ index 0692a9d..d316dd9 100644
          this.trigger('display:add', display);
      }
      shutdown() {
-@@ -99,7 +99,7 @@ export class HeadlessCircuit {
+@@ -99,7 +100,7 @@ export class HeadlessCircuit {
      _makeGraph(data, subcircuits, opt) {
          opt = opt || {};
          const graph = new joint.dia.Graph();
@@ -2442,7 +2726,7 @@ index 0692a9d..d316dd9 100644
          graph._warnings = 0;
          if (opt.nested) graph.set('subcircuit', true);
          const changeWarnings = (x) => {
-@@ -313,7 +313,7 @@ export class HeadlessCircuit {
+@@ -313,7 +314,7 @@ export class HeadlessCircuit {
          return ret;
      }
      waitForWire(wire, trigger) {
@@ -2451,7 +2735,7 @@ index 0692a9d..d316dd9 100644
              trigger = [trigger];
          return new Promise(resolve => {
              this.monitorWire(wire, (tick, sig) => { resolve(tick) }, 
-@@ -321,7 +321,7 @@ export class HeadlessCircuit {
+@@ -321,7 +322,7 @@ export class HeadlessCircuit {
          });
      }
      waitFor(cell, port, trigger) {

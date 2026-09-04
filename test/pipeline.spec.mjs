@@ -445,6 +445,104 @@ describe('Input widget (Button/NumEntry) initial value', function () {
     });
 });
 
+// A Verilog output port only has one bit-width - there's no way to recover
+// two independent dimensions from it alone (64 bits could be 8x8 or 4x16).
+// An LED matrix's rows/cols instead ride a pair of custom attributes on the
+// port (led_matrix_rows/led_matrix_cols), which survive synthesis onto the
+// port's backing wire (yosys2digitaljs core.js's "Add inputs/outputs" loop
+// reads mod.netnames[pname].attributes, same technique already used there
+// for a Dff's .initial value) and get picked up by io_ui().
+describe('LED matrix widget (led_matrix_rows/led_matrix_cols attributes)', function () {
+    before(function () {
+        if (!yosysAvailable()) {
+            console.warn('  yosys not found on PATH - skipping pipeline tests');
+            this.skip();
+        }
+    });
+
+    it('io_ui infers an 8x8 LEDMatrix from port attributes', function () {
+        const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'hdl-test-'));
+        try {
+            const file = 'ledmatrix_attr.sv';
+            fs.writeFileSync(path.join(tmp, file), `
+module top(
+  (* led_matrix_rows = 8, led_matrix_cols = 8 *)
+  output logic [63:0] matrix
+);
+  assign matrix = 64'd0;
+endmodule
+`);
+            const outJson = path.join(tmp, 'out.json');
+            const script = build_yosys_script({ [file]: '' }, {}) + `\njson -o ${outJson}`;
+            fs.writeFileSync(path.join(tmp, 'synth.ys'), script);
+            execFileSync('yosys', ['-q', '-s', 'synth.ys'], { cwd: tmp, stdio: 'pipe' });
+            const raw = JSON.parse(fs.readFileSync(outJson, 'utf8'));
+            const output = yosys2digitaljs(raw, {});
+            io_ui(output);
+            const dev = Object.values(output.devices).find((d) => d.net === 'matrix');
+            assert.strictEqual(dev.type, 'LEDMatrix');
+            assert.strictEqual(dev.rows, 8);
+            assert.strictEqual(dev.cols, 8);
+        } finally {
+            fs.rmSync(tmp, { recursive: true, force: true });
+        }
+    });
+});
+
+// The LEDMatrix cell itself (node_modules/digitaljs): its LED grid is built
+// once from rows/cols in initialize() (markup + per-LED attrs), not from a
+// fixed template like Display7's - this is the part that makes "more LEDs"
+// mean "smaller LEDs", not "a bigger widget" (see ledmatrix.mjs's
+// computeLayout()).
+describe('LEDMatrix cell layout and bit mapping', function () {
+    const require = createRequire(import.meta.url);
+    const { HeadlessCircuit } = require('../node_modules/digitaljs/lib/circuit.js');
+    const { Vector4vl } = require('@twint/4vl');
+
+    it('lays out one LED per bit, sized once from rows x cols', function () {
+        const circuit = new HeadlessCircuit({
+            devices: { m1: { type: 'LEDMatrix', rows: 4, cols: 4, bits: 16, net: 'matrix' } },
+            connectors: []
+        });
+        const dev = circuit._graph.getCell('m1');
+        // base box markup (body rect + label) + one circle per LED
+        assert.strictEqual(dev.get('markup').length, 2 + 16);
+        assert.ok(dev.get('attrs').led0_0, 'top-left LED should have computed attrs');
+        assert.ok(dev.get('attrs').led3_3, 'bottom-right LED should have computed attrs');
+    });
+
+    it('a bigger grid gets a finer pitch instead of a bigger widget', function () {
+        const makeMatrix = (rows, cols) => {
+            const circuit = new HeadlessCircuit({
+                devices: { m1: { type: 'LEDMatrix', rows, cols, bits: rows * cols, net: 'm' } },
+                connectors: []
+            });
+            return circuit._graph.getCell('m1');
+        };
+        const small = makeMatrix(8, 8);
+        const big = makeMatrix(32, 32);
+        // both grids are capped to roughly the same footprint...
+        assert.ok(Math.abs(small.get('size').width - big.get('size').width) < 20);
+        // ...so the LED radius, not the widget, is what shrinks
+        assert.ok(big.get('attrs').led0_0.r < small.get('attrs').led0_0.r);
+    });
+
+    it('reads back the bit-to-LED mapping (row-major, bit 0 = top-left)', function () {
+        const circuit = new HeadlessCircuit({
+            devices: { m1: { type: 'LEDMatrix', rows: 2, cols: 2, bits: 4, net: 'matrix' } },
+            connectors: []
+        });
+        const dev = circuit._graph.getCell('m1');
+        dev.set('inputSignals', { in: Vector4vl.fromBin('0010', 4) }); // bit 1 -> row0,col1
+        const out = dev.getOutput();
+        // Vector4vl.get() returns 1 for high, -1 for low (not 0/1) - matching
+        // the same "=== 1" convention the cell's own view code uses to
+        // decide a lit vs. unlit LED.
+        assert.strictEqual(out.get(1), 1, 'bit 1 (row0,col1) should be high');
+        assert.notStrictEqual(out.get(0), 1, 'bit 0 (row0,col0) should not be high');
+    });
+});
+
 // A 4th visual state for Z in wire/lamp/waveform coloring. The coloring code
 // itself lives in View classes that need a real DOM, so it can't be
 // exercised directly here; this locks in the pure helper each patched
