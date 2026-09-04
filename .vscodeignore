@@ -6,6 +6,7 @@ test/**
 CLAUDE.md
 TODO.md
 4VL_INTEGRATION_PLAN.md
+graphify-out/**
 vsc-extension-quickstart.md
 **/jsconfig.json
 **/*.map
