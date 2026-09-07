@@ -1,5 +1,5 @@
 diff --git a/node_modules/yosys2digitaljs/dist/core.js b/node_modules/yosys2digitaljs/dist/core.js
-index 7e927b4..cea57e0 100644
+index 7e927b4..6d92bc4 100644
 --- a/node_modules/yosys2digitaljs/dist/core.js
 +++ b/node_modules/yosys2digitaljs/dist/core.js
 @@ -7,7 +7,7 @@ exports.prepare_yosys_script = prepare_yosys_script;
@@ -99,7 +99,7 @@ index 7e927b4..cea57e0 100644
      function connect_mem(dname, cell, dev) {
          for (const [k, port] of dev.rdports.entries()) {
              const portname = "rd" + k;
-@@ -429,12 +445,24 @@ function yosys_to_digitaljs_mod(name, mod, portmaps, options = {}) {
+@@ -429,12 +445,28 @@ function yosys_to_digitaljs_mod(name, mod, portmaps, options = {}) {
          const dir = port.direction == "input" ? "Input" :
              port.direction == "output" ? "Output" :
                  undefined;
@@ -122,11 +122,15 @@ index 7e927b4..cea57e0 100644
 +            devArgs.rows = decode_json_number(portAttrs.led_matrix_rows);
 +            devArgs.cols = decode_json_number(portAttrs.led_matrix_cols);
 +        }
++        // Same technique, for a 1-bit Input port to opt into the momentary
++        // PushButton widget (io_ui()) instead of the default toggling Button.
++        if (portAttrs?.momentary !== undefined)
++            devArgs.momentary = true;
 +        const dname = add_device(devArgs);
          switch (port.direction) {
              case 'input':
                  add_net_source(port.bits, dname, 'out', true);
-@@ -469,7 +497,7 @@ function yosys_to_digitaljs_mod(name, mod, portmaps, options = {}) {
+@@ -469,7 +501,7 @@ function yosys_to_digitaljs_mod(name, mod, portmaps, options = {}) {
                  const ccon = con.slice();
                  const pad = sig ? con.slice(-1)[0] : '0';
                  con.splice(con.length, 0, ...Array(sz - con.length).fill(pad));
@@ -135,7 +139,7 @@ index 7e927b4..cea57e0 100644
                      // WARNING: potentially troublesome hack for readability
                      // handled generally in the grouping phase,
                      // but it's hard to add sign extensions there
-@@ -595,6 +623,18 @@ function yosys_to_digitaljs_mod(name, mod, portmaps, options = {}) {
+@@ -595,6 +627,18 @@ function yosys_to_digitaljs_mod(name, mod, portmaps, options = {}) {
                  match_port(cell.connections.A, cell.parameters.A_SIGNED, cell.connections.Y.length);
                  dev.bits = cell.connections.Y.length;
                  break;
@@ -154,7 +158,7 @@ index 7e927b4..cea57e0 100644
              case '$add':
              case '$sub':
              case '$mul':
-@@ -717,6 +757,24 @@ function yosys_to_digitaljs_mod(name, mod, portmaps, options = {}) {
+@@ -717,6 +761,24 @@ function yosys_to_digitaljs_mod(name, mod, portmaps, options = {}) {
                      sel: decode_json_number(cell.parameters.S_WIDTH)
                  };
                  break;
@@ -179,7 +183,7 @@ index 7e927b4..cea57e0 100644
              case '$dff':
                  dev.bits = decode_json_number(cell.parameters.WIDTH);
                  dev.polarity = {
-@@ -841,7 +899,7 @@ function yosys_to_digitaljs_mod(name, mod, portmaps, options = {}) {
+@@ -841,7 +903,7 @@ function yosys_to_digitaljs_mod(name, mod, portmaps, options = {}) {
                      + decode_json_number(cell.parameters.CTRL_IN_WIDTH)
                      + decode_json_number(cell.parameters.CTRL_OUT_WIDTH);
                  const tt = typeof (cell.parameters.TRANS_TABLE) == "number"
@@ -188,7 +192,7 @@ index 7e927b4..cea57e0 100644
                      : cell.parameters.TRANS_TABLE;
                  assert(tt.length == TRANS_NUM * step);
                  dev.polarity = {
-@@ -915,12 +973,12 @@ function yosys_to_digitaljs_mod(name, mod, portmaps, options = {}) {
+@@ -915,12 +977,12 @@ function yosys_to_digitaljs_mod(name, mod, portmaps, options = {}) {
                  const rdsrst = v2_feature_const(cell.parameters.RD_SRST_VALUE, dev.bits * RD_PORTS);
                  if (cell.parameters.INIT) {
                      const l = init.slice(-1)[0] == 'x' ? 'x' : '0';
@@ -203,7 +207,7 @@ index 7e927b4..cea57e0 100644
                      }
                      dev.memdata = memdata.toJSON();
                  }
-@@ -998,6 +1056,11 @@ function yosys_to_digitaljs_mod(name, mod, portmaps, options = {}) {
+@@ -998,6 +1060,11 @@ function yosys_to_digitaljs_mod(name, mod, portmaps, options = {}) {
                  delete cell.connections.A;
                  delete cell.connections.Y;
                  break;
@@ -215,7 +219,7 @@ index 7e927b4..cea57e0 100644
              default:
          }
          if (dev.type == 'Dff') {
-@@ -1016,6 +1079,8 @@ function yosys_to_digitaljs_mod(name, mod, portmaps, options = {}) {
+@@ -1016,6 +1083,8 @@ function yosys_to_digitaljs_mod(name, mod, portmaps, options = {}) {
              connect_device(dname, cell, portmap);
          else if (cell.type == '$pmux')
              connect_pmux(dname, cell);
@@ -224,7 +228,7 @@ index 7e927b4..cea57e0 100644
          else if (cell.type == '$mem')
              connect_mem(dname, cell, dev);
          else if (cell.type == '$mem_v2')
-@@ -1027,7 +1092,7 @@ function yosys_to_digitaljs_mod(name, mod, portmaps, options = {}) {
+@@ -1027,7 +1096,7 @@ function yosys_to_digitaljs_mod(name, mod, portmaps, options = {}) {
      }
      // Group bits into nets for complex sources
      for (const [nbits, net] of nets.entries()) {
@@ -233,7 +237,7 @@ index 7e927b4..cea57e0 100644
              continue;
          const groups = [[]];
          let pbitinfo = undefined;
-@@ -1067,7 +1132,7 @@ function yosys_to_digitaljs_mod(name, mod, portmaps, options = {}) {
+@@ -1067,7 +1136,7 @@ function yosys_to_digitaljs_mod(name, mod, portmaps, options = {}) {
      }
      // Add constants
      for (const [nbits, net] of nets.entries()) {
@@ -242,7 +246,7 @@ index 7e927b4..cea57e0 100644
              continue;
          if (!nbits.every(constbit))
              continue;
-@@ -1080,7 +1145,7 @@ function yosys_to_digitaljs_mod(name, mod, portmaps, options = {}) {
+@@ -1080,7 +1149,7 @@ function yosys_to_digitaljs_mod(name, mod, portmaps, options = {}) {
      }
      // Select bits from complex targets
      for (const [nbits, net] of nets.entries()) {
@@ -251,7 +255,7 @@ index 7e927b4..cea57e0 100644
              continue;
          // constants should be already handled!
          assert(nbits.every(x => constbit(x) || (typeof x == 'number' && x > 1)));
-@@ -1102,17 +1167,28 @@ function yosys_to_digitaljs_mod(name, mod, portmaps, options = {}) {
+@@ -1102,17 +1171,28 @@ function yosys_to_digitaljs_mod(name, mod, portmaps, options = {}) {
          add_net_source(nbits, dname, 'out');
          add_net_target(cconn, dname, 'in');
      }
@@ -282,7 +286,13 @@ index 7e927b4..cea57e0 100644
              };
              if (net.name)
                  conn.name = net.name;
-@@ -1158,6 +1234,12 @@ function io_ui(output) {
+@@ -1154,10 +1234,17 @@ function io_ui(output) {
+             dev.propagation = 100;
+         }
+         if (dev.type == 'Input')
+-            dev.type = dev.bits == 1 ? 'Button' : 'NumEntry';
++            dev.type = (dev.bits == 1 && dev.momentary) ? 'PushButton'
++                : dev.bits == 1 ? 'Button' : 'NumEntry';
          if (dev.type == 'Output') {
              if (dev.bits == 1)
                  dev.type = 'Lamp';

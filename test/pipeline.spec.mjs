@@ -489,6 +489,92 @@ endmodule
     });
 });
 
+// Same technique as led_matrix_rows/led_matrix_cols above, extended to a
+// 1-bit Input port: a (* momentary *) attribute survives synthesis onto the
+// port's backing wire and makes io_ui() pick the PushButton widget instead
+// of the default toggling Button. Without the attribute, nothing changes.
+describe('Pushbutton widget (momentary attribute)', function () {
+    before(function () {
+        if (!yosysAvailable()) {
+            console.warn('  yosys not found on PATH - skipping pipeline tests');
+            this.skip();
+        }
+    });
+
+    it('io_ui infers a PushButton from the momentary attribute', function () {
+        const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'hdl-test-'));
+        try {
+            const file = 'pushbutton_attr.sv';
+            fs.writeFileSync(path.join(tmp, file), `
+module top(
+  (* momentary *) input logic btn,
+  output logic led
+);
+  assign led = btn;
+endmodule
+`);
+            const outJson = path.join(tmp, 'out.json');
+            const script = build_yosys_script({ [file]: '' }, {}) + `\njson -o ${outJson}`;
+            fs.writeFileSync(path.join(tmp, 'synth.ys'), script);
+            execFileSync('yosys', ['-q', '-s', 'synth.ys'], { cwd: tmp, stdio: 'pipe' });
+            const raw = JSON.parse(fs.readFileSync(outJson, 'utf8'));
+            const output = yosys2digitaljs(raw, {});
+            io_ui(output);
+            const dev = Object.values(output.devices).find((d) => d.net === 'btn');
+            assert.strictEqual(dev.type, 'PushButton');
+        } finally {
+            fs.rmSync(tmp, { recursive: true, force: true });
+        }
+    });
+
+    it('a 1-bit input without the attribute stays a plain Button', function () {
+        const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'hdl-test-'));
+        try {
+            const file = 'plain_button.sv';
+            fs.writeFileSync(path.join(tmp, file), `
+module top(
+  input logic btn,
+  output logic led
+);
+  assign led = btn;
+endmodule
+`);
+            const outJson = path.join(tmp, 'out.json');
+            const script = build_yosys_script({ [file]: '' }, {}) + `\njson -o ${outJson}`;
+            fs.writeFileSync(path.join(tmp, 'synth.ys'), script);
+            execFileSync('yosys', ['-q', '-s', 'synth.ys'], { cwd: tmp, stdio: 'pipe' });
+            const raw = JSON.parse(fs.readFileSync(outJson, 'utf8'));
+            const output = yosys2digitaljs(raw, {});
+            io_ui(output);
+            const dev = Object.values(output.devices).find((d) => d.net === 'btn');
+            assert.strictEqual(dev.type, 'Button');
+        } finally {
+            fs.rmSync(tmp, { recursive: true, force: true });
+        }
+    });
+});
+
+// The PushButton cell itself (node_modules/digitaljs): press()/release()
+// drive the output directly, unlike Button/Input's click-to-toggle
+// toggleInput().
+describe('PushButton cell press/release', function () {
+    const require = createRequire(import.meta.url);
+    const { HeadlessCircuit } = require('../node_modules/digitaljs/lib/circuit.js');
+
+    it('is low at rest, high while pressed, low again on release', function () {
+        const circuit = new HeadlessCircuit({
+            devices: { p1: { type: 'PushButton', bits: 1, net: 'p1' } },
+            connectors: []
+        });
+        const dev = circuit._graph.getCell('p1');
+        assert.strictEqual(dev.get('outputSignals').out.toBin(), '0');
+        dev.press();
+        assert.strictEqual(dev.get('outputSignals').out.toBin(), '1');
+        dev.release();
+        assert.strictEqual(dev.get('outputSignals').out.toBin(), '0');
+    });
+});
+
 // The LEDMatrix cell itself (node_modules/digitaljs): its LED grid is built
 // once from rows/cols in initialize() (markup + per-LED attrs), not from a
 // fixed template like Display7's - this is the part that makes "more LEDs"

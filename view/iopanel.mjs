@@ -52,6 +52,7 @@ export class RemoteIOPanel extends Backbone.View {
     _addInput(cell) {
         const row = this._createRow(cell);
         row.dir = 'input';
+        row.type = cell.get('type');
         this.view.push(row);
         const bits = cell.get('bits');
         row.bits = bits;

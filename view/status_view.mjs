@@ -107,7 +107,7 @@ class Status {
             old_widgets[key].widget.detach();
         for (const view of views) {
             const old_w = old_widgets[view.id];
-            if (old_w && old_w.dir == view.dir && old_w.bits == view.bits) {
+            if (old_w && old_w.dir == view.dir && old_w.bits == view.bits && old_w.type == view.type) {
                 old_w.updater(view.value);
                 this.#iopanel.append(old_w.widget);
                 this.#widgets[view.id] = old_w;
@@ -129,9 +129,12 @@ class Status {
                   this.#newNumberWidget(view, is_input);
         w.dir = view.dir;
         w.bits = view.bits;
+        w.type = view.type;
         return w;
     }
     #newBitWidget(view, is_input) {
+        if (is_input && view.type == 'PushButton')
+            return this.#newPushButtonWidget(view);
         const id = view.id;
         const widget = $(`<tr>
   <td>
@@ -162,6 +165,41 @@ class Status {
                 vscode.postMessage({ command: 'iopanel:update', id, value: new_bin });
             });
         }
+        return { widget, updater };
+    }
+    // Momentary pushbutton: high only while held, unlike the checkbox above
+    // (click-to-toggle-and-latch). Known gap: <vscode-button> only fires
+    // 'click' for Enter/Space, so this widget isn't keyboard-operable.
+    #newPushButtonWidget(view) {
+        const id = view.id;
+        const widget = $(`<tr>
+  <td>
+    <span class="djs-io-name" style="color:var(--foreground);vertical-align:middle;"></span>
+  </td>
+  <td>
+    <vscode-button style="vertical-align:middle;">Push</vscode-button>
+  </td>
+  <td></td>
+</tr>`);
+        widget.find('span.djs-io-name').text(view.label);
+        const button = widget.find('vscode-button');
+        // Nothing to reflect visually from an incoming value: the widget is
+        // just a momentary press trigger, not a state display.
+        const updater = () => {};
+        let pressed = false;
+        const post = (new_bin) => {
+            vscode.postMessage({ command: 'iopanel:update', id, value: new_bin });
+        };
+        button.on('mousedown', () => {
+            if (pressed) return;
+            pressed = true;
+            post('1');
+        });
+        button.on('mouseup mouseleave', () => {
+            if (!pressed) return;
+            pressed = false;
+            post('0');
+        });
         return { widget, updater };
     }
     #newClockWidget(view) {

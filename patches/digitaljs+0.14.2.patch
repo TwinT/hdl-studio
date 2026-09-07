@@ -426,7 +426,7 @@ index a940148..a318ff2 100644
        if (this.get('no_data')) return apply_sr(this.get('outputSignals').out);
        return apply_sr(data.in);
 diff --git a/node_modules/digitaljs/lib/cells/display7.js b/node_modules/digitaljs/lib/cells/display7.js
-index 4c6d747..f404221 100644
+index 4c6d747..086b1e5 100644
 --- a/node_modules/digitaljs/lib/cells/display7.js
 +++ b/node_modules/digitaljs/lib/cells/display7.js
 @@ -6,8 +6,8 @@ Object.defineProperty(exports, "__esModule", {
@@ -492,10 +492,15 @@ index 7424f83..5176b79 100644
  const xor_arc_path_markup = {
    tagName: 'path',
 diff --git a/node_modules/digitaljs/lib/cells/io.js b/node_modules/digitaljs/lib/cells/io.js
-index 30675da..959c2cc 100644
+index 30675da..d5fe269 100644
 --- a/node_modules/digitaljs/lib/cells/io.js
 +++ b/node_modules/digitaljs/lib/cells/io.js
-@@ -7,7 +7,7 @@ exports.OutputView = exports.Output = exports.NumEntryView = exports.NumEntry =
+@@ -3,11 +3,11 @@
+ Object.defineProperty(exports, "__esModule", {
+   value: true
+ });
+-exports.OutputView = exports.Output = exports.NumEntryView = exports.NumEntry = exports.NumDisplayView = exports.NumDisplay = exports.NumBaseView = exports.NumBase = exports.LampView = exports.Lamp = exports.InputView = exports.Input = exports.IOView = exports.IO = exports.ConstantView = exports.Constant = exports.ClockView = exports.Clock = exports.ButtonView = exports.Button = void 0;
++exports.OutputView = exports.Output = exports.PushButtonView = exports.PushButton = exports.NumEntryView = exports.NumEntry = exports.NumDisplayView = exports.NumDisplay = exports.NumBaseView = exports.NumBase = exports.LampView = exports.Lamp = exports.InputView = exports.Input = exports.IOView = exports.IO = exports.ConstantView = exports.Constant = exports.ClockView = exports.Clock = exports.ButtonView = exports.Button = void 0;
  var joint = _interopRequireWildcard(require("@joint/core"));
  var _base = require("./base.js");
  var _jquery = _interopRequireDefault(require("jquery"));
@@ -582,7 +587,43 @@ index 30675da..959c2cc 100644
    }
  });
  
-@@ -364,6 +374,11 @@ const OutputView = exports.OutputView = IOView.extend({
+@@ -318,6 +328,35 @@ const ButtonView = exports.ButtonView = InputView;
+ const NumEntry = exports.NumEntry = Input;
+ const NumEntryView = exports.NumEntryView = InputView;
+ 
++// Momentary pushbutton: high only while held, unlike Button/Input's
++// click-to-toggle-and-latch behavior.
++const PushButton = exports.PushButton = Input.define('PushButton', {}, {
++  press() {
++    this.setInput(_vl.Vector4vl.ones(this.get('bits')));
++  },
++  release() {
++    this.setInput(_vl.Vector4vl.zeros(this.get('bits')));
++  }
++});
++const PushButtonView = exports.PushButtonView = InputView.extend({
++  events: joint.util.merge({
++    "mousedown .btnface": "_onPress",
++    "mouseup .btnface": "_onRelease",
++    "mouseleave .btnface": "_onRelease",
++    // release if dragged off while held
++    "touchstart .btnface": "_onPress",
++    "touchend .btnface": "_onRelease"
++  }, NumBaseView.prototype.events),
++  _onPress(evt) {
++    evt.stopPropagation(); // also prevents drag, like Input's plain stopprop
++    this.model.press();
++  },
++  _onRelease(evt) {
++    evt.stopPropagation();
++    this.model.release();
++  }
++});
++
+ // Output model
+ const Output = exports.Output = IO.define('Output', {
+   attrs: {
+@@ -364,6 +403,11 @@ const OutputView = exports.OutputView = IOView.extend({
            'fill': '#fc7c68'
          }
        },
@@ -594,7 +635,7 @@ index 30675da..959c2cc 100644
        undef: {
          led: {
            'fill': '#bfc5c6'
-@@ -387,12 +402,12 @@ const OutputView = exports.OutputView = IOView.extend({
+@@ -387,12 +431,12 @@ const OutputView = exports.OutputView = IOView.extend({
    },
    _updateLamp() {
      const signal = this.model.get('inputSignals').in;
@@ -610,7 +651,7 @@ index 30675da..959c2cc 100644
    },
    render() {
      IOView.prototype.render.apply(this, arguments);
-@@ -437,13 +452,13 @@ const Constant = exports.Constant = NumBase.define('Constant', {
+@@ -437,13 +481,13 @@ const Constant = exports.Constant = NumBase.define('Constant', {
          out: bits
        });
        this.set('bits', bits);
@@ -626,7 +667,7 @@ index 30675da..959c2cc 100644
    },
    operation() {
      return {
-@@ -467,8 +482,8 @@ const ConstantView = exports.ConstantView = NumBaseView.extend({
+@@ -467,8 +511,8 @@ const ConstantView = exports.ConstantView = NumBaseView.extend({
      if (this.hasFlag(flags, 'CONSTANT') || this.hasFlag(flags, 'NUMBASE')) this._showText();
    },
    _showText() {
@@ -637,7 +678,7 @@ index 30675da..959c2cc 100644
    },
    update() {
      NumBaseView.prototype.update.apply(this, arguments);
-@@ -495,7 +510,7 @@ const Clock = exports.Clock = _base.Box.define('Clock', {
+@@ -495,7 +539,7 @@ const Clock = exports.Clock = _base.Box.define('Clock', {
  }, {
    _resetPortValue(port) {
      if (port.id == "out" && port.dir == "out") {
@@ -1128,7 +1169,7 @@ index 0000000..d5a06fe
 +});
 +const TriMergeView = exports.TriMergeView = _base.BoxView;
 diff --git a/node_modules/digitaljs/lib/circuit.js b/node_modules/digitaljs/lib/circuit.js
-index 4511409..36b1cc2 100644
+index 4511409..855c43e 100644
 --- a/node_modules/digitaljs/lib/circuit.js
 +++ b/node_modules/digitaljs/lib/circuit.js
 @@ -7,7 +7,7 @@ exports.engines = exports.cells = exports.HeadlessCircuit = void 0;
@@ -1140,7 +1181,15 @@ index 4511409..36b1cc2 100644
  var cells = _interopRequireWildcard(require("./cells.js"));
  exports.cells = cells;
  var help = _interopRequireWildcard(require("./help.js"));
-@@ -71,7 +71,8 @@ function getCellType(tp) {
+@@ -61,6 +61,7 @@ function getCellType(tp) {
+     '$fsm': cells.FSM,
+     '$clock': cells.Clock,
+     '$button': cells.Button,
++    '$pushbutton': cells.PushButton,
+     '$lamp': cells.Lamp,
+     '$numdisplay': cells.NumDisplay,
+     '$numentry': cells.NumEntry,
+@@ -71,7 +72,8 @@ function getCellType(tp) {
      '$busslice': cells.BusSlice,
      '$zeroextend': cells.ZeroExtend,
      '$signextend': cells.SignExtend,
@@ -1150,7 +1199,7 @@ index 4511409..36b1cc2 100644
    };
    if (tp in types) return types[tp];else return cells.Subcircuit;
  }
-@@ -84,8 +85,8 @@ class HeadlessCircuit {
+@@ -84,8 +86,8 @@ class HeadlessCircuit {
    } = {}) {
      this._cells = Object.assign(cells, cellsNamespace);
      this._defaultCombinationalPropagation = defaultCombinationalPropagation;
@@ -1161,7 +1210,7 @@ index 4511409..36b1cc2 100644
      this._graph = this._makeGraph(data, data.subcircuits);
      engineOptions.cells = this._cells;
      this._engine = new engine(this._graph, engineOptions);
-@@ -95,7 +96,7 @@ class HeadlessCircuit {
+@@ -95,7 +97,7 @@ class HeadlessCircuit {
      });
    }
    addDisplay(display) {
@@ -1170,7 +1219,7 @@ index 4511409..36b1cc2 100644
      this.trigger('display:add', display);
    }
    shutdown() {
-@@ -110,7 +111,7 @@ class HeadlessCircuit {
+@@ -110,7 +112,7 @@ class HeadlessCircuit {
    _makeGraph(data, subcircuits, opt) {
      opt = opt || {};
      const graph = new joint.dia.Graph();
@@ -1179,7 +1228,7 @@ index 4511409..36b1cc2 100644
      graph._warnings = 0;
      if (opt.nested) graph.set('subcircuit', true);
      const changeWarnings = x => {
-@@ -323,7 +324,7 @@ class HeadlessCircuit {
+@@ -323,7 +325,7 @@ class HeadlessCircuit {
      return ret;
    }
    waitForWire(wire, trigger) {
@@ -1188,7 +1237,7 @@ index 4511409..36b1cc2 100644
      return new Promise(resolve => {
        this.monitorWire(wire, (tick, sig) => {
          resolve(tick);
-@@ -336,7 +337,7 @@ class HeadlessCircuit {
+@@ -336,7 +338,7 @@ class HeadlessCircuit {
      });
    }
    waitFor(cell, port, trigger) {
@@ -1235,7 +1284,7 @@ index bdb9b09..206ba26 100644
              'port.index': -i
            }
 diff --git a/node_modules/digitaljs/lib/engines/worker-worker.js b/node_modules/digitaljs/lib/engines/worker-worker.js
-index e0fc9ce..f48f7b6 100644
+index e0fc9ce..cc45690 100644
 --- a/node_modules/digitaljs/lib/engines/worker-worker.js
 +++ b/node_modules/digitaljs/lib/engines/worker-worker.js
 @@ -339,7 +339,16 @@ class WorkerEngineWorker {
@@ -1257,7 +1306,7 @@ index e0fc9ce..f48f7b6 100644
        tick,
        stopOnAlarm,
 diff --git a/node_modules/digitaljs/lib/engines/worker.js b/node_modules/digitaljs/lib/engines/worker.js
-index 1ea806b..09e6768 100644
+index 1ea806b..50e19d9 100644
 --- a/node_modules/digitaljs/lib/engines/worker.js
 +++ b/node_modules/digitaljs/lib/engines/worker.js
 @@ -6,7 +6,7 @@ Object.defineProperty(exports, "__esModule", {
@@ -2078,7 +2127,7 @@ index 78d1464..13ed75e 100644
      
  const xor_arc_path_markup = {
 diff --git a/node_modules/digitaljs/src/cells/io.mjs b/node_modules/digitaljs/src/cells/io.mjs
-index dc91963..b931aa9 100644
+index dc91963..c9720ff 100644
 --- a/node_modules/digitaljs/src/cells/io.mjs
 +++ b/node_modules/digitaljs/src/cells/io.mjs
 @@ -1,9 +1,9 @@
@@ -2171,7 +2220,42 @@ index dc91963..b931aa9 100644
      }
  });
  
-@@ -341,6 +351,7 @@ export const OutputView = IOView.extend({
+@@ -304,6 +314,34 @@ export const ButtonView = InputView;
+ export const NumEntry = Input;
+ export const NumEntryView = InputView;
+ 
++// Momentary pushbutton: high only while held, unlike Button/Input's
++// click-to-toggle-and-latch behavior.
++export const PushButton = Input.define('PushButton', {}, {
++    press() {
++        this.setInput(Vector4vl.ones(this.get('bits')));
++    },
++    release() {
++        this.setInput(Vector4vl.zeros(this.get('bits')));
++    }
++});
++export const PushButtonView = InputView.extend({
++    events: joint.util.merge({
++        "mousedown .btnface": "_onPress",
++        "mouseup .btnface": "_onRelease",
++        "mouseleave .btnface": "_onRelease", // release if dragged off while held
++        "touchstart .btnface": "_onPress",
++        "touchend .btnface": "_onRelease"
++    }, NumBaseView.prototype.events),
++    _onPress(evt) {
++        evt.stopPropagation(); // also prevents drag, like Input's plain stopprop
++        this.model.press();
++    },
++    _onRelease(evt) {
++        evt.stopPropagation();
++        this.model.release();
++    }
++});
++
+ // Output model
+ export const Output = IO.define('Output', {
+     attrs: {
+@@ -341,6 +379,7 @@ export const OutputView = IOView.extend({
          lamp: {
              high: { led: { 'fill': '#03c03c' } },
              low: { led: { 'fill': '#fc7c68' } },
@@ -2179,7 +2263,7 @@ index dc91963..b931aa9 100644
              undef: { led: { 'fill': '#bfc5c6' } }
          }
      }, IOView.prototype.attrs),
-@@ -359,13 +370,14 @@ export const OutputView = IOView.extend({
+@@ -359,13 +398,14 @@ export const OutputView = IOView.extend({
          const signal = this.model.get('inputSignals').in;
          const attrs = this.attrs.lamp[
              signal.isHigh ? 'high' :
@@ -2197,7 +2281,7 @@ index dc91963..b931aa9 100644
      },
      render() {
          IOView.prototype.render.apply(this, arguments);
-@@ -408,13 +420,13 @@ export const Constant = NumBase.define('Constant', {
+@@ -408,13 +448,13 @@ export const Constant = NumBase.define('Constant', {
              const bits = constant.length;
              this._setPortsBits({ out: bits });
              this.set('bits', bits);
@@ -2213,7 +2297,7 @@ index dc91963..b931aa9 100644
      },
      operation() {
          return { out: this.get('constantCache') };
-@@ -438,8 +450,8 @@ export const ConstantView = NumBaseView.extend({
+@@ -438,8 +478,8 @@ export const ConstantView = NumBaseView.extend({
              this.hasFlag(flags, 'NUMBASE')) this._showText();
      },
      _showText() {
@@ -2224,7 +2308,7 @@ index dc91963..b931aa9 100644
      },
      update() {
          NumBaseView.prototype.update.apply(this, arguments);
-@@ -462,7 +474,7 @@ export const Clock = Box.define('Clock', {
+@@ -462,7 +502,7 @@ export const Clock = Box.define('Clock', {
  }, {
      _resetPortValue(port) {
          if (port.id == "out" && port.dir == "out") {
@@ -2677,7 +2761,7 @@ index 0000000..c8201d5
 +});
 +export const TriMergeView = BoxView;
 diff --git a/node_modules/digitaljs/src/circuit.mjs b/node_modules/digitaljs/src/circuit.mjs
-index 0692a9d..4c45156 100644
+index 0692a9d..002f01d 100644
 --- a/node_modules/digitaljs/src/circuit.mjs
 +++ b/node_modules/digitaljs/src/circuit.mjs
 @@ -1,7 +1,7 @@
@@ -2689,7 +2773,15 @@ index 0692a9d..4c45156 100644
  import * as cells from './cells.mjs';
  import * as help from './help.mjs';
  import * as engines from './engines.mjs';
-@@ -64,6 +64,7 @@ export function getCellType(tp) {
+@@ -53,6 +53,7 @@ export function getCellType(tp) {
+         '$fsm': cells.FSM,
+         '$clock': cells.Clock,
+         '$button': cells.Button,
++        '$pushbutton': cells.PushButton,
+         '$lamp': cells.Lamp,
+         '$numdisplay': cells.NumDisplay,
+         '$numentry': cells.NumEntry,
+@@ -64,6 +65,7 @@ export function getCellType(tp) {
          '$zeroextend': cells.ZeroExtend,
          '$signextend': cells.SignExtend,
          '$display7': cells.Display7,
@@ -2697,7 +2789,7 @@ index 0692a9d..4c45156 100644
      };
      if (tp in types) return types[tp];
      else return cells.Subcircuit;
-@@ -73,8 +74,8 @@ export class HeadlessCircuit {
+@@ -73,8 +75,8 @@ export class HeadlessCircuit {
      constructor(data, {cellsNamespace = {}, engine = SynchEngine, engineOptions = {}, defaultCombinationalPropagation} = {}) {
          this._cells = Object.assign(cells, cellsNamespace);
          this._defaultCombinationalPropagation = defaultCombinationalPropagation;
@@ -2708,7 +2800,7 @@ index 0692a9d..4c45156 100644
          this._graph = this._makeGraph(data, data.subcircuits);
          engineOptions.cells = this._cells;
          this._engine = new engine(this._graph, engineOptions);
-@@ -84,7 +85,7 @@ export class HeadlessCircuit {
+@@ -84,7 +86,7 @@ export class HeadlessCircuit {
          });
      }
      addDisplay(display) {
@@ -2717,7 +2809,7 @@ index 0692a9d..4c45156 100644
          this.trigger('display:add', display);
      }
      shutdown() {
-@@ -99,7 +100,7 @@ export class HeadlessCircuit {
+@@ -99,7 +101,7 @@ export class HeadlessCircuit {
      _makeGraph(data, subcircuits, opt) {
          opt = opt || {};
          const graph = new joint.dia.Graph();
@@ -2726,7 +2818,7 @@ index 0692a9d..4c45156 100644
          graph._warnings = 0;
          if (opt.nested) graph.set('subcircuit', true);
          const changeWarnings = (x) => {
-@@ -313,7 +314,7 @@ export class HeadlessCircuit {
+@@ -313,7 +315,7 @@ export class HeadlessCircuit {
          return ret;
      }
      waitForWire(wire, trigger) {
@@ -2735,7 +2827,7 @@ index 0692a9d..4c45156 100644
              trigger = [trigger];
          return new Promise(resolve => {
              this.monitorWire(wire, (tick, sig) => { resolve(tick) }, 
-@@ -321,7 +322,7 @@ export class HeadlessCircuit {
+@@ -321,7 +323,7 @@ export class HeadlessCircuit {
          });
      }
      waitFor(cell, port, trigger) {
