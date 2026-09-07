@@ -18,7 +18,8 @@ apretado el boton varios ciclos de clk cuenta como una sola pulsacion.
 module pushbutton_counter (
     input  logic clk,
     input  logic rst,
-    (* momentary *) input logic btn,
+    (* momentary *)
+    input logic btn,
     output logic [3:0] count
 );
 

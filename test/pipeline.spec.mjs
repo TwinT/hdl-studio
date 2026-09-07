@@ -489,11 +489,13 @@ endmodule
     });
 });
 
-// Same technique as led_matrix_rows/led_matrix_cols above, extended to a
-// 1-bit Input port: a (* momentary *) attribute survives synthesis onto the
-// port's backing wire and makes io_ui() pick the PushButton widget instead
-// of the default toggling Button. Without the attribute, nothing changes.
-describe('Pushbutton widget (momentary attribute)', function () {
+// Two ways to opt a 1-bit Input into the momentary PushButton widget instead
+// of the default toggling Button: a (* momentary *) attribute (same
+// technique as led_matrix_rows/led_matrix_cols above - it survives synthesis
+// onto the port's backing wire), or a "pushbutton"-prefixed port name (same
+// technique io_ui() already uses for clk/clock -> Clock). Neither one
+// changes an otherwise plain 1-bit input.
+describe('Pushbutton widget (momentary attribute / name)', function () {
     before(function () {
         if (!yosysAvailable()) {
             console.warn('  yosys not found on PATH - skipping pipeline tests');
@@ -521,6 +523,32 @@ endmodule
             const output = yosys2digitaljs(raw, {});
             io_ui(output);
             const dev = Object.values(output.devices).find((d) => d.net === 'btn');
+            assert.strictEqual(dev.type, 'PushButton');
+        } finally {
+            fs.rmSync(tmp, { recursive: true, force: true });
+        }
+    });
+
+    it('io_ui infers a PushButton from a "pushbutton"-prefixed name, no attribute needed', function () {
+        const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'hdl-test-'));
+        try {
+            const file = 'pushbutton_name.sv';
+            fs.writeFileSync(path.join(tmp, file), `
+module top(
+  input logic pushbutton_start,
+  output logic led
+);
+  assign led = pushbutton_start;
+endmodule
+`);
+            const outJson = path.join(tmp, 'out.json');
+            const script = build_yosys_script({ [file]: '' }, {}) + `\njson -o ${outJson}`;
+            fs.writeFileSync(path.join(tmp, 'synth.ys'), script);
+            execFileSync('yosys', ['-q', '-s', 'synth.ys'], { cwd: tmp, stdio: 'pipe' });
+            const raw = JSON.parse(fs.readFileSync(outJson, 'utf8'));
+            const output = yosys2digitaljs(raw, {});
+            io_ui(output);
+            const dev = Object.values(output.devices).find((d) => d.net === 'pushbutton_start');
             assert.strictEqual(dev.type, 'PushButton');
         } finally {
             fs.rmSync(tmp, { recursive: true, force: true });

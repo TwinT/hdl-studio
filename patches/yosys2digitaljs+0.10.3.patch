@@ -1,5 +1,5 @@
 diff --git a/node_modules/yosys2digitaljs/dist/core.js b/node_modules/yosys2digitaljs/dist/core.js
-index 7e927b4..6d92bc4 100644
+index 7e927b4..0e52062 100644
 --- a/node_modules/yosys2digitaljs/dist/core.js
 +++ b/node_modules/yosys2digitaljs/dist/core.js
 @@ -7,7 +7,7 @@ exports.prepare_yosys_script = prepare_yosys_script;
@@ -286,12 +286,16 @@ index 7e927b4..6d92bc4 100644
              };
              if (net.name)
                  conn.name = net.name;
-@@ -1154,10 +1234,17 @@ function io_ui(output) {
+@@ -1153,11 +1233,21 @@ function io_ui(output) {
+             dev.type = 'Clock';
              dev.propagation = 100;
          }
++        // use PushButton for explicitly momentary inputs, same as the
++        // clocky-named-input rule above but for a name prefix instead of an
++        // exact name
          if (dev.type == 'Input')
 -            dev.type = dev.bits == 1 ? 'Button' : 'NumEntry';
-+            dev.type = (dev.bits == 1 && dev.momentary) ? 'PushButton'
++            dev.type = (dev.bits == 1 && (dev.momentary || dev.label.startsWith('pushbutton'))) ? 'PushButton'
 +                : dev.bits == 1 ? 'Button' : 'NumEntry';
          if (dev.type == 'Output') {
              if (dev.bits == 1)

@@ -99,8 +99,25 @@ The webview code was written against an older digitaljs; 0.14.2 differs:
 ## I/O widget inference (`yosys2digitaljs` `io_ui`)
 
 Top-module port → widget by name + width: 1-bit input `clk`/`clock` → Clock (auto);
-other 1-bit input → Button; multi-bit input → NumEntry; 1-bit output → Lamp; multi-bit
-output → NumDisplay; 8-bit output `display7`/`display7_*` → 7-segment Display7.
+1-bit input named `pushbutton*` or carrying `(* momentary *)` → PushButton (see
+below); other 1-bit input → Button; multi-bit input → NumEntry; 1-bit output → Lamp;
+multi-bit output → NumDisplay; 8-bit output `display7`/`display7_*` → 7-segment
+Display7.
+
+**PushButton** (momentary — high only while held, `test/verilog/11_pushbutton/`) is a
+sibling of the default toggling Button/switch, opt-in two ways: a port named with the
+`pushbutton` prefix (same technique as the `clk`/`clock` → Clock rule above), or an
+explicit `(* momentary *)` attribute read off the port's backing wire in `netnames`
+(same technique LEDMatrix uses below, extended to a 1-bit Input). Neither changes an
+otherwise plain 1-bit input. The click-to-toggle `Button`/`Input` cell
+(`node_modules/digitaljs/src/cells/io.mjs`) is untouched; `PushButton`/`PushButtonView`
+are a separate model/view pair there (mousedown/mouseup/mouseleave calling
+`setInput` directly, not `toggleInput()`), registered in `circuit.mjs`'s
+`getCellType` map. The two UI surfaces — the canvas cell and the control-panel
+widget (`view/status_view.mjs`'s `#newPushButtonWidget`) — are independent code
+paths with no shared code, so both had to be touched; the control panel is not
+currently keyboard-operable (`<vscode-button>` only fires `click` on Enter/Space,
+not mousedown/mouseup).
 
 **LEDMatrix** (rows × cols grid of LEDs, one bit per LED, `test/verilog/10_led_matrix/`)
 is the one exception that isn't inferred from name/width alone: a single port width
