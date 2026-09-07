@@ -5,6 +5,17 @@ All notable changes to HDL Studio will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0] - 2026-09-06
+
+### Added
+- New **momentary pushbutton** input widget (`PushButton`): high only while
+  the mouse is held down, releasing on mouseup, as opposed to the existing
+  click-to-toggle Button/switch. Available on both the circuit canvas and
+  the control panel. Opt in with a `(* momentary *)` attribute on a 1-bit
+  input port, or simply by naming the port with a `pushbutton` prefix (same
+  convention as the existing `clk`/`clock` auto-detection) - an otherwise
+  plain 1-bit input is unaffected either way.
+
 ## [0.5.0] - 2026-09-04
 
 ### Added
