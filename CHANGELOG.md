@@ -5,6 +5,14 @@ All notable changes to HDL Studio will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.1] - 2026-09-25
+
+### Fixed
+- Synthesizing with slang a top module that has an interface port (e.g.
+  `alu_if.alu alu_io`) failed with "top-level module has unconnected
+  interface port" on newer yosys-slang builds. The interface is now
+  flattened into ordinary ports (`alu_io.<signal>`).
+
 ## [0.6.0] - 2026-09-06
 
 ### Added
