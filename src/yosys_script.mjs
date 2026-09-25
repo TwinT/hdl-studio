@@ -23,8 +23,11 @@ export function build_yosys_script(files, opts = {}) {
         // slang elaborates the whole design as a unit, so unlike read_verilog it
         // doesn't care what order the files are given in (packages/interfaces
         // used by another file don't need to be read first).
+        // --allow-toplevel-iface-ports: a top with an interface port (e.g. the
+        // alu example's `alu_if.alu alu_io`) is an error in newer yosys-slang;
+        // with it the interface is flattened into plain `alu_io.<signal>` ports.
         const topArg = opts.top ? ` --top ${opts.top}` : '';
-        cmds.push(`read_slang --best-effort-hierarchy ${Object.keys(files).join(' ')}${topArg}`);
+        cmds.push(`read_slang --best-effort-hierarchy --allow-toplevel-iface-ports ${Object.keys(files).join(' ')}${topArg}`);
     } else {
         for (const [name, _] of Object.entries(files)) {
             const ext = path.extname(name);
