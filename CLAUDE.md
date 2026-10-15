@@ -227,6 +227,11 @@ three call sites in `digitaljs/src` and all are now safe for wide values: `Shift
 `wavecanvas` each have their own
 `patches/<pkg>+<ver>.patch` too; all are applied automatically via the
 `postinstall: patch-package` script (`package.json`).
+patch-package only applies at install time, so after a `git pull` that changed a
+patch, `node_modules` keeps the old version of it (seen as an old, already fixed
+bug coming back, e.g. Reset erasing the schematic). `npm run compile` runs
+`patch-package --error-on-fail` first (`precompile`) to catch that; the fix is
+`rm -rf node_modules && npm install`.
 
 - **Dual-tree gotcha**: `digitaljs`'s package `exports` map resolves the
   **`browser`** condition (`src/index.mjs`) for webpack's default browser

@@ -356,6 +356,7 @@
     "scripts": {
         "postinstall": "patch-package",
         "vscode:prepublish": "npm run compile",
+        "precompile": "patch-package --error-on-fail",
         "compile": "npm-run-all compile:*",
         "compile:rust": "cargo build --release",
         "compile:views": "webpack --mode production",
