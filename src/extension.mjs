@@ -347,6 +347,21 @@ class DigitalJS {
     get image_exts_set() {
         return this.#image_exts_set;
     }
+    setTimescale(timescale) {
+        if (this.#document)
+            this.#document.setTimescale(timescale);
+    }
+    // Simulation speed in ticks/s, null = as fast as possible. Global (not per
+    // document) and sent to every circuit view, not just the active one, so
+    // switching documents doesn't pick up a stale speed.
+    get simSpeed() {
+        return this.#global_state.get('simSpeed', 100);
+    }
+    set simSpeed(speed) {
+        this.#global_state.update('simSpeed', speed);
+        for (const view of this.#openCircuitViews)
+            view.post({ command: 'setspeed', speed });
+    }
     postPanelMessage(msg) {
         if (!this.#circuitView)
             return;

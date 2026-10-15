@@ -18,7 +18,8 @@ const default_synth_options = {
     techmap: false, // decompose complex cells into basic logic gates (yosys 'techmap')
     top: '', // top module name override; empty = auto-detect
     defaultcomb: false, // zero combinational propagation delay (digitaljs sim option)
-    layout: 'elkjs' // auto-layout engine: elkjs/dagre (digitaljs display option)
+    layout: 'elkjs', // auto-layout engine: elkjs/dagre (digitaljs display option)
+    timescale: '1ns' // duration of one simulation tick (control panel display/run-for/clock period)
 };
 
 let doc_id = 1;
@@ -109,6 +110,13 @@ export class Document {
             this.#synth_options = { ...options };
             this.#synthOptionUpdated.fire();
         });
+    }
+    // Edited from the control panel, not the synthesis panel, so unlike the
+    // plain setter this also fires synthOptionUpdated: otherwise the synthesis
+    // panel keeps its stale copy and writes the old timescale back.
+    setTimescale(timescale) {
+        this.synth_options = { ...this.#synth_options, timescale };
+        this.#synthOptionUpdated.fire();
     }
     get circuit() {
         return this.#circuit;

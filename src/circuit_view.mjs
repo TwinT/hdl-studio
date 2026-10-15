@@ -12,8 +12,10 @@ export class CircuitView {
     #document
     #queue
     #init
+    #djs
     #subcircuits = {}
     constructor(djs, panel, document) {
+        this.#djs = djs;
         this.#panel = panel;
         this.#document = document;
         this.#queue = new WebviewMsgQueue(this.#panel.webview);
@@ -84,7 +86,8 @@ export class CircuitView {
             // circuit, not yosys.
             opts: { ...opts,
                     defaultcomb: this.#document.synth_options.defaultcomb,
-                    layout: this.#document.synth_options.layout }
+                    layout: this.#document.synth_options.layout,
+                    speed: this.#djs.simSpeed }
         });
     }
     async #getViewContent(djs, webview) {

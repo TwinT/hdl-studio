@@ -120,9 +120,19 @@ This extension is designed to run inside the provided dev-container [sd](https:/
     The input and output ports can also be seen/controlled in the control side panel.
 
     To start/pause the simulation, use the play/pause icon next to the editor title.
-    For more complex simulation control including fast-forward, single-step,
-    or wait for event, a more complete set of buttons is available in the control panel.
-    The simulation time tick is also shown in the control panel.
+    For more complex simulation control including single-step, wait for event
+    and reset (back to tick 0 with registers and memories at their initial values),
+    a more complete set of buttons is available in the control panel.
+    Its speed slider sets how fast Start runs (and Lua scripts with it); the
+    rightmost position, "max", runs as fast as possible. While running, the
+    panel also shows the speed actually reached, since a large circuit can't
+    keep up with a high setting. LED matrix outputs are drawn as a small LED
+    grid in the panel.
+
+    The control panel also shows the simulation time, in ticks and in time units.
+    How long one tick is (`1 tick = 1 ns` by default) is set per project in the
+    same panel; "Run for" advances a given time (e.g. `2 us`) and pauses,
+    and the clock widgets show and edit the clock period in time units.
 
     The magnifying glass icon on the wires allows you to monitor a signal
     and create a plot for it. Clicking the icon brings up the monitor view

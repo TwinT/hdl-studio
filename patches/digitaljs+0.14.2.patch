@@ -40,7 +40,7 @@ index 2cd5a5d..495f8db 100644
 +  });
 +});
 diff --git a/node_modules/digitaljs/lib/cells/arith.js b/node_modules/digitaljs/lib/cells/arith.js
-index 82c329f..cbef2c3 100644
+index 82c329f..fb9a49e 100644
 --- a/node_modules/digitaljs/lib/cells/arith.js
 +++ b/node_modules/digitaljs/lib/cells/arith.js
 @@ -5,7 +5,7 @@ Object.defineProperty(exports, "__esModule", {
@@ -194,7 +194,7 @@ index 82c329f..cbef2c3 100644
    },
    _operationHelpers: BaseCompareConst.prototype._operationHelpers.concat(['bincomp'])
 diff --git a/node_modules/digitaljs/lib/cells/base.js b/node_modules/digitaljs/lib/cells/base.js
-index 3ca5527..95106ef 100644
+index 3ca5527..5e7f14b 100644
 --- a/node_modules/digitaljs/lib/cells/base.js
 +++ b/node_modules/digitaljs/lib/cells/base.js
 @@ -3,13 +3,24 @@
@@ -362,7 +362,7 @@ index 3ca5527..95106ef 100644
    },
    // Quick-and-dirty performance fix
 diff --git a/node_modules/digitaljs/lib/cells/bus.js b/node_modules/digitaljs/lib/cells/bus.js
-index ab33314..e96eb69 100644
+index ab33314..7e72ac8 100644
 --- a/node_modules/digitaljs/lib/cells/bus.js
 +++ b/node_modules/digitaljs/lib/cells/bus.js
 @@ -5,7 +5,7 @@ Object.defineProperty(exports, "__esModule", {
@@ -393,7 +393,7 @@ index ab33314..e96eb69 100644
    }
  });
 diff --git a/node_modules/digitaljs/lib/cells/dff.js b/node_modules/digitaljs/lib/cells/dff.js
-index a940148..e672371 100644
+index a940148..a318ff2 100644
 --- a/node_modules/digitaljs/lib/cells/dff.js
 +++ b/node_modules/digitaljs/lib/cells/dff.js
 @@ -5,7 +5,7 @@ Object.defineProperty(exports, "__esModule", {
@@ -440,7 +440,7 @@ index a940148..e672371 100644
        if (this.get('no_data')) return apply_sr(this.get('outputSignals').out);
        return apply_sr(data.in);
 diff --git a/node_modules/digitaljs/lib/cells/display7.js b/node_modules/digitaljs/lib/cells/display7.js
-index 4c6d747..f404221 100644
+index 4c6d747..086b1e5 100644
 --- a/node_modules/digitaljs/lib/cells/display7.js
 +++ b/node_modules/digitaljs/lib/cells/display7.js
 @@ -6,8 +6,8 @@ Object.defineProperty(exports, "__esModule", {
@@ -455,7 +455,7 @@ index 4c6d747..f404221 100644
  /*
   * This is a standard 7-segment display element.
 diff --git a/node_modules/digitaljs/lib/cells/fsm.js b/node_modules/digitaljs/lib/cells/fsm.js
-index ec13773..bc3189b 100644
+index ec13773..4944f89 100644
 --- a/node_modules/digitaljs/lib/cells/fsm.js
 +++ b/node_modules/digitaljs/lib/cells/fsm.js
 @@ -8,7 +8,7 @@ var _jquery = _interopRequireDefault(require("jquery"));
@@ -488,7 +488,7 @@ index ec13773..bc3189b 100644
        while (results.length > 1) {
          const other = results.pop();
 diff --git a/node_modules/digitaljs/lib/cells/gates.js b/node_modules/digitaljs/lib/cells/gates.js
-index 7424f83..6727536 100644
+index 7424f83..5176b79 100644
 --- a/node_modules/digitaljs/lib/cells/gates.js
 +++ b/node_modules/digitaljs/lib/cells/gates.js
 @@ -3,11 +3,12 @@
@@ -506,7 +506,7 @@ index 7424f83..6727536 100644
  const xor_arc_path_markup = {
    tagName: 'path',
 diff --git a/node_modules/digitaljs/lib/cells/io.js b/node_modules/digitaljs/lib/cells/io.js
-index 30675da..e36618f 100644
+index 30675da..d5fe269 100644
 --- a/node_modules/digitaljs/lib/cells/io.js
 +++ b/node_modules/digitaljs/lib/cells/io.js
 @@ -3,11 +3,11 @@
@@ -703,10 +703,10 @@ index 30675da..e36618f 100644
    operation() {
 diff --git a/node_modules/digitaljs/lib/cells/ledmatrix.js b/node_modules/digitaljs/lib/cells/ledmatrix.js
 new file mode 100644
-index 0000000..e1af6d2
+index 0000000..486d47e
 --- /dev/null
 +++ b/node_modules/digitaljs/lib/cells/ledmatrix.js
-@@ -0,0 +1,124 @@
+@@ -0,0 +1,128 @@
 +"use strict";
 +
 +Object.defineProperty(exports, "__esModule", {
@@ -807,7 +807,11 @@ index 0000000..e1af6d2
 +  },
 +  getOutput() {
 +    return this.get('inputSignals').in;
-+  }
++  },
++  // rows/cols must survive toJSON() (document save, undo/redo, reset):
++  // they can't be recovered from the port width alone.
++  _gateParams: _io.IO.prototype._gateParams.concat(['rows', 'cols']),
++  _unsupportedPropChanges: _io.IO.prototype._unsupportedPropChanges.concat(['rows', 'cols'])
 +});
 +const LEDMatrixView = exports.LEDMatrixView = _io.IOView.extend({
 +  _autoResizeBox: false,
@@ -832,7 +836,7 @@ index 0000000..e1af6d2
 +  }
 +});
 diff --git a/node_modules/digitaljs/lib/cells/memory.js b/node_modules/digitaljs/lib/cells/memory.js
-index 5ade418..0050d0f 100644
+index 5ade418..52b5c50 100644
 --- a/node_modules/digitaljs/lib/cells/memory.js
 +++ b/node_modules/digitaljs/lib/cells/memory.js
 @@ -7,7 +7,7 @@ exports.MemoryView = exports.Memory = void 0;
@@ -964,7 +968,7 @@ index 5ade418..0050d0f 100644
          z.addClass('flash');
        }, 10);
 diff --git a/node_modules/digitaljs/lib/cells/mux.js b/node_modules/digitaljs/lib/cells/mux.js
-index 1db63cf..abbc11b 100644
+index 1db63cf..9f3d3fc 100644
 --- a/node_modules/digitaljs/lib/cells/mux.js
 +++ b/node_modules/digitaljs/lib/cells/mux.js
 @@ -6,7 +6,7 @@ Object.defineProperty(exports, "__esModule", {
@@ -1126,10 +1130,10 @@ index 0000000..c9a5d55
 +const TribufView = exports.TribufView = _base.GateView;
 diff --git a/node_modules/digitaljs/lib/cells/trimerge.js b/node_modules/digitaljs/lib/cells/trimerge.js
 new file mode 100644
-index 0000000..d5a06fe
+index 0000000..9831893
 --- /dev/null
 +++ b/node_modules/digitaljs/lib/cells/trimerge.js
-@@ -0,0 +1,71 @@
+@@ -0,0 +1,72 @@
 +"use strict";
 +
 +Object.defineProperty(exports, "__esModule", {
@@ -1195,14 +1199,15 @@ index 0000000..d5a06fe
 +    }
 +    return _vl.Vector4vl.fromArray(out);
 +  },
-+  _gateParams: _base.Box.prototype._gateParams.concat(['inputs']),
-+  _unsupportedPropChanges: _base.Box.prototype._unsupportedPropChanges.concat(['inputs']),
++  // `bits` too: without it toJSON() rebuilds a 1-bit merge on a 32-bit bus
++  _gateParams: _base.Box.prototype._gateParams.concat(['inputs', 'bits']),
++  _unsupportedPropChanges: _base.Box.prototype._unsupportedPropChanges.concat(['inputs', 'bits']),
 +  _operationHelpers: _base.Box.prototype._operationHelpers.concat(['_mergeTwo']),
 +  _gateKind: 'bus'
 +});
 +const TriMergeView = exports.TriMergeView = _base.BoxView;
 diff --git a/node_modules/digitaljs/lib/circuit.js b/node_modules/digitaljs/lib/circuit.js
-index 4511409..ff0a5c2 100644
+index 4511409..20029e0 100644
 --- a/node_modules/digitaljs/lib/circuit.js
 +++ b/node_modules/digitaljs/lib/circuit.js
 @@ -7,7 +7,7 @@ exports.engines = exports.cells = exports.HeadlessCircuit = void 0;
@@ -1261,7 +1266,18 @@ index 4511409..ff0a5c2 100644
      graph._warnings = 0;
      if (opt.nested) graph.set('subcircuit', true);
      const changeWarnings = x => {
-@@ -323,7 +325,7 @@ class HeadlessCircuit {
+@@ -229,7 +231,9 @@ class HeadlessCircuit {
+     this._engine.interval = ms;
+   }
+   get running() {
+-    return this._engine.running;
++    // _makeGraph() asks while building, before the engine exists, when a
++    // cell starts with a warning (e.g. a bus width mismatch)
++    return this._engine ? this._engine.running : false;
+   }
+   getInputCells() {
+     return this._graph.getElements().filter(x => x.isInput);
+@@ -323,7 +327,7 @@ class HeadlessCircuit {
      return ret;
    }
    waitForWire(wire, trigger) {
@@ -1270,7 +1286,7 @@ index 4511409..ff0a5c2 100644
      return new Promise(resolve => {
        this.monitorWire(wire, (tick, sig) => {
          resolve(tick);
-@@ -336,7 +338,7 @@ class HeadlessCircuit {
+@@ -336,7 +340,7 @@ class HeadlessCircuit {
      });
    }
    waitFor(cell, port, trigger) {
@@ -1280,7 +1296,7 @@ index 4511409..ff0a5c2 100644
        this.monitor(cell, port, (tick, sig) => {
          resolve(tick);
 diff --git a/node_modules/digitaljs/lib/elkjs.js b/node_modules/digitaljs/lib/elkjs.js
-index bdb9b09..bf9ba6e 100644
+index bdb9b09..206ba26 100644
 --- a/node_modules/digitaljs/lib/elkjs.js
 +++ b/node_modules/digitaljs/lib/elkjs.js
 @@ -7,6 +7,23 @@ exports.elk_layout = elk_layout;
@@ -1316,11 +1332,69 @@ index bdb9b09..bf9ba6e 100644
              'port.borderOffset': 30,
              'port.index': -i
            }
+diff --git a/node_modules/digitaljs/lib/engines/synch.js b/node_modules/digitaljs/lib/engines/synch.js
+index ec3d27c..d4579e0 100644
+--- a/node_modules/digitaljs/lib/engines/synch.js
++++ b/node_modules/digitaljs/lib/engines/synch.js
+@@ -188,8 +188,11 @@ class SynchEngine extends _base.BaseEngine {
+     });
+     if (!this._alarmQueue.has(tick)) this._alarmQueue.set(tick, new Set());
+     this._alarmQueue.get(tick).add(cb);
+-    this._pq.add(tick - 1);
+-    if (!this._queue.has(tick - 1)) this._queue.set(tick - 1, new Map());
++    // see WorkerEngine's alarm(): a duplicate pq entry throws when polled
++    if (!this._queue.has(tick - 1)) {
++      this._queue.set(tick - 1, new Map());
++      this._pq.add(tick - 1);
++    }
+     return cb;
+   }
+   unalarm(alarmId) {
 diff --git a/node_modules/digitaljs/lib/engines/worker-worker.js b/node_modules/digitaljs/lib/engines/worker-worker.js
-index e0fc9ce..f48f7b6 100644
+index e0fc9ce..d3f1ff0 100644
 --- a/node_modules/digitaljs/lib/engines/worker-worker.js
 +++ b/node_modules/digitaljs/lib/engines/worker-worker.js
-@@ -339,7 +339,16 @@ class WorkerEngineWorker {
+@@ -210,12 +210,36 @@ class WorkerEngineWorker {
+     if (sendUpdates) this._sendUpdates();
+     this._sendAck(reqid);
+   }
++  // Rate-limited run: `_interval` is ms per tick and may be fractional
++  // (1e-6 = 1G ticks/s), so a fixed 10 ms timer advances however many
++  // ticks are owed since the last call. Only ticks with events cost
++  // anything: the events before the target tick are processed (alarms are
++  // queued events too) and the tick then jumps to the target - the same as
++  // that many _updateGates() calls. Re-reading `_interval` each call lets
++  // the speed change while running. Like startFast(), at most 10 ms of
++  // work per call; a backlog that can't be caught up is dropped.
+   start() {
+     this._stop();
++    let last = Date.now();
++    let owed = 0;
+     this._updater = setInterval(() => {
+-      this._updateGates();
+-      this._postMonitors();
+-    }, this._interval);
++      const now = Date.now();
++      owed += (now - last) / this._interval;
++      last = now;
++      const steps = Math.floor(owed);
++      if (steps < 1) return;
++      owed -= steps;
++      const target = this._tick + steps;
++      while (this._updater && this._pq.size && this._pq.peek() < target) {
++        this._updateGatesNext();
++        this._postMonitors();
++        if (Date.now() - now >= 10) {
++          owed = 0;
++          return;
++        }
++      }
++      if (this._updater) this._tick = target;
++    }, 10);
+   }
+   startFast() {
+     this._stop();
+@@ -339,7 +363,16 @@ class WorkerEngineWorker {
      stopOnAlarm,
      synchronous
    }) {
@@ -1338,8 +1412,24 @@ index e0fc9ce..f48f7b6 100644
      this._alarms[alarmId] = {
        tick,
        stopOnAlarm,
+@@ -347,8 +380,13 @@ class WorkerEngineWorker {
+     };
+     if (!this._alarmQueue.has(tick)) this._alarmQueue.set(tick, new Set());
+     this._alarmQueue.get(tick).add(alarmId);
+-    this._pq.add(tick - 1);
+-    if (!this._queue.has(tick - 1)) this._queue.set(tick - 1, new Map());
++    // Only add to the priority queue if tick-1 isn't queued yet (as in
++    // _enqueue): a duplicate entry gets polled twice, and the second
++    // _updateGatesNext finds no _queue map for it and throws.
++    if (!this._queue.has(tick - 1)) {
++      this._queue.set(tick - 1, new Map());
++      this._pq.add(tick - 1);
++    }
+   }
+   unalarm(alarmId) {
+     const alarm = this._alarms[alarmId];
 diff --git a/node_modules/digitaljs/lib/engines/worker.js b/node_modules/digitaljs/lib/engines/worker.js
-index 1ea806b..09e6768 100644
+index 1ea806b..50e19d9 100644
 --- a/node_modules/digitaljs/lib/engines/worker.js
 +++ b/node_modules/digitaljs/lib/engines/worker.js
 @@ -6,7 +6,7 @@ Object.defineProperty(exports, "__esModule", {
@@ -1420,7 +1510,7 @@ index 1ea806b..09e6768 100644
    _handle_ack(reqid, response) {
      this._resolvePromise(reqid, response);
 diff --git a/node_modules/digitaljs/lib/help.js b/node_modules/digitaljs/lib/help.js
-index 9fa0cc5..5ce81e8 100644
+index 9fa0cc5..4149850 100644
 --- a/node_modules/digitaljs/lib/help.js
 +++ b/node_modules/digitaljs/lib/help.js
 @@ -3,12 +3,12 @@
@@ -1476,7 +1566,7 @@ index 9fa0cc5..5ce81e8 100644
  }
  ;
 diff --git a/node_modules/digitaljs/lib/iopanel.js b/node_modules/digitaljs/lib/iopanel.js
-index 3aba3d7..8e35f1b 100644
+index 3aba3d7..f6f9472 100644
 --- a/node_modules/digitaljs/lib/iopanel.js
 +++ b/node_modules/digitaljs/lib/iopanel.js
 @@ -7,7 +7,7 @@ exports.IOPanelView = void 0;
@@ -1570,7 +1660,7 @@ index 3aba3d7..8e35f1b 100644
        });
      }
 diff --git a/node_modules/digitaljs/lib/monitor.js b/node_modules/digitaljs/lib/monitor.js
-index 829fd07..f6a7a36 100644
+index 829fd07..f7a9f1d 100644
 --- a/node_modules/digitaljs/lib/monitor.js
 +++ b/node_modules/digitaljs/lib/monitor.js
 @@ -7,7 +7,7 @@ exports.MonitorView = exports.Monitor = void 0;
@@ -1662,7 +1752,7 @@ index 829fd07..f6a7a36 100644
      const row = (0, _jquery.default)('<tr><td class="name"></td><td>' + base_sel + '</td><td>' + trigger + '</td><td>' + this._removeButtonMarkup + '</td><td><canvas class="wavecanvas" height="30" draggable="true"></canvas></td></tr>');
      row.attr('wireid', wireid);
 diff --git a/node_modules/digitaljs/lib/transform.js b/node_modules/digitaljs/lib/transform.js
-index 7f0e172..3caa95b 100644
+index 7f0e172..81272f2 100644
 --- a/node_modules/digitaljs/lib/transform.js
 +++ b/node_modules/digitaljs/lib/transform.js
 @@ -13,7 +13,7 @@ exports.removeRepeater = removeRepeater;
@@ -1704,7 +1794,7 @@ index 9b290fe..9fa4f29 100644
 +export * from "./cells/trimerge.mjs";
 +export * from "./cells/tribuf.mjs";
 diff --git a/node_modules/digitaljs/src/cells/arith.mjs b/node_modules/digitaljs/src/cells/arith.mjs
-index ca5f960..5a36b07 100644
+index ca5f960..f299de6 100644
 --- a/node_modules/digitaljs/src/cells/arith.mjs
 +++ b/node_modules/digitaljs/src/cells/arith.mjs
 @@ -1,7 +1,7 @@
@@ -1831,7 +1921,7 @@ index ca5f960..5a36b07 100644
 +            const lim = BigInt(Math.max(sig.bits, bits.out));
 +            const raw = data.in.toBigInt(sgn.in);
 +            const am = Number(raw > lim ? lim : raw < -lim ? -lim : raw);
-             return {
+             return { 
                  out: shiftHelp(sig, am * this.shiftdir, sig.bits, bits.out, constant < 0, sgn.out, fillx) 
              };
 @@ -509,16 +519,16 @@ export const CompareConst = BaseCompareConst.define('CompareConst', {}, {
@@ -2365,10 +2455,10 @@ index dc91963..c9720ff 100644
      operation() {
 diff --git a/node_modules/digitaljs/src/cells/ledmatrix.mjs b/node_modules/digitaljs/src/cells/ledmatrix.mjs
 new file mode 100644
-index 0000000..5d2b14d
+index 0000000..7545b9a
 --- /dev/null
 +++ b/node_modules/digitaljs/src/cells/ledmatrix.mjs
-@@ -0,0 +1,118 @@
+@@ -0,0 +1,122 @@
 +import { IO, IOView, NumBase } from './io.mjs';
 +import { BoxView } from './base.mjs';
 +
@@ -2464,6 +2554,10 @@ index 0000000..5d2b14d
 +    getOutput() {
 +        return this.get('inputSignals').in;
 +    },
++    // rows/cols must survive toJSON() (document save, undo/redo, reset):
++    // they can't be recovered from the port width alone.
++    _gateParams: IO.prototype._gateParams.concat(['rows', 'cols']),
++    _unsupportedPropChanges: IO.prototype._unsupportedPropChanges.concat(['rows', 'cols']),
 +});
 +
 +export const LEDMatrixView = IOView.extend({
@@ -2763,10 +2857,10 @@ index 0000000..34891a3
 +export const TribufView = GateView;
 diff --git a/node_modules/digitaljs/src/cells/trimerge.mjs b/node_modules/digitaljs/src/cells/trimerge.mjs
 new file mode 100644
-index 0000000..c8201d5
+index 0000000..f16d337
 --- /dev/null
 +++ b/node_modules/digitaljs/src/cells/trimerge.mjs
-@@ -0,0 +1,58 @@
+@@ -0,0 +1,59 @@
 +"use strict";
 +
 +import { Box, BoxView } from './base.mjs';
@@ -2819,14 +2913,15 @@ index 0000000..c8201d5
 +        }
 +        return Vector4vl.fromArray(out);
 +    },
-+    _gateParams: Box.prototype._gateParams.concat(['inputs']),
-+    _unsupportedPropChanges: Box.prototype._unsupportedPropChanges.concat(['inputs']),
++    // `bits` too: without it toJSON() rebuilds a 1-bit merge on a 32-bit bus
++    _gateParams: Box.prototype._gateParams.concat(['inputs', 'bits']),
++    _unsupportedPropChanges: Box.prototype._unsupportedPropChanges.concat(['inputs', 'bits']),
 +    _operationHelpers: Box.prototype._operationHelpers.concat(['_mergeTwo']),
 +    _gateKind: 'bus'
 +});
 +export const TriMergeView = BoxView;
 diff --git a/node_modules/digitaljs/src/circuit.mjs b/node_modules/digitaljs/src/circuit.mjs
-index 0692a9d..002f01d 100644
+index 0692a9d..93acd27 100644
 --- a/node_modules/digitaljs/src/circuit.mjs
 +++ b/node_modules/digitaljs/src/circuit.mjs
 @@ -1,7 +1,7 @@
@@ -2883,7 +2978,18 @@ index 0692a9d..002f01d 100644
          graph._warnings = 0;
          if (opt.nested) graph.set('subcircuit', true);
          const changeWarnings = (x) => {
-@@ -313,7 +315,7 @@ export class HeadlessCircuit {
+@@ -214,7 +216,9 @@ export class HeadlessCircuit {
+         this._engine.interval = ms;
+     }
+     get running() {
+-        return this._engine.running;
++        // _makeGraph() asks while building, before the engine exists, when a
++        // cell starts with a warning (e.g. a bus width mismatch)
++        return this._engine ? this._engine.running : false;
+     }
+     getInputCells() {
+         return this._graph.getElements().filter(x => x.isInput);
+@@ -313,7 +317,7 @@ export class HeadlessCircuit {
          return ret;
      }
      waitForWire(wire, trigger) {
@@ -2892,7 +2998,7 @@ index 0692a9d..002f01d 100644
              trigger = [trigger];
          return new Promise(resolve => {
              this.monitorWire(wire, (tick, sig) => { resolve(tick) }, 
-@@ -321,7 +323,7 @@ export class HeadlessCircuit {
+@@ -321,7 +325,7 @@ export class HeadlessCircuit {
          });
      }
      waitFor(cell, port, trigger) {
@@ -2934,8 +3040,26 @@ index 7987cda..b7f9de0 100644
                          'port.borderOffset': 30,
                          'port.index': -i
                      }
+diff --git a/node_modules/digitaljs/src/engines/synch.mjs b/node_modules/digitaljs/src/engines/synch.mjs
+index dfc502f..9ce2ae6 100644
+--- a/node_modules/digitaljs/src/engines/synch.mjs
++++ b/node_modules/digitaljs/src/engines/synch.mjs
+@@ -166,9 +166,11 @@ export class SynchEngine extends BaseEngine {
+         if (!this._alarmQueue.has(tick))
+             this._alarmQueue.set(tick, new Set());
+         this._alarmQueue.get(tick).add(cb);
+-        this._pq.add(tick-1);
+-        if (!this._queue.has(tick-1))
++        // see WorkerEngine's alarm(): a duplicate pq entry throws when polled
++        if (!this._queue.has(tick-1)) {
+             this._queue.set(tick-1, new Map());
++            this._pq.add(tick-1);
++        }
+         return cb;
+     }
+     unalarm(alarmId) {
 diff --git a/node_modules/digitaljs/src/engines/worker-worker.mjs b/node_modules/digitaljs/src/engines/worker-worker.mjs
-index ec31c21..7badf14 100644
+index ec31c21..cb8449f 100644
 --- a/node_modules/digitaljs/src/engines/worker-worker.mjs
 +++ b/node_modules/digitaljs/src/engines/worker-worker.mjs
 @@ -1,7 +1,7 @@
@@ -2959,7 +3083,49 @@ index ec31c21..7badf14 100644
                  this._links_to[port.id] = new Set();
              }
          }
-@@ -280,7 +280,7 @@ class WorkerEngineWorker {
+@@ -213,12 +213,38 @@ class WorkerEngineWorker {
+         if (sendUpdates) this._sendUpdates();
+         this._sendAck(reqid);
+     }
++    // Rate-limited run: `_interval` is ms per tick and may be fractional
++    // (1e-6 = 1G ticks/s), so a fixed 10 ms timer advances however many
++    // ticks are owed since the last call. Only ticks with events cost
++    // anything: the events before the target tick are processed (alarms are
++    // queued events too) and the tick then jumps to the target - the same as
++    // that many _updateGates() calls. Re-reading `_interval` each call lets
++    // the speed change while running. Like startFast(), at most 10 ms of
++    // work per call; a backlog that can't be caught up is dropped.
+     start() {
+         this._stop();
++        let last = Date.now();
++        let owed = 0;
+         this._updater = setInterval(() => {
+-            this._updateGates();
+-            this._postMonitors();
+-        }, this._interval);
++            const now = Date.now();
++            owed += (now - last) / this._interval;
++            last = now;
++            const steps = Math.floor(owed);
++            if (steps < 1)
++                return;
++            owed -= steps;
++            const target = this._tick + steps;
++            while (this._updater && this._pq.size && this._pq.peek() < target) {
++                this._updateGatesNext();
++                this._postMonitors();
++                if (Date.now() - now >= 10) {
++                    owed = 0;
++                    return;
++                }
++            }
++            if (this._updater)
++                this._tick = target;
++        }, 10);
+     }
+     startFast() {
+         this._stop();
+@@ -280,7 +306,7 @@ class WorkerEngineWorker {
          const link = graph.getLink(linkId);
          graph.removeLink(linkId);
          const targetGate = graph.getGate(link.target.id);
@@ -2968,7 +3134,7 @@ index ec31c21..7badf14 100644
          this._setGateInputSignal(targetGate, link.target.port, sig);
      }
      removeGate(graphId, gateId) {
-@@ -299,7 +299,7 @@ class WorkerEngineWorker {
+@@ -299,7 +325,7 @@ class WorkerEngineWorker {
      }
      changeInput(graphId, gateId, sig) {
          const gate = this._graphs[graphId].getGate(gateId);
@@ -2977,7 +3143,7 @@ index ec31c21..7badf14 100644
      }
      changeParam(graphId, gateId, paramName, val) {
          const gate = this._graphs[graphId].getGate(gateId);
-@@ -307,13 +307,13 @@ class WorkerEngineWorker {
+@@ -307,13 +333,13 @@ class WorkerEngineWorker {
      }
      manualMemChange(graphId, gateId, addr, data) {
          const gate = this._graphs[graphId].getGate(gateId);
@@ -2993,7 +3159,7 @@ index ec31c21..7badf14 100644
          const gate = this._graphs[graphId].getGate(gateId);
          this._monitors[monitorId] = { gate, port, triggerValues, stopOnTrigger, oneShot, synchronous };
          gate.monitor(port, monitorId);
-@@ -328,7 +328,17 @@ class WorkerEngineWorker {
+@@ -328,14 +354,28 @@ class WorkerEngineWorker {
          delete this._monitorChecks[monitorId];
      }
      alarm(tick, alarmId, {stopOnAlarm, synchronous}) {
@@ -3012,6 +3178,19 @@ index ec31c21..7badf14 100644
          this._alarms[alarmId] = { tick, stopOnAlarm, synchronous };
          if (!this._alarmQueue.has(tick))
              this._alarmQueue.set(tick, new Set());
+         this._alarmQueue.get(tick).add(alarmId);
+-        this._pq.add(tick-1);
+-        if (!this._queue.has(tick-1))
++        // Only add to the priority queue if tick-1 isn't queued yet (as in
++        // _enqueue): a duplicate entry gets polled twice, and the second
++        // _updateGatesNext finds no _queue map for it and throws.
++        if (!this._queue.has(tick-1)) {
+             this._queue.set(tick-1, new Map());
++            this._pq.add(tick-1);
++        }
+     }
+     unalarm(alarmId) {
+         const alarm = this._alarms[alarmId];
 diff --git a/node_modules/digitaljs/src/engines/worker.mjs b/node_modules/digitaljs/src/engines/worker.mjs
 index 35d0726..3331e76 100644
 --- a/node_modules/digitaljs/src/engines/worker.mjs
