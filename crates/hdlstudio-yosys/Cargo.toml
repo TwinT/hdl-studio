@@ -1,0 +1,14 @@
+[package]
+name = "hdlstudio-yosys"
+description = "Yosys JSON netlist to HDL Studio circuit; port of yosys2digitaljs, io_ui, the inout split and digitaljs's transform"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+hdlstudio-logic = { path = "../hdlstudio-logic" }
+hdlstudio-netlist = { path = "../hdlstudio-netlist" }
+indexmap = { version = "2", features = ["serde"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["preserve_order"] }

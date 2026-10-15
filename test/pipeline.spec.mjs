@@ -2,8 +2,8 @@
 'use strict';
 
 // Synthesis pipeline test: runs every example in test/verilog through the same
-// flow the extension uses (yosys -> yosys2digitaljs -> io_ui) and checks it
-// converts without error. This catches the "Unknown yosys2digitaljs error" /
+// flow the extension uses (yosys -> the hdlstudio engine's yosys2hdlstudio)
+// and checks it converts without error. This catches the
 // "Invalid cell type" class of bugs. It needs the `yosys` binary on PATH but
 // does NOT need VS Code, so it is named *.spec.mjs to stay out of the
 // @vscode/test-electron suite (which globs **/**.test.js).
@@ -15,13 +15,13 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { createRequire } from 'module';
 import { execFileSync } from 'child_process';
-import { yosys2digitaljs, io_ui } from 'yosys2digitaljs/core';
 import { build_yosys_script, isHdlFile, data_file_paths } from '../src/yosys_script.mjs';
-import { split_inout_ports } from '../src/inout_split.mjs';
+import { convert_yosys_json, set_hdlstudio_root } from '../src/hdlstudio_bin.mjs';
 import { parseTime, formatTime, formatFreq } from '../src/time_units.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const verilogDir = path.resolve(__dirname, 'verilog');
+set_hdlstudio_root(path.resolve(__dirname, '..'));
 
 // ui=false skips io_ui, keeping plain Input/Output devices (for simulation).
 function synth(svPath, opts = {}, ui = true) {
@@ -34,10 +34,7 @@ function synth(svPath, opts = {}, ui = true) {
         const script = build_yosys_script({ [file]: '' }, opts) + `\njson -o ${outJson}`;
         fs.writeFileSync(path.join(tmp, 'synth.ys'), script);
         execFileSync('yosys', ['-q', '-s', 'synth.ys'], { cwd: tmp, stdio: 'pipe' });
-        const raw = JSON.parse(fs.readFileSync(outJson, 'utf8'));
-        const output = yosys2digitaljs(split_inout_ports(raw), {});
-        if (ui) io_ui(output);
-        return output;
+        return convert_yosys_json(fs.readFileSync(outJson, 'utf8'), {}, ui);
     } finally {
         fs.rmSync(tmp, { recursive: true, force: true });
     }
@@ -60,10 +57,7 @@ function synthDir(dir, opts = {}, ui = true) {
         const script = build_yosys_script(files, opts) + `\njson -o ${outJson}`;
         fs.writeFileSync(path.join(tmp, 'synth.ys'), script);
         execFileSync('yosys', ['-q', '-s', 'synth.ys'], { cwd: tmp, stdio: 'pipe' });
-        const raw = JSON.parse(fs.readFileSync(outJson, 'utf8'));
-        const output = yosys2digitaljs(split_inout_ports(raw), {});
-        if (ui) io_ui(output);
-        return output;
+        return convert_yosys_json(fs.readFileSync(outJson, 'utf8'), {}, ui);
     } finally {
         fs.rmSync(tmp, { recursive: true, force: true });
     }
@@ -125,7 +119,7 @@ describe('build_yosys_script with a data file entry', function () {
     });
 });
 
-describe('Synthesis pipeline (yosys -> yosys2digitaljs)', function () {
+describe('Synthesis pipeline (yosys -> yosys2hdlstudio)', function () {
     this.timeout(60000);
 
     before(function () {
@@ -149,7 +143,7 @@ describe('Synthesis pipeline (yosys -> yosys2digitaljs)', function () {
 
     // techmap decomposes combinational logic to gates; it must keep flip-flops,
     // latches and memories coarse (a bare `techmap` lowers them to $_DFF_P_ etc.
-    // which yosys2digitaljs cannot convert).
+    // which the converter cannot convert).
     for (const f of files) {
         const name = path.basename(f);
         it(`synthesizes and converts ${name} with techmap`, function () {
@@ -180,8 +174,8 @@ describe('Synthesis pipeline (yosys -> yosys2digitaljs)', function () {
         assert.strictEqual(merges[0].bits, 4);
     });
 
-    // `inout` ports: yosys2digitaljs only knows input/output, so
-    // split_inout_ports() (src/inout_split.mjs) turns each inout P into an
+    // `inout` ports: digitaljs ports are one-directional, so the converter
+    // (crates/hdlstudio-yosys/src/inout.rs) turns each inout P into an
     // input P (what the insides read) plus an output P__out that carries only
     // the module's own drivers.
     it('splits inout ports into an input plus a driver-only __out output (12_inout_bus.sv)', function () {
@@ -264,7 +258,7 @@ describe('Synthesis pipeline (yosys -> yosys2digitaljs)', function () {
     // only effect is internal register/memory state) used to render an
     // arbitrary other module instead (e.g. alu.sv) - opt_clean's
     // reachable-from-outputs sweep silently deleted every one of datapath's
-    // instantiated cells, and yosys2digitaljs's topsort-based top-detection
+    // instantiated cells, and the converter's topsort-based top-detection
     // then picked whichever now-orphaned leaf module happened to sort last.
     // Fixed by keeping the requested top's contents alive across the opt
     // passes (see build_yosys_script's `if (opts.top)` block).
@@ -396,10 +390,10 @@ endmodule
 // A net with 2+ sources arises in practice via $tribuf (converted above, real
 // yosys - plain multi-driven wires are refused before JSON export: "Cell ...
 // Y port signal ... already driven by ..."). This block separately exercises
-// yosys2digitaljs's net-merge logic directly against a hand-built netlist
+// the converter's net-merge logic directly against a hand-built netlist
 // (2 real $not cells, structurally identical to real yosys output, both
 // driving the same net-bit-array) instead of going through yosys.
-describe('yosys2digitaljs net merging (multiple sources per net)', function () {
+describe('Converter net merging (multiple sources per net)', function () {
     function notCell(aBits, yBits) {
         return {
             hide_name: 1,
@@ -438,7 +432,7 @@ describe('yosys2digitaljs net merging (multiple sources per net)', function () {
     };
 
     it('merges two sources into a single TriMerge device instead of throwing', function () {
-        const output = yosys2digitaljs(rawJson, {});
+        const output = convert_yosys_json(rawJson, {}, false);
 
         const merges = Object.entries(output.devices).filter(([, d]) => d.type === 'TriMerge');
         assert.strictEqual(merges.length, 1, 'expected exactly one TriMerge device');
@@ -669,9 +663,9 @@ describe('Input widget (Button/NumEntry) initial value', function () {
 // two independent dimensions from it alone (64 bits could be 8x8 or 4x16).
 // An LED matrix's rows/cols instead ride a pair of custom attributes on the
 // port (led_matrix_rows/led_matrix_cols), which survive synthesis onto the
-// port's backing wire (yosys2digitaljs core.js's "Add inputs/outputs" loop
-// reads mod.netnames[pname].attributes, same technique already used there
-// for a Dff's .initial value) and get picked up by io_ui().
+// port's backing wire (the converter's "Add inputs/outputs" step reads the
+// port's netnames attributes, same technique it uses for a Dff's .initial
+// value) and get picked up by io_ui.
 describe('LED matrix widget (led_matrix_rows/led_matrix_cols attributes)', function () {
     before(function () {
         if (!yosysAvailable()) {
@@ -697,8 +691,7 @@ endmodule
             fs.writeFileSync(path.join(tmp, 'synth.ys'), script);
             execFileSync('yosys', ['-q', '-s', 'synth.ys'], { cwd: tmp, stdio: 'pipe' });
             const raw = JSON.parse(fs.readFileSync(outJson, 'utf8'));
-            const output = yosys2digitaljs(raw, {});
-            io_ui(output);
+            const output = convert_yosys_json(raw);
             const dev = Object.values(output.devices).find((d) => d.net === 'matrix');
             assert.strictEqual(dev.type, 'LEDMatrix');
             assert.strictEqual(dev.rows, 8);
@@ -740,8 +733,7 @@ endmodule
             fs.writeFileSync(path.join(tmp, 'synth.ys'), script);
             execFileSync('yosys', ['-q', '-s', 'synth.ys'], { cwd: tmp, stdio: 'pipe' });
             const raw = JSON.parse(fs.readFileSync(outJson, 'utf8'));
-            const output = yosys2digitaljs(raw, {});
-            io_ui(output);
+            const output = convert_yosys_json(raw);
             const dev = Object.values(output.devices).find((d) => d.net === 'btn');
             assert.strictEqual(dev.type, 'PushButton');
         } finally {
@@ -766,8 +758,7 @@ endmodule
             fs.writeFileSync(path.join(tmp, 'synth.ys'), script);
             execFileSync('yosys', ['-q', '-s', 'synth.ys'], { cwd: tmp, stdio: 'pipe' });
             const raw = JSON.parse(fs.readFileSync(outJson, 'utf8'));
-            const output = yosys2digitaljs(raw, {});
-            io_ui(output);
+            const output = convert_yosys_json(raw);
             const dev = Object.values(output.devices).find((d) => d.net === 'pushbutton_start');
             assert.strictEqual(dev.type, 'PushButton');
         } finally {
@@ -792,8 +783,7 @@ endmodule
             fs.writeFileSync(path.join(tmp, 'synth.ys'), script);
             execFileSync('yosys', ['-q', '-s', 'synth.ys'], { cwd: tmp, stdio: 'pipe' });
             const raw = JSON.parse(fs.readFileSync(outJson, 'utf8'));
-            const output = yosys2digitaljs(raw, {});
-            io_ui(output);
+            const output = convert_yosys_json(raw);
             const dev = Object.values(output.devices).find((d) => d.net === 'btn');
             assert.strictEqual(dev.type, 'Button');
         } finally {

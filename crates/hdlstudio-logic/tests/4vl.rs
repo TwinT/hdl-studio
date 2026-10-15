@@ -122,6 +122,7 @@ fn check(c: &Value) -> Vec<String> {
             let mem = LogicMem::from_json(c["bits"].as_u64().unwrap() as usize, &rep).unwrap();
             let got: Vec<String> = (0..mem.len()).map(|i| mem.get(i).to_bin()).collect();
             expect("mem", json!(got), out);
+            expect("toJSON", json!(mem.to_json()), &c["json"]);
         }
         op => panic!("unknown op {op}"),
     }

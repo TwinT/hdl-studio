@@ -11,6 +11,7 @@ import { SynthProvider } from './synth_provider.mjs';
 import { StatusProvider } from './status_provider.mjs';
 import { read_txt_file, write_txt_file, file_exist } from './utils.mjs';
 import { extension_formats } from '../lib/image_formats.mjs';
+import { set_hdlstudio_root } from './hdlstudio_bin.mjs';
 
 const SOURCE_EXTS = ['.sv', '.v', '.vh', '.lua', '.hex', '.mem'];
 
@@ -54,6 +55,7 @@ async function expandSources(uris, recursive) {
 }
 
 export function activate(context) {
+    set_hdlstudio_root(context.extensionPath);
     new DigitalJS(context);
 }
 

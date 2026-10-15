@@ -22,5 +22,6 @@ node_modules/
 !node_modules/@vscode/codicons/dist/
 crates/**
 target/**
+!target/release/hdlstudio
 Cargo.toml
 Cargo.lock

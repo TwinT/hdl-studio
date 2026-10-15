@@ -5,7 +5,8 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import { dequal } from 'dequal';
-import { run_yosys, convert_yosys_json } from './requests.mjs';
+import { run_yosys } from './requests.mjs';
+import { convert_yosys_json } from './hdlstudio_bin.mjs';
 import { Sources } from './sources.mjs';
 import { write_txt_file } from './utils.mjs';
 

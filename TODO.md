@@ -50,11 +50,46 @@
          checkbox handler had no value-changed guard (unlike the number/clock
          widgets), so any input change could bounce forever between the
          circuit and the control panel. Fixed: added the same guard.
-- [ ] `alarm()`'s `this._pq.add(tick-1)` (`node_modules/digitaljs`
+- [X] `alarm()`'s `this._pq.add(tick-1)` (`node_modules/digitaljs`
       `engines/worker-worker.mjs` and `engines/synch.mjs`) is unguarded
       against a duplicate entry at the same tick, unlike `_enqueue()`'s own
       guarded version — a collision could silently freeze all future
-      combinational recomputation.
+      combinational recomputation. (Fixed, see `CLAUDE.md`'s "Simulation
+      controls".)
 - [ ] `HeadlessCircuit.unobserveGraph` (`node_modules/digitaljs`
       `circuit.mjs`) calls `observeGraph` instead of `unobserveGraph` — a
       real typo/leak.
+
+## Pending, noted during the Rust migration 📌
+- [ ] `@twint/4vl` 1.0.2: `isHigh`/`isZ` are false for an all-ones/all-z
+      vector whose width is a multiple of 32 (`_lastmask` is `4294967295`,
+      but `word & _lastmask` is `-1` in JS). Fix in 4vl 1.0.3:
+      `_lastmask` returns `(~0 >>> -this.bits) | 0`. Visible today: a 32-bit
+      all-ones bus isn't drawn green, `transform` skips all-x 32-bit
+      constants, Lua's `ishigh` is wrong. `hdlstudio-logic` doesn't copy the
+      bug (documented in `crates/hdlstudio-logic/tests/4vl.rs`).
+- [ ] Release 0.7.0: publish to the Marketplace (`vsce login TwinT`, then
+      `vsce publish --packagePath hdl-studio-0.7.0.vsix`) and create the
+      GitHub Release (`gh auth login`). The `v0.6.1` tag was never pushed.
+- [ ] Check whether `@vscode/webview-ui-toolkit` is really deprecated
+      (phase 6 drops it either way).
+- [ ] Converter quirks copied from yosys2digitaljs / digitaljs's transform on
+      purpose (phase 2 ports faithfully); fix each in its own commit:
+      - gate-level `$_DFF_P_`/`$_DFFE_PP_` are "Invalid cell type" (the kinds
+        Map lists `$_DFF_`/`$_DFFE_` twice and the async-reset entries win);
+      - `makeBinaryMuxes` never goes sparse below 7 select bits (its
+        `mapping.size < 2**(dev.bits-1)` test uses `dev.bits`, an object);
+      - `makeBinaryMuxes` checks `groups` on the OrReduce instead of its
+        BusGroup, so that check always passes;
+      - a `$mem_v2` with 2+ read ports gets the read ports' init/arst/srst
+        values in reverse port order (sliced from the MSB end);
+      - a ROM (`$mem_v2` with no write ports) gets `transparent`/`collision`
+        `true` on its read ports (`[].every()` is true);
+      - with several top-level modules the top is picked by name order.
+- [ ] The techmap option fails on `soc`'s `board`: yosys leaves `$fa`/`$alu`
+      cells the converter has no cell for ("Invalid cell type: $fa").
+- [ ] `test/pipeline.spec.mjs`'s wide-index test runs `digitaljs/lib/transform.js`,
+      which (unlike the patched `src/` the extension uses) still makes
+      MuxSparse `inputs` BigInts. Gone with digitaljs in the cutover.
+- [ ] Opening a raw yosys netlist on vscode.dev no longer works (conversion
+      needs the native `hdlstudio`). Expected: the web build goes away.

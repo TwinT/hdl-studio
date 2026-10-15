@@ -365,8 +365,9 @@
         "watch-prod:webpack": "webpack --watch --mode production",
         "lint": "eslint .",
         "pretest": "npm run lint",
-        "test": "npm-run-all test:pipeline test:vscode",
-        "test:pipeline": "mocha test/pipeline.spec.mjs",
+        "test": "npm-run-all test:rust test:pipeline test:vscode",
+        "test:rust": "cargo test --workspace",
+        "test:pipeline": "npm run compile:rust && mocha test/pipeline.spec.mjs",
         "test:vscode": "node ./test/runTest.js",
         "open-in-browser": "vscode-test-web --extensionDevelopmentPath=. ."
     },
@@ -411,8 +412,7 @@
         "stream-browserify": "^3.0.0",
         "svg-pan-zoom": "^3.6.2",
         "util": "^0.12.5",
-        "wavecanvas": "^1.1.1",
-        "yosys2digitaljs": "^0.10.3"
+        "wavecanvas": "^1.1.1"
     },
     "allowScripts": {
         "@parcel/watcher@2.5.6": true,

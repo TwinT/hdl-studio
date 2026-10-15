@@ -1,8 +1,30 @@
 # HDL Studio — notes for future work
 
 VS Code extension that synthesizes SystemVerilog (via the `yosys` CLI) and renders
-an interactive circuit diagram/simulator using the `digitaljs` + `yosys2digitaljs`
-npm packages. Educational focus (examples live in `test/verilog/`).
+an interactive circuit diagram/simulator using the `digitaljs` npm package. The
+yosys netlist is converted by the native engine `hdlstudio` (Rust, `crates/`, see
+"Rust engine" below). Educational focus (examples live in `test/verilog/`).
+
+## Rust engine (`crates/`, branch `rust-migration`)
+
+Cargo workspace (`Cargo.toml`) being grown phase by phase to replace digitaljs,
+yosys2digitaljs, digitaljs_lua and `@twint/4vl` (one commit per phase; loose ends go
+in `TODO.md`'s "Pending, noted during the Rust migration"). Crates: `hdlstudio-logic` (4vl port), `hdlstudio-netlist`
+(circuit model; its serde form is digitaljs's circuit JSON, field for field),
+`hdlstudio-yosys` (yosys JSON → circuit: port of yosys2digitaljs + our old patch,
+`io_ui`, the inout split and digitaljs's `transform.mjs`), `hdlstudio` (the binary).
+
+- `npm run compile` builds it (`compile:rust` = `cargo build --release`). The host
+  runs `target/release/hdlstudio` (`src/hdlstudio_bin.mjs`, vscode-free; the root is
+  set from `context.extensionPath` in `activate`). The vsix ships it at that same
+  path (`!target/release/hdlstudio` in `.vscodeignore`).
+- `hdlstudio yosys2hdlstudio [--transform] [--no-io-ui] < yosys.json` prints the
+  digitaljs circuit. Its output was checked identical to the old JS chain on every
+  example × 5 option sets; `crates/hdlstudio-yosys/tests/golden.json` freezes that
+  for the small examples plus cell-coverage netlists (`BLESS=1 cargo test` rewrites
+  it after an intended change). It reproduces yosys2digitaljs's quirks on purpose
+  (device numbering, a Map typo that makes `$_DFF_P_` invalid, transform's dead
+  sparse-mux test): semantic changes go in their own commits.
 
 ## Architecture: host vs webview
 
@@ -36,9 +58,9 @@ webview logic is `view/synth_view.mjs`).
 
 ## Testing & lint
 
-- `npm test` → `test:pipeline` then `test:vscode`.
-- `test:pipeline` (`mocha test/pipeline.spec.mjs`) — synthesizes every single-file
-  example through the real flow (yosys → yosys2digitaljs → io_ui) and asserts it
+- `npm test` → `test:rust` (`cargo test --workspace`), `test:pipeline`, `test:vscode`.
+- `test:pipeline` (builds the engine, then `mocha test/pipeline.spec.mjs`) — synthesizes
+  every single-file example through the real flow (yosys → `hdlstudio`) and asserts it
   converts. No VS Code, no DOM; needs `yosys` on PATH (skips if absent). Named
   `.spec.mjs` on purpose so the electron glob (`**/**.test.js`) ignores it. It
   imports the extension's own `build_yosys_script` so the test can't drift.
@@ -57,8 +79,9 @@ webview logic is `view/synth_view.mjs`).
 
 `document.doSynth()` → `sources.doSynth(opts)` → `run_yosys(files, opts)` (`src/requests.mjs`)
 → `build_yosys_script(files, opts)` (`src/yosys_script.mjs`, kept **free of `vscode`** so
-tests can import it) → runs `yosys -s script.ys` → `yosys2digitaljs(json, opts)` →
-`io_ui(output)` → `digitaljs_transform.transformCircuit` (if `transform` on).
+tests can import it) → runs `yosys -s script.ys` → `convert_yosys_json(json, opts)`
+(`src/hdlstudio_bin.mjs`) → `hdlstudio yosys2hdlstudio`: inout split, convert,
+`io_ui`, and transform if `transform` is on.
 
 Synth options live in `document.mjs` `default_synth_options` and are edited in the
 synth panel. Two kinds:
@@ -74,23 +97,23 @@ Adding a new option = touch: `default_synth_options`, the panel HTML
 (`synth_provider.mjs`), the arrays in `synth_view.mjs`, and either `doSynth` (yosys) or
 `#showCircuit` + `#_mkCircuit` (circuit-build).
 
-### `inout` ports (`src/inout_split.mjs`)
-`yosys2digitaljs` only knows input/output (`Invalid port direction: inout`, both on
-module ports and on `Subcircuit` cell `port_directions`). `convert_yosys_json` runs
-`split_inout_ports(raw)` first: each inout `P` becomes an input `P` (what the module
+### `inout` ports (`crates/hdlstudio-yosys/src/inout.rs`)
+digitaljs ports are one-directional (yosys2digitaljs used to fail with
+`Invalid port direction: inout`, both on module ports and on `Subcircuit` cell
+`port_directions`). The converter splits them first: each inout `P` becomes an input `P` (what the module
 reads) plus an output `P__out` carrying **only the module's own drivers**; a parent's
 multiple `P__out` on one net then merge through the existing `TriMerge`. An inout
 nothing drives becomes a plain input (no `__out`). Don't export the resolved value as
 the output: the parent merges it again and feeds it back into `P`, a
-`x = merge(x, z)` loop that latches the last bus value. Pure function, no `vscode`;
-`test/pipeline.spec.mjs`'s `synth`/`synthDir` call it too (example:
-`test/verilog/12_inout_bus/`, incl. a headless sim of float/contention).
+`x = merge(x, z)` loop that latches the last bus value (example:
+`test/verilog/12_inout_bus/`, incl. a headless sim of float/contention in
+`test/pipeline.spec.mjs`).
 `build_yosys_script` also runs `bwmuxmap` after `proc` (`$bwmux`, e.g. a part-select
 write into a wide register, has no digitaljs cell).
 
 ### techmap gotcha
 Bare `techmap` also lowers flip-flops/latches/memory to gate-level primitives
-(`$_DFF_P_`, `$_DLATCH_P_`) that yosys2digitaljs cannot convert → `Invalid cell type`.
+(`$_DFF_P_`, `$_DLATCH_P_`) that the converter cannot convert → `Invalid cell type`.
 `build_yosys_script` excludes them with `select *; select -del t:$dff ... t:$mem_v2`
 before `techmap`, so only combinational logic is decomposed.
 
@@ -127,7 +150,7 @@ The webview code was written against an older digitaljs; 0.14.2 differs:
 - Reading wire colours: green = all 1, salmon = all 0 (multi-bit too), blue = defined
   mix, orange = z, grey = x (`WireView.attrs.signal`). A salmon bus is zeros, not x.
 
-## I/O widget inference (`yosys2digitaljs` `io_ui`)
+## I/O widget inference (`io_ui` in `crates/hdlstudio-yosys/src/lib.rs`)
 
 Top-module port → widget by name + width: 1-bit input `clk`/`clock` → Clock (auto);
 1-bit input named `pushbutton*` or carrying `(* momentary *)` → PushButton (see
@@ -159,8 +182,8 @@ port's bit width, else it falls through to the ordinary NumDisplay/Display7 rule
 Ports have no `attributes` field of their own in yosys's JSON schema, but their
 backing wire (same name, in `netnames`) does, and custom attributes survive this
 project's synthesis pass sequence onto it (confirmed empirically) — the same
-technique `core.js` already used for a `Dff`'s `.initial` value, extended in this
-project's patch to the "Add inputs/outputs" loop. The `LEDMatrix` cell itself
+technique the converter uses for a `Dff`'s `.initial` value, applied in its
+"Add inputs/outputs" step. The `LEDMatrix` cell itself
 (`node_modules/digitaljs/src/cells/ledmatrix.mjs`, patched) computes its LED pitch
 **once** from rows/cols at creation, clamped to a roughly-fixed footprint — more
 LEDs means smaller LEDs, not a bigger widget. There's no interactive resize (see
@@ -200,8 +223,8 @@ three call sites in `digitaljs/src` and all are now safe for wide values: `Shift
 `digitaljs` is patched (`patches/digitaljs+0.14.2.patch`) for native
 4-valued (0/1/x/z) logic via `@twint/4vl` (replacing the stock `3vl`), the
 `Tribuf`/`TriMerge` cells for tri-state bus merging, and assorted bug fixes
-(e.g. the Wire per-link routing fix above). `yosys2digitaljs`,
-`digitaljs_lua`, and `wavecanvas` each have their own
+(e.g. the Wire per-link routing fix above). `digitaljs_lua` and
+`wavecanvas` each have their own
 `patches/<pkg>+<ver>.patch` too; all are applied automatically via the
 `postinstall: patch-package` script (`package.json`).
 
@@ -463,7 +486,7 @@ ever see ticks.
   spin on `jal x0,0`) and `test/pipeline.spec.mjs` simulates it. `test/verilog/soc/rtl/`
   is the `inout`-bus version (`cpu_ram.sv` = CPU + RAM without the LED matrix, to check
   that both `.hex` files loaded: the bus should alternate `0x0 -> 0x00010437 -> 0x4 ...`).
-  `board` (soc + `led_panel`, 32x32 Game of Life) needs ~1500 clock cycles (~300k ticks,
+  `board` (soc + `led_panel`, a capybara walking on a 16x32 LED matrix) needs ~1500 clock cycles (~300k ticks,
   Clock `propagation` 100 = 200 ticks/cycle) after reset before the first LED lights:
   use Fast-forward (plain Start does one tick per `interval`, 10 ms by default).
 - Yosys errors: on failure the script + yosys stdout/stderr are dumped to the

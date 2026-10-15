@@ -353,7 +353,7 @@ export class Sources {
                 const error = e.error;
                 if (error === undefined) {
                     console.error(e);
-                    await vscode.window.showErrorMessage(`Unknown yosys2digitaljs error.`);
+                    await vscode.window.showErrorMessage(`Unknown synthesis error.`);
                     return;
                 }
                 await vscode.window.showErrorMessage(`Synthesis error: ${error}`);

@@ -2,7 +2,7 @@
 
 Contador de pulsaciones con pushbutton momentaneo
 
-Demuestra el widget PushButton: yosys2digitaljs infiere ese widget (en vez
+Demuestra el widget PushButton: HDL Studio infiere ese widget (en vez
 del switch/toggle que usa por defecto cualquier entrada de 1 bit) para un
 puerto que lleva el atributo (* momentary *). A diferencia del switch (click
 para poner en alto, click de nuevo para poner en bajo), el pushbutton solo

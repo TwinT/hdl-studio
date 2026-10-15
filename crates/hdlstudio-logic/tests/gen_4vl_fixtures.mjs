@@ -117,7 +117,8 @@ for (let i = 0; i < 40; i++) {
         const hex = () => str(hexlen, '0123456789abcdef');
         rep = [hex(), 3, hex(), hex() + hex() + hex(), str(hexlen, 'x'), 2, str(hexlen, 'z')];
     }
-    cases.push({ op: 'mem', bits, rep, out: Mem4vl.fromJSON(bits, rep).toArray().map(v => v.toBin()) });
+    const mem = Mem4vl.fromJSON(bits, rep);
+    cases.push({ op: 'mem', bits, rep, out: mem.toArray().map(v => v.toBin()), json: mem.toJSON() });
 }
 
 process.stdout.write(JSON.stringify(cases) + '\n');

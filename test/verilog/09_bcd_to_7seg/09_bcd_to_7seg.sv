@@ -2,7 +2,7 @@
 
 BCD a siete segmentos — instanciación del widget Display7
 
-yosys2digitaljs infiere widgets de E/S por nombre y ancho del puerto del
+HDL Studio infiere widgets de E/S por nombre y ancho del puerto del
 módulo top (ver CLAUDE.md, "I/O widget inference"): una salida de
 EXACTAMENTE 8 bits llamada "display7" (o que empiece con "display7_") se
 renderiza como un display de siete segmentos en vez de un NumDisplay
