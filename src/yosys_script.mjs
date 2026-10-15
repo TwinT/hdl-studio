@@ -16,6 +16,18 @@ export function isHdlFile(name) {
     return HDL_EXTENSIONS.has(path.extname(name));
 }
 
+// Where a data file must exist inside the synthesis directory so that a
+// $readmemh/$readmemb finds it. The .sv sources are flattened into the root
+// of that directory, so a bare reference (`"control_unit.hex"`, written
+// relative to the source file) only resolves if the file is also at the
+// root; a project-relative reference (`"core/control_unit.hex"`) needs the
+// nested path. Write both. Exact names are written first by the caller, so
+// an alias never shadows a file that really lives at the root.
+export function data_file_paths(name) {
+    const base = path.basename(name);
+    return base === name ? [name] : [name, base];
+}
+
 export function build_yosys_script(files, opts = {}) {
     const cmds = ['design -reset'];
 
@@ -54,6 +66,10 @@ export function build_yosys_script(files, opts = {}) {
     }
 
     cmds.push('proc');
+    // Lowers $bwmux (per-bit select, e.g. a part-select write into a wide
+    // register like `matrix[i*COLS+:COLS] <= d`) to $and/$or/$not:
+    // yosys2digitaljs has no cell for it ("Invalid cell type: $bwmux").
+    cmds.push('bwmuxmap');
     // Converts tri-state muxes (`assign x = en ? val : 'z;`) into $tribuf
     // cells with a genuine enable + high-Z output, instead of leaving them
     // as an inferred mux. yosys2digitaljs converts $tribuf directly (native

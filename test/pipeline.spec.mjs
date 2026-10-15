@@ -16,12 +16,14 @@ import { fileURLToPath } from 'url';
 import { createRequire } from 'module';
 import { execFileSync } from 'child_process';
 import { yosys2digitaljs, io_ui } from 'yosys2digitaljs/core';
-import { build_yosys_script, isHdlFile } from '../src/yosys_script.mjs';
+import { build_yosys_script, isHdlFile, data_file_paths } from '../src/yosys_script.mjs';
+import { split_inout_ports } from '../src/inout_split.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const verilogDir = path.resolve(__dirname, 'verilog');
 
-function synth(svPath, opts = {}) {
+// ui=false skips io_ui, keeping plain Input/Output devices (for simulation).
+function synth(svPath, opts = {}, ui = true) {
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'hdl-test-'));
     try {
         const file = path.basename(svPath);
@@ -32,8 +34,8 @@ function synth(svPath, opts = {}) {
         fs.writeFileSync(path.join(tmp, 'synth.ys'), script);
         execFileSync('yosys', ['-q', '-s', 'synth.ys'], { cwd: tmp, stdio: 'pipe' });
         const raw = JSON.parse(fs.readFileSync(outJson, 'utf8'));
-        const output = yosys2digitaljs(raw, {});
-        io_ui(output);
+        const output = yosys2digitaljs(split_inout_ports(raw), {});
+        if (ui) io_ui(output);
         return output;
     } finally {
         fs.rmSync(tmp, { recursive: true, force: true });
@@ -44,7 +46,7 @@ function synth(svPath, opts = {}) {
 // (source + any .hex/.mem data files) into the temp synth dir instead of
 // just one. Needed for test/verilog/micro/, a multi-file design excluded
 // from the single-.sv-per-subfolder loop above.
-function synthDir(dir, opts = {}) {
+function synthDir(dir, opts = {}, ui = true) {
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'hdl-test-'));
     try {
         const names = fs.readdirSync(dir).filter((f) => isHdlFile(f) || f.endsWith('.hex') || f.endsWith('.mem'));
@@ -58,8 +60,8 @@ function synthDir(dir, opts = {}) {
         fs.writeFileSync(path.join(tmp, 'synth.ys'), script);
         execFileSync('yosys', ['-q', '-s', 'synth.ys'], { cwd: tmp, stdio: 'pipe' });
         const raw = JSON.parse(fs.readFileSync(outJson, 'utf8'));
-        const output = yosys2digitaljs(raw, {});
-        io_ui(output);
+        const output = yosys2digitaljs(split_inout_ports(raw), {});
+        if (ui) io_ui(output);
         return output;
     } finally {
         fs.rmSync(tmp, { recursive: true, force: true });
@@ -81,6 +83,15 @@ describe('isHdlFile', function () {
         assert.strictEqual(isHdlFile('top.v'), true);
         assert.strictEqual(isHdlFile('rtl/control_unit.hex'), false);
         assert.strictEqual(isHdlFile('rom.mem'), false);
+    });
+});
+
+describe('data_file_paths', function () {
+    // The .sv sources are flattened to the synthesis dir root, so a $readmemh
+    // with a bare name only finds a nested data file through its alias.
+    it('adds a bare-name alias for a nested data file, nothing for a root one', function () {
+        assert.deepStrictEqual(data_file_paths('control_unit.hex'), ['control_unit.hex']);
+        assert.deepStrictEqual(data_file_paths('core/control_unit.hex'), ['core/control_unit.hex', 'control_unit.hex']);
     });
 });
 
@@ -164,6 +175,59 @@ describe('Synthesis pipeline (yosys -> yosys2digitaljs)', function () {
         assert.strictEqual(merges[0].bits, 4);
     });
 
+    // `inout` ports: yosys2digitaljs only knows input/output, so
+    // split_inout_ports() (src/inout_split.mjs) turns each inout P into an
+    // input P (what the insides read) plus an output P__out that carries only
+    // the module's own drivers.
+    it('splits inout ports into an input plus a driver-only __out output (12_inout_bus.sv)', function () {
+        const output = synth(path.join(verilogDir, '12_inout_bus', '12_inout_bus.sv'));
+        const nets = (sub, type) => Object.values(sub.devices).filter((d) => d.type === type).map((d) => d.net);
+        const merges = (sub) => Object.values(sub.devices).filter((d) => d.type === 'TriMerge');
+
+        // drives + reads: both halves
+        assert.deepStrictEqual(nets(output.subcircuits.bus_reg, 'Input').filter((n) => n.startsWith('bus')), ['bus']);
+        assert.deepStrictEqual(nets(output.subcircuits.bus_reg, 'Output'), ['bus__out']);
+        // only reads: no output half, nothing to drive
+        assert.deepStrictEqual(nets(output.subcircuits.bus_probe, 'Input').filter((n) => n.startsWith('bus')), ['bus']);
+        assert.ok(!nets(output.subcircuits.bus_probe, 'Output').includes('bus__out'));
+        // passes the bus down to two bus_reg: both of their drivers merge
+        assert.deepStrictEqual(nets(output.subcircuits.bus_pair, 'Output'), ['bus__out']);
+        assert.strictEqual(merges(output.subcircuits.bus_pair).length, 1);
+        assert.strictEqual(merges(output.subcircuits.bus_pair)[0].inputs, 2);
+        // top: the external tribuf + bus_pair's driver half
+        assert.strictEqual(merges(output)[0].inputs, 2);
+    });
+
+    it('resolves a shared inout bus: one driver passes, none floats (no latch), two conflict', function () {
+        const require = createRequire(import.meta.url);
+        const { HeadlessCircuit } = require('../node_modules/digitaljs/lib/circuit.js');
+        const { Vector4vl } = require('@twint/4vl');
+        const circuit = new HeadlessCircuit(synth(path.join(verilogDir, '12_inout_bus', '12_inout_bus.sv'), {}, false));
+        const set = (net, bin) => circuit.setInput(circuit.findInputByNet(net).id, Vector4vl.fromBin(bin));
+        // updateGates() advances ONE tick; run to quiescence so a clock edge
+        // never races the data it is meant to sample.
+        const settle = () => { while (circuit.hasPendingEvents) circuit.updateGatesNext(); };
+        const apply = (o) => { for (const [k, v] of Object.entries(o)) set(k, v); settle(); };
+        const pulse = () => { apply({ clk: '1' }); apply({ clk: '0' }); };
+        const seen = () => circuit.getOutput(circuit.findOutputByNet('seen').id).toBin();
+
+        apply({ clk: '0', ld_a: '0', oe_a: '0', ld_b: '0', oe_b: '0', drive: '0', data: '0000' });
+        // the outside world loads a.val through the top-level driver
+        apply({ drive: '1', data: '0101', ld_a: '1' }); pulse();
+        assert.strictEqual(seen(), '0101');
+        // a drives the bus, b loads it from there (across the hierarchy)
+        apply({ drive: '0', data: '0000', ld_a: '0', oe_a: '1', ld_b: '1' }); pulse();
+        // nobody drives: floats, and must NOT keep the last driven value
+        apply({ oe_a: '0', ld_b: '0' }); pulse();
+        assert.strictEqual(seen(), 'zzzz', 'released bus must float, not hold its last value');
+        // only b drives: proves b really loaded 0101 off the bus
+        apply({ oe_b: '1' }); pulse();
+        assert.strictEqual(seen(), '0101');
+        // b and the external driver disagree: contention
+        apply({ drive: '1', data: '1010' }); pulse();
+        assert.strictEqual(seen(), 'xxxx');
+    });
+
     // bmux_regfile.sv's q[] is populated by separate module instances (not a
     // single memory-inferring write), so a dynamic read of q[raddr] compiles
     // to a $bmux cell (word-wide binary-select) - but only through the
@@ -207,6 +271,100 @@ describe('Synthesis pipeline (yosys -> yosys2digitaljs)', function () {
             assert.ok(sub, `expected a "${name}" subcircuit under datapath, got none ` +
                             `(top devices: ${Object.keys(output.devices).join(', ')})`);
         }
+    });
+
+    // Regression: yosys keeps the width of an index expression, so a 32-bit
+    // signal into a 16-word memory gives ABITS=32. Memory._calcaddr() (and a
+    // constant << variable-amount ShiftConst, which the default `transform`
+    // produces) used to hit toNumber()'s `bits < 32` assertion even for a=5,
+    // killing the simulation. Both are exercised with and without transform.
+    it('simulates a memory indexed by a 32-bit signal and a constant << 32-bit amount', function () {
+        const require = createRequire(import.meta.url);
+        const { HeadlessCircuit } = require('../node_modules/digitaljs/lib/circuit.js');
+        const { transformCircuit } = require('../node_modules/digitaljs/lib/transform.js');
+        const { Vector4vl } = require('@twint/4vl');
+        const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hdl-wide-'));
+        let base;
+        try {
+            const sv = path.join(dir, 'wide_idx.sv');
+            fs.writeFileSync(sv, `
+module wide_idx (
+    input  logic        clk,
+    input  logic [31:0] a,
+    input  logic [7:0]  d,
+    input  logic        we,
+    output logic [7:0]  q,
+    output logic [31:0] one_hot
+);
+    logic [7:0] mem [16];
+    always_ff @(posedge clk) if (we) mem[a] <= d;
+    assign q = mem[a];
+    assign one_hot = 32'd1 << a;
+endmodule
+`);
+            base = synth(sv, { useSlang: true, top: 'wide_idx' }, false);
+        } finally {
+            fs.rmSync(dir, { recursive: true, force: true });
+        }
+
+        for (const transform of [false, true]) {
+            const data = JSON.parse(JSON.stringify(base));
+            const circuit = new HeadlessCircuit(transform ? transformCircuit(data) : data);
+            if (transform)
+                assert.ok(Object.values(circuit.toJSON().devices).some((d) => /ShiftLeftConst/.test(d.type)),
+                          'transform should turn 1 << a into a ShiftLeftConst (leftOp), the other fixed site');
+            const settle = () => { while (circuit.hasPendingEvents) circuit.updateGatesNext(); };
+            const set = (net, bin) => circuit.setInput(circuit.findInputByNet(net).id, Vector4vl.fromBin(bin));
+            const out = (net) => circuit.getOutput(circuit.findOutputByNet(net).id).toBin();
+            const a32 = (n) => (n >>> 0).toString(2).padStart(32, '0');
+            const where = `transform=${transform}`;
+
+            set('clk', '0'); set('we', '1'); set('d', '10101011'); set('a', a32(5)); settle();
+            set('clk', '1'); settle(); set('clk', '0'); settle(); set('we', '0'); settle();
+            assert.strictEqual(out('q'), '10101011', `${where}: mem[5] should read back what was written`);
+            assert.strictEqual(out('one_hot'), a32(1 << 5), `${where}: 1 << 5`);
+
+            // |amount| >= the output width: all-fill, not an assertion
+            set('a', a32(33)); settle();
+            assert.strictEqual(out('one_hot'), a32(0), `${where}: 1 << 33`);
+            set('a', a32(0x80000000)); settle();
+            assert.strictEqual(out('one_hot'), a32(0), `${where}: 1 << 2^31`);
+            assert.ok(!/[01]/.test(out('q')), `${where}: out-of-range address must read as undefined, got ${out('q')}`);
+        }
+    });
+
+    // The micro's memory.hex used to be a 2-word placeholder: the CPU fetched
+    // two zero words, then an uninitialized (x) one, and everything went x
+    // forever. It now holds a small RV32I program (sum 5+4+3+2+1 in x2, store
+    // it, load it back into x3, then spin on `jal x0, 0`). Runs the real
+    // datapath headlessly: proves both .hex files load and the CPU executes.
+    it('runs the micro/memory.hex program to completion (x2 = x3 = 15)', function () {
+        const require = createRequire(import.meta.url);
+        const { HeadlessCircuit } = require('../node_modules/digitaljs/lib/circuit.js');
+        const { Vector4vl } = require('@twint/4vl');
+        const output = synthDir(path.join(verilogDir, 'micro'), { useSlang: true, top: 'datapath' }, false);
+        const circuit = new HeadlessCircuit(output);
+        // updateGates() advances ONE tick; run to quiescence instead.
+        const settle = () => { while (circuit.hasPendingEvents) circuit.updateGatesNext(); };
+        const set = (net, bin) => circuit.setInput(circuit.findInputByNet(net).id, Vector4vl.fromBin(bin));
+        const tick = () => { set('clk', '1'); settle(); set('clk', '0'); settle(); };
+        set('clk', '0'); set('rst', '1'); settle(); tick(); tick(); set('rst', '0'); settle();
+        for (let i = 0; i < 100; i++) tick();
+
+        const regs = {};
+        (function walk(graph) {
+            for (const c of graph.getElements()) {
+                if (c.get('type') !== 'Subcircuit') continue;
+                const m = /^gen_regs\[(\d+)\]\.register/.exec(c.get('label') || '');
+                const dff = m && c.get('graph').getElements().find((e) => e.get('type') === 'Dff');
+                if (dff) regs[m[1]] = dff.get('outputSignals').out.toBin();
+                else if (c.get('graph')) walk(c.get('graph'));
+            }
+        })(circuit._graph);
+        const val = (r) => parseInt(regs[r], 2);
+        assert.strictEqual(val(1), 0, `x1 (loop counter) should have counted down to 0, got ${regs[1]}`);
+        assert.strictEqual(val(2), 15, `x2 (running sum) should be 5+4+3+2+1, got ${regs[2]}`);
+        assert.strictEqual(val(3), 15, `x3 (loaded back from memory) should be 15, got ${regs[3]}`);
     });
 });
 
@@ -371,6 +529,43 @@ describe('digitaljs cell operation() z-input safety', function () {
                 'throws on BigInt');
         assert.deepStrictEqual(params.inputs, [1, 2, 3]);
         assert.doesNotThrow(() => JSON.stringify(params));
+    });
+});
+
+// Regression: yosys can hand a Shift cell an amount wider than 32 bits (e.g.
+// the 34-bit signed `$shift` behind `a[i*W +: W] <= d`), and Shift.operation()
+// used to feed it to Vector4vl.toNumber(), which asserts bits < 32 - killing
+// the whole simulation as soon as the amount became defined. Any |amount| >=
+// max(in1, out) gives the same all-fill result, so the cell now saturates.
+describe('digitaljs Shift saturates wide shift amounts', function () {
+    const require = createRequire(import.meta.url);
+    const cells = require('../node_modules/digitaljs/lib/cells.js');
+    const { Vector4vl } = require('@twint/4vl');
+
+    const shift = (Cell, n) => {
+        const dev = new cells[Cell]({
+            id: 's1', type: Cell,
+            bits: { in1: 32, in2: 34, out: 1024 },
+            signed: { in1: false, in2: true, out: false }
+        });
+        const amount = Vector4vl.fromBin(BigInt.asUintN(34, BigInt(n)).toString(2).padStart(34, '0'));
+        const in1 = Vector4vl.fromBin('1111'.padStart(32, '0'));
+        return dev.operation({ in1, in2: amount }).out.toBin();
+    };
+    const wide = (bin) => bin.padStart(1024, '0');
+
+    it('still shifts by the exact amount when it is small (negative = reverse direction)', function () {
+        assert.strictEqual(shift('ShiftRight', 0), wide('1111'));
+        assert.strictEqual(shift('ShiftRight', 2), wide('11'));
+        assert.strictEqual(shift('ShiftRight', -5), wide('111100000'));
+        assert.strictEqual(shift('ShiftLeft', 5), wide('111100000'));
+    });
+
+    it('does not throw for amounts that need more than 32 bits, and gives all-fill', function () {
+        const zeros = '0'.repeat(1024);
+        assert.strictEqual(shift('ShiftRight', 2n ** 33n), zeros);
+        assert.strictEqual(shift('ShiftRight', -(2n ** 33n)), zeros);
+        assert.strictEqual(shift('ShiftLeft', 2n ** 33n), zeros);
     });
 });
 

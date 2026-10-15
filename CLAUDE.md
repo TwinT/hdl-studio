@@ -74,6 +74,20 @@ Adding a new option = touch: `default_synth_options`, the panel HTML
 (`synth_provider.mjs`), the arrays in `synth_view.mjs`, and either `doSynth` (yosys) or
 `#showCircuit` + `#_mkCircuit` (circuit-build).
 
+### `inout` ports (`src/inout_split.mjs`)
+`yosys2digitaljs` only knows input/output (`Invalid port direction: inout`, both on
+module ports and on `Subcircuit` cell `port_directions`). `convert_yosys_json` runs
+`split_inout_ports(raw)` first: each inout `P` becomes an input `P` (what the module
+reads) plus an output `P__out` carrying **only the module's own drivers**; a parent's
+multiple `P__out` on one net then merge through the existing `TriMerge`. An inout
+nothing drives becomes a plain input (no `__out`). Don't export the resolved value as
+the output: the parent merges it again and feeds it back into `P`, a
+`x = merge(x, z)` loop that latches the last bus value. Pure function, no `vscode`;
+`test/pipeline.spec.mjs`'s `synth`/`synthDir` call it too (example:
+`test/verilog/12_inout_bus/`, incl. a headless sim of float/contention).
+`build_yosys_script` also runs `bwmuxmap` after `proc` (`$bwmux`, e.g. a part-select
+write into a wide register, has no digitaljs cell).
+
 ### techmap gotcha
 Bare `techmap` also lowers flip-flops/latches/memory to gate-level primitives
 (`$_DFF_P_`, `$_DLATCH_P_`) that yosys2digitaljs cannot convert → `Invalid cell type`.
@@ -95,6 +109,11 @@ The webview code was written against an older digitaljs; 0.14.2 differs:
   the dialog when the layout batch completes.
 - Dialog **restore** (`#restoreStates`) only runs on `keep=true` reloads (undo/redo of a
   circuit edit), never on re-synthesis (keep=false, by design — new circuit).
+- Headless (`HeadlessCircuit` + `SynchEngine`): `circuit.updateGates()` advances **one
+  tick**, it does not run to quiescence. Toggling a clock right after it races the
+  data and shows spurious `x` that aren't in the design. Settle with
+  `while (circuit.hasPendingEvents) circuit.updateGatesNext()` (see the simulation
+  tests in `test/pipeline.spec.mjs`).
 
 ## I/O widget inference (`yosys2digitaljs` `io_ui`)
 
@@ -148,6 +167,21 @@ legitimately exceed the "in range" count — and `toNumber()` throws
 `"... called on a too wide vector"` at simulation time. Size any such
 counter/index with `$clog2(N)`, not to match the bus it addresses (see
 `test/verilog/10_led_matrix/10_led_matrix.sv`'s `POSW` for the pattern).
+
+**Update:** the `Shift*` cells (`cells/arith.mjs`/`lib/cells/arith.js`, patched)
+now *saturate* the amount instead of calling `toNumber()`: any
+`|amount| >= max(in1, out)` gives the same all-fill result, so a wide amount no
+longer kills the simulation. This matters because yosys itself can emit one
+(`a[i*W +: W] <= d` becomes a 34-bit signed `$shift`/`$shiftx` fed by a `$neg`,
+and no yosys pass narrows it — tried `opt_expr -fine`, `opt -full`, `peepopt`,
+`wreduce` twice). Sizing indices with `$clog2` is still good practice (smaller
+netlist); it's just no longer needed to avoid the crash. `toNumber()` has exactly
+three call sites in `digitaljs/src` and all are now safe for wide values: `Shift`,
+`ShiftConst` with a constant left operand (what `transform` makes of `1 << a`), and
+`Memory._calcaddr` (yosys keeps the index expression's width, so `mem[a]` with a
+32-bit `a` gives `ABITS=32` and used to assert even for `a=5`; it now goes through
+`toBigInt()` for >= 32 bits). Mux selects were never affected (they use
+`toBigInt()`). If a new `toNumber()` appears in a digitaljs upgrade, treat it the same way.
 
 ## Patching digitaljs & friends (patch-package)
 
@@ -305,6 +339,17 @@ real typo/leak.
 
 ## Misc
 
+- `$readmemh`/`$readmemb` data files (`.hex`/`.mem`): `run_yosys` writes each one at its
+  project-relative name **and** at its bare basename (`data_file_paths`, applied after all
+  exact names so an alias never shadows a real root file). The `.sv` sources are flattened
+  into the synthesis dir root, so a bare `"control_unit.hex"` (the convention in the
+  `soc`/`micro` sources, written relative to the source file) only resolves through the
+  alias. Without it a nested file fails loudly: `failed to open file 'control_unit.hex'`.
+- Examples worth knowing: `test/verilog/micro/` is the RV32I datapath with plain `output`
+  bus ports; its `memory.hex` holds a tiny program (sum 5..1 into x2, store/load into x3,
+  spin on `jal x0,0`) and `test/pipeline.spec.mjs` simulates it. `test/verilog/soc/rtl/`
+  is the `inout`-bus version (`cpu_ram.sv` = CPU + RAM without the LED matrix, to check
+  that both `.hex` files loaded: the bus should alternate `0x0 -> 0x00010437 -> 0x4 ...`).
 - Yosys errors: on failure the script + yosys stdout/stderr are dumped to the
   "HDL Studio (Yosys)" OutputChannel and revealed (`src/requests.mjs`).
 - Known cosmetic limitation: `<vscode-checkbox>` with slotted text stacks its label

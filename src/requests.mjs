@@ -7,8 +7,9 @@ import * as fs from 'fs';
 import * as os from 'os';
 import { promisify } from 'util';
 import { yosys2digitaljs, io_ui } from 'yosys2digitaljs/core';
+import { split_inout_ports } from './inout_split.mjs';
 import * as digitaljs_transform from '../node_modules/digitaljs/src/transform.mjs';
-import { build_yosys_script, isHdlFile } from './yosys_script.mjs';
+import { build_yosys_script, isHdlFile, data_file_paths } from './yosys_script.mjs';
 
 const execFile = promisify(child_process.execFile);
 
@@ -20,7 +21,8 @@ function yosysLog() {
 }
 
 export function convert_yosys_json(raw, options = {}) {
-    let output = yosys2digitaljs(raw, options);
+    // inout ports -> input + output halves (yosys2digitaljs only knows in/out)
+    let output = yosys2digitaljs(split_inout_ports(raw), options);
     io_ui(output);
 
     if (options.transform)
@@ -68,18 +70,22 @@ export async function run_yosys(files, options) {
     try {
         // Write each source file with a mapped name to avoid path issues
         const mappedFiles = {};
+        const dataAliases = [];
         for (const [name, content] of Object.entries(files)) {
             if (!isHdlFile(name)) {
                 // Data file (e.g. .hex/.mem read via $readmemh/$readmemb):
                 // must exist on disk under its own (possibly nested) name for
                 // yosys to find it, but must never be read_verilog'd, so it's
-                // kept out of mappedFiles/FileMap entirely.
-                const fullPath = path.join(tmpDir, name);
+                // kept out of mappedFiles/FileMap entirely. Its bare-name
+                // alias (see data_file_paths) is written after all exact names.
+                const [exact, alias] = data_file_paths(name);
+                const fullPath = path.join(tmpDir, exact);
                 if (!fullPath.startsWith(tmpDir + path.sep)) {
                     throw { error: `Refusing to write source "${name}" outside the synthesis directory.` };
                 }
                 fs.mkdirSync(path.dirname(fullPath), { recursive: true });
                 fs.writeFileSync(fullPath, content);
+                if (alias) dataAliases.push([alias, content]);
                 continue;
             }
             const ext = path.extname(name);
@@ -88,6 +94,11 @@ export async function run_yosys(files, options) {
             const fullPath = path.join(tmpDir, mappedName);
             fs.writeFileSync(fullPath, content);
             mappedFiles[mappedName] = content;
+        }
+
+        for (const [alias, content] of dataAliases) {
+            const aliasPath = path.join(tmpDir, alias);
+            if (!fs.existsSync(aliasPath)) fs.writeFileSync(aliasPath, content);
         }
 
         const script = build_yosys_script(mappedFiles, { ...options, useSlang }) + `\njson -o ${outputJson}`;
