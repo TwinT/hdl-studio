@@ -310,7 +310,12 @@ export class Sources {
                 continue;
             const uri = info.uri;
             const doc = docs[uri_str];
-            const content = doc ? doc.getText() : await read_txt_file(uri);
+            let content;
+            try {
+                content = doc ? doc.getText() : await read_txt_file(uri);
+            } catch {
+                throw { error: `Can't read source file ${uri.fsPath}. Was it moved or deleted?` };
+            }
             info.sha512 = hash_sha512(content);
             data[info.name] = content;
         }
@@ -344,9 +349,9 @@ export class Sources {
         return this.#withSave(async () => {
             this.#clearCache();
             this.#prescanSources(basenames_map);
-            const data = await this.#loadSources();
             let res;
             try {
+                const data = await this.#loadSources();
                 res = await run_yosys(data, opts);
             }
             catch (e) {
