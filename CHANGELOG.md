@@ -5,6 +5,42 @@ All notable changes to HDL Studio will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.0] - 2026-10-15
+
+### Added
+- `inout` ports, on the top module and on submodules: a bus shared between
+  modules (e.g. a CPU and a RAM on one data bus) now synthesizes and
+  simulates, merging every module's drivers on the same net.
+- Control panel:
+  - **Reset**: back to tick 0 with registers and memories at their initial
+    values, without re-synthesizing.
+  - **Speed slider**, from 1 tick/s up to 10⁹ ticks/s, or max. It applies to
+    Start and to Lua scripts. While running, the panel also shows the speed
+    actually reached, since a large circuit can't keep up with a high setting.
+    It replaces the Fast-forward button (its "max" position).
+  - **Run for** a given simulated time (e.g. `2 us`), then pause.
+  - **Timescale** (`1 tick = 1 ns` by default), saved with the project. The
+    simulated time and the clock periods are shown in time units.
+  - LED matrix outputs are drawn as a small LED grid.
+  - Redesigned layout that follows the light and dark themes and fits a
+    narrow sidebar.
+- `$readmemh`/`$readmemb` files are also found by their bare name, so a
+  source in a subfolder can load a data file next to it.
+- Examples: `soc` (an RV32I CPU, RAM and a 16x32 LED matrix on an `inout`
+  bus, running a walking capybara) and `micro` with a real program.
+
+### Fixed
+- Saving and reopening a project, undo/redo and Reset lost tri-state bus
+  widths and LED matrix sizes, and could leave an empty schematic.
+- The simulation froze at tick 0 in the circuit view for designs with a
+  one-hot mux (e.g. a `case` on a decoded value, with the `transform` option).
+- A variable shift with a wide shift amount, or a memory with a wide address,
+  no longer stops the simulation.
+- Writing a part-select of a wide register (`r[i*W +: W] <= d`) failed to
+  synthesize.
+- Waiting for a tick that already had pending events (e.g. Lua `sim.sleep`)
+  crashed the simulation.
+
 ## [0.6.1] - 2026-09-25
 
 ### Fixed
