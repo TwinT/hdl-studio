@@ -12,7 +12,8 @@ yosys2digitaljs, digitaljs_lua and `@twint/4vl` (one commit per phase; loose end
 in `TODO.md`'s "Pending, noted during the Rust migration"). Crates: `hdlstudio-logic` (4vl port), `hdlstudio-netlist`
 (circuit model; its serde form is digitaljs's circuit JSON, field for field),
 `hdlstudio-yosys` (yosys JSON → circuit: port of yosys2digitaljs + our old patch,
-`io_ui`, the inout split and digitaljs's `transform.mjs`), `hdlstudio` (the binary).
+`io_ui`, the inout split and digitaljs's `transform.mjs`), `hdlstudio-sim` (the
+event-driven simulator, digitaljs's WorkerEngine semantics), `hdlstudio` (the binary).
 
 - `npm run compile` builds it (`compile:rust` = `cargo build --release`). The host
   runs `target/release/hdlstudio` (`src/hdlstudio_bin.mjs`, vscode-free; the root is
@@ -25,6 +26,19 @@ in `TODO.md`'s "Pending, noted during the Rust migration"). Crates: `hdlstudio-l
   it after an intended change). It reproduces yosys2digitaljs's quirks on purpose
   (device numbering, a Map typo that makes `$_DFF_P_` invalid, transform's dead
   sparse-mux test): semantic changes go in their own commits.
+- `hdlstudio-sim` flattens the hierarchy (subcircuits add neither delay nor
+  events in digitaljs's worker) and copies a queued cell's inputs lazily (only
+  when one changes in a later tick). `npm run test:simdiff`
+  (`test/simdiff/`) is its safety net: every example × {transform, no
+  transform, `defaultcomb`} runs on digitaljs's real WorkerEngine (a worker
+  thread, `src/` tree loaded in Node through a module hook) and on `hdlstudio
+  simtrace`, with a seeded stimulus; every cell output's end-of-tick values
+  must match line for line (glitches inside a tick depend on queue order, which
+  the engines don't share). Known digitaljs bugs hdlstudio fixes are patched
+  into digitaljs in `worker_boot.mjs`, so they are the only allowed
+  differences: today, Memory transparency compares addresses by value (JS
+  compared them by object). Speed: `cargo run --release -p hdlstudio-sim
+  --example bench -- circuit.json TICKS`.
 
 ## Architecture: host vs webview
 

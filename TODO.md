@@ -93,3 +93,17 @@
       MuxSparse `inputs` BigInts. Gone with digitaljs in the cutover.
 - [ ] Opening a raw yosys netlist on vscode.dev no longer works (conversion
       needs the native `hdlstudio`). Expected: the web build goes away.
+- [ ] Simulator divergences from digitaljs, on purpose: Memory transparency and
+      collision compare read/write addresses by value (digitaljs's JS `==`
+      compares objects, so it depended on whether a Mux or Dff happened to pass
+      the same object along); ticks are u64 (digitaljs's are int32: they wrap
+      after 2^31, ~2.1 s at 1 tick = 1 ns).
+- [ ] Simulator speed: the board runs at ~39k cycles/s, 9x digitaljs (the goal
+      was 10x). The cost is spread over evaluating and propagating; the next
+      steps are structural: fold the zero-delay bus cells (BusSlice/BusGroup,
+      a third of all evaluations) into their readers, and a narrow-value fast
+      path for nets of up to 64 bits.
+- [ ] Simulator features still to port for phase 4: monitors and alarms,
+      `memChange`/manual memory edits, parameter changes while running (a
+      Clock's period), FSM `current_state`/`next_trans` for the editor.
+

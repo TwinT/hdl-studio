@@ -146,3 +146,30 @@ fn matches_4vl() {
     );
 }
 
+
+/// `shift` against its definition with concat and slice, on every width
+/// around the word boundaries.
+#[test]
+fn shift_matches_concat_and_slice() {
+    let bits = [Bit::Zero, Bit::One, Bit::X, Bit::Z];
+    let mut seed = 7u64;
+    let mut rand = |n: u64| {
+        seed = seed.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+        (seed >> 33) % n
+    };
+    for width in [1, 2, 31, 63, 64, 65, 100, 127, 128, 129, 200] {
+        let v = LogicVec::from_bits(&(0..width).map(|_| bits[rand(4) as usize]).collect::<Vec<_>>());
+        for am in [-200i64, -129, -65, -64, -63, -33, -1, 0, 1, 7, 63, 64, 65, 128, 199, 300] {
+            for fill in bits {
+                let s = am.unsigned_abs() as usize;
+                let pad = LogicVec::make(s, fill);
+                let want = if am < 0 {
+                    LogicVec::concat(&[&pad, &v]).slice(0, width)
+                } else {
+                    LogicVec::concat(&[&v.slice(s.min(width), width), &pad]).slice(0, width)
+                };
+                assert_eq!(v.shift(am, fill), want, "width {width} am {am} fill {fill:?}");
+            }
+        }
+    }
+}

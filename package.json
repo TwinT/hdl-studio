@@ -366,9 +366,10 @@
         "watch-prod:webpack": "webpack --watch --mode production",
         "lint": "eslint .",
         "pretest": "npm run lint",
-        "test": "npm-run-all test:rust test:pipeline test:vscode",
+        "test": "npm-run-all test:rust test:pipeline test:simdiff test:vscode",
         "test:rust": "cargo test --workspace",
         "test:pipeline": "npm run compile:rust && mocha test/pipeline.spec.mjs",
+        "test:simdiff": "npm run compile:rust && mocha test/simdiff/simdiff.spec.mjs",
         "test:vscode": "node ./test/runTest.js",
         "open-in-browser": "vscode-test-web --extensionDevelopmentPath=. ."
     },

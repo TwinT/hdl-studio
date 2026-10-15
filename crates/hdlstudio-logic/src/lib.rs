@@ -54,10 +54,32 @@ impl Bit {
 /// Plane A words, then plane B words.
 type Words = SmallVec<[u64; 2]>;
 
-#[derive(Clone, PartialEq, Eq, Hash)]
+#[derive(Eq)]
 pub struct LogicVec {
     bits: usize,
     w: Words,
+}
+
+// Hot in the simulator: compared without a memcmp call.
+impl PartialEq for LogicVec {
+    fn eq(&self, o: &LogicVec) -> bool {
+        self.bits == o.bits && self.w.iter().zip(o.w.iter()).all(|(a, b)| a == b)
+    }
+}
+
+// Consistent with `eq`: both look at the width and the words.
+impl std::hash::Hash for LogicVec {
+    fn hash<H: std::hash::Hasher>(&self, h: &mut H) {
+        self.bits.hash(h);
+        self.w.hash(h);
+    }
+}
+
+// SmallVec's own Clone copies item by item; the words are Copy.
+impl Clone for LogicVec {
+    fn clone(&self) -> LogicVec {
+        LogicVec { bits: self.bits, w: Words::from_slice(&self.w) }
+    }
 }
 
 impl std::fmt::Debug for LogicVec {
@@ -89,8 +111,12 @@ fn field(p: &[u64], pos: usize, len: usize) -> u64 {
 
 /// Sets bits `from..to` of plane `p` to 1.
 fn fill_ones(p: &mut [u64], from: usize, to: usize) {
-    for i in from..to {
-        p[i / 64] |= 1 << (i % 64);
+    let mut i = from;
+    while i < to {
+        let (k, sh) = (i / 64, i % 64);
+        let len = (64 - sh).min(to - i);
+        p[k] |= if len == 64 { !0 } else { ((1 << len) - 1) << sh };
+        i += len;
     }
 }
 
@@ -111,6 +137,12 @@ impl LogicVec {
             v.w[2 * n - 1] &= m;
         }
         v
+    }
+
+    /// A vector of 1 to 64 bits from its two planes.
+    fn one_word(bits: usize, a: u64, b: u64) -> LogicVec {
+        let m = last_mask(bits);
+        LogicVec { bits, w: SmallVec::from_buf([a & m, b & m]) }
     }
 
     fn zeroed(bits: usize) -> Words {
@@ -177,7 +209,16 @@ impl LogicVec {
 
     /// Concatenation, least significant vector first.
     pub fn concat(vs: &[&LogicVec]) -> LogicVec {
-        let bits = vs.iter().map(|v| v.bits).sum();
+        let bits: usize = vs.iter().map(|v| v.bits).sum();
+        if (1..=64).contains(&bits) {
+            let (mut a, mut b, mut off) = (0, 0, 0);
+            for v in vs.iter().filter(|v| v.bits > 0) {
+                a |= v.w[0] << off;
+                b |= v.w[1] << off;
+                off += v.bits;
+            }
+            return Self::one_word(bits, a, b);
+        }
         let n = nwords(bits);
         let mut w = Self::zeroed(bits);
         let mut off = 0;
@@ -269,7 +310,7 @@ impl LogicVec {
     /// A number given as magnitude words and sign, in two's complement. Without
     /// `nbits`: just enough bits for a non-negative value (at least 1), and
     /// one more than the magnitude's for a negative one (4vl's `fromNumber`).
-    fn from_magnitude(neg: bool, mag: &[u64], nbits: Option<usize>) -> LogicVec {
+    pub fn from_magnitude(neg: bool, mag: &[u64], nbits: Option<usize>) -> LogicVec {
         let mag_bits = mag
             .iter()
             .rposition(|&x| x != 0)
@@ -426,6 +467,23 @@ impl LogicVec {
         self.bitwise(o, "xnor", |a1, b1, a2, b2| (!((a1 & a2) ^ (b1 | b2)), !((a1 | a2) & (b1 ^ b2))))
     }
 
+    /// Two drivers of one net, resolved (digitaljs's TriMerge): a z bit
+    /// yields to the other driver, equal bits pass, different ones are x.
+    pub fn resolve(&self, o: &LogicVec) -> LogicVec {
+        assert_eq!(self.bits, o.bits, "LogicVec::resolve() called with vectors of different sizes");
+        let n = nwords(self.bits);
+        let mut w = Self::zeroed(self.bits);
+        for i in 0..n {
+            let (sa, sb, oa, ob) = (self.w[i], self.w[n + i], o.w[i], o.w[n + i]);
+            let (zs, zo) = (sa & !sb, oa & !ob);
+            let eq = !((sa ^ oa) | (sb ^ ob));
+            let take_s = !zs & (zo | eq);
+            let x = !zs & !zo & !eq;
+            (w[i], w[n + i]) = ((zs & oa) | (take_s & sa), (zs & ob) | (take_s & sb) | x);
+        }
+        Self::from_words(self.bits, w)
+    }
+
     pub fn not(&self) -> LogicVec {
         let n = nwords(self.bits);
         let mut w = Self::zeroed(self.bits);
@@ -503,6 +561,9 @@ impl LogicVec {
     pub fn slice(&self, start: usize, end: usize) -> LogicVec {
         let end = end.min(self.bits).max(start);
         let bits = end - start;
+        if self.bits <= 64 && bits > 0 {
+            return Self::one_word(bits, self.w[0] >> start, self.w[1] >> start);
+        }
         let n = nwords(bits);
         let mut w = Self::zeroed(bits);
         for j in 0..n {
@@ -510,6 +571,54 @@ impl LogicVec {
             w[n + j] = field(self.b(), start + 64 * j, 64);
         }
         Self::from_words(bits, w)
+    }
+
+    /// Shifted right by `am` bits (left if negative), the vacated bits set
+    /// to `fill`; the width stays.
+    pub fn shift(&self, am: i64, fill: Bit) -> LogicVec {
+        let s = am.unsigned_abs() as usize;
+        if s == 0 {
+            return self.clone();
+        }
+        if s >= self.bits {
+            return LogicVec::make(self.bits, fill);
+        }
+        if self.bits <= 64 {
+            let (fa, fb) = fill.planes();
+            let (a, b) = (self.w[0], self.w[1]);
+            let low = (1u64 << s) - 1;
+            return if am < 0 {
+                Self::one_word(self.bits, (a << s) | (fa & low), (b << s) | (fb & low))
+            } else {
+                let high = low << (self.bits - s);
+                Self::one_word(self.bits, (a >> s) | (fa & high), (b >> s) | (fb & high))
+            };
+        }
+        let n = nwords(self.bits);
+        let mut w = Self::zeroed(self.bits);
+        for j in 0..n {
+            let lo = 64 * j;
+            for (plane, src) in [(0, self.a()), (n, self.b())] {
+                w[plane + j] = if am > 0 {
+                    field(src, lo + s, 64)
+                } else if lo >= s {
+                    field(src, lo - s, 64)
+                } else if lo + 64 > s {
+                    field(src, 0, 64 - (s - lo)) << (s - lo)
+                } else {
+                    0
+                };
+            }
+        }
+        let (from, to) = if am > 0 { (self.bits - s, self.bits) } else { (0, s) };
+        let (fa, fb) = fill.planes();
+        if fa != 0 {
+            fill_ones(&mut w[..n], from, to);
+        }
+        if fb != 0 {
+            fill_ones(&mut w[n..], from, to);
+        }
+        Self::from_words(self.bits, w)
     }
 
     /// Least significant bit first (4vl's `toArray`).
