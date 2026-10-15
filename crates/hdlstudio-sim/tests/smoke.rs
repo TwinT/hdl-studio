@@ -21,7 +21,7 @@ fn every_golden_circuit_runs() {
     for (name, circuit) in golden() {
         let mut sim = Sim::new(&circuit, false).unwrap_or_else(|e| panic!("{name}: {e}"));
         for _ in 0..2000 {
-            sim.update_gates();
+            sim.update_gates().unwrap();
         }
         assert_eq!(sim.tick(), 2000, "{name}");
     }
@@ -40,7 +40,7 @@ fn counter_counts() {
     let probe = sim.probes.iter().position(|p| p.path == from.id && p.port == from.port).unwrap();
     let run = |sim: &mut Sim, ticks| {
         for _ in 0..ticks {
-            sim.update_gates();
+            sim.update_gates().unwrap();
         }
     };
     sim.set_input(&id("rst"), LogicVec::ones(1)).unwrap();
@@ -49,4 +49,32 @@ fn counter_counts() {
     run(&mut sim, 200 * 5);
     let count = sim.value(&sim.probes[probe]).to_u64().unwrap();
     assert!((4..=6).contains(&count), "count {count} after 5 clock periods");
+}
+
+#[test]
+fn a_zero_delay_loop_that_never_settles_is_an_error() {
+    // y = sel ? ~y : 0 with no delay: once sel is 1 it toggles forever in the
+    // same tick (digitaljs hangs on it); until then it settles at 0
+    let circuit: Circuit = serde_json::from_value(serde_json::json!({
+        "devices": {
+            "dev0": { "type": "Button", "net": "sel", "order": 0, "bits": 1 },
+            "dev1": { "type": "Constant", "constant": "0" },
+            "dev2": { "type": "Not", "propagation": 0 },
+            "dev3": { "type": "Mux", "propagation": 0 }
+        },
+        "connectors": [
+            { "from": { "id": "dev0", "port": "out" }, "to": { "id": "dev3", "port": "sel" } },
+            { "from": { "id": "dev1", "port": "out" }, "to": { "id": "dev3", "port": "in0" } },
+            { "from": { "id": "dev2", "port": "out" }, "to": { "id": "dev3", "port": "in1" } },
+            { "from": { "id": "dev3", "port": "out" }, "to": { "id": "dev2", "port": "in" } }
+        ]
+    }))
+    .unwrap();
+    let mut sim = Sim::new(&circuit, false).unwrap();
+    for _ in 0..10 {
+        sim.update_gates().unwrap();
+    }
+    sim.set_input("dev0", LogicVec::ones(1)).unwrap();
+    let err = sim.update_gates().expect_err("the loop should be reported");
+    assert!(err.contains("did not settle"), "{err}");
 }

@@ -15,7 +15,7 @@ fn main() {
     let rst = circuit.devices.iter().find(|(_, d)| matches!(&d.cell, Cell::Button(io) if io.net == "rst"));
     let run_to = |sim: &mut Sim, t: u64| {
         while sim.has_pending_events() && sim.next_event_tick().is_some_and(|k| k < t) {
-            sim.update_gates_next();
+            sim.update_gates_next().unwrap();
         }
     };
     if let Some((id, _)) = rst {

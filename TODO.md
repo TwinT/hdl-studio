@@ -97,7 +97,9 @@
       collision compare read/write addresses by value (digitaljs's JS `==`
       compares objects, so it depended on whether a Mux or Dff happened to pass
       the same object along); ticks are u64 (digitaljs's are int32: they wrap
-      after 2^31, ~2.1 s at 1 tick = 1 ns).
+      after 2^31, ~2.1 s at 1 tick = 1 ns); a zero-delay loop that never
+      settles is an error ("combinational loop did not settle in tick N")
+      where digitaljs hangs.
 - [ ] Simulator speed: the board runs at ~39k cycles/s, 9x digitaljs (the goal
       was 10x). The cost is spread over evaluating and propagating; the next
       steps are structural: fold the zero-delay bus cells (BusSlice/BusGroup,

@@ -152,19 +152,22 @@ impl Sim {
     }
 
     /// Runs the current tick if it has events, else just moves past it.
-    pub fn update_gates(&mut self) -> usize {
+    pub fn update_gates(&mut self) -> Result<usize, String> {
         if self.queue.first_key_value().is_some_and(|(&k, _)| k == self.tick) {
             self.update_gates_next()
         } else {
             self.tick += 1;
-            0
+            Ok(0)
         }
     }
 
     /// Jumps to the next tick with events and runs it; returns how many
-    /// cells ran.
-    pub fn update_gates_next(&mut self) -> usize {
-        let Some((k, entries)) = self.queue.pop_first() else { return 0 };
+    /// cells ran. A zero-delay loop that never settles (each cell running
+    /// over and over in the same tick) is an error, where digitaljs hangs.
+    pub fn update_gates_next(&mut self) -> Result<usize, String> {
+        let Some((k, entries)) = self.queue.pop_first() else { return Ok(0) };
+        // ponytail: a fixed budget per cell; no real circuit gets near it
+        let limit = 100 * self.cells.len() + 10_000;
         self.tick = k;
         self.current = entries;
         self.running = true;
@@ -201,6 +204,12 @@ impl Sim {
                 self.set_net(net, v);
             }
             count += 1;
+            if count > limit {
+                self.running = false;
+                self.current = TickQueue::default();
+                self.tick = k + 1;
+                return Err(format!("combinational loop did not settle in tick {k}"));
+            }
         }
         self.running = false;
         let mut done = std::mem::take(&mut self.current);
@@ -208,7 +217,7 @@ impl Sim {
         done.copies.clear();
         self.spare.push(done);
         self.tick = k + 1;
-        count
+        Ok(count)
     }
 
     /// Nets whose value changed since the last call.
@@ -535,7 +544,7 @@ pub fn trace(circuit: &Circuit, ticks: u64, stimulus: &[(u64, String, String)], 
             let v = LogicVec::from_bin(v, Some(v.len())).ok_or("bad stimulus value")?;
             sim.set_input(id, v)?;
         }
-        sim.update_gates();
+        sim.update_gates()?;
         let mut idx: Vec<usize> = sim.take_changed().iter().flat_map(|n| by_net.get(n).into_iter().flatten().copied()).collect();
         idx.sort_unstable();
         idx.dedup();
