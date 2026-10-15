@@ -40,7 +40,7 @@ index 2cd5a5d..495f8db 100644
 +  });
 +});
 diff --git a/node_modules/digitaljs/lib/cells/arith.js b/node_modules/digitaljs/lib/cells/arith.js
-index 82c329f..563dab4 100644
+index 82c329f..cbef2c3 100644
 --- a/node_modules/digitaljs/lib/cells/arith.js
 +++ b/node_modules/digitaljs/lib/cells/arith.js
 @@ -5,7 +5,7 @@ Object.defineProperty(exports, "__esModule", {
@@ -89,16 +89,25 @@ index 82c329f..563dab4 100644
    return out.slice(0, bits_out);
  }
  
-@@ -220,7 +220,7 @@ const Shift = exports.Shift = Arith.define('Shift', {
+@@ -220,9 +220,15 @@ const Shift = exports.Shift = Arith.define('Shift', {
      const sgn = this.get('signed');
      const fillx = this.get('fillx');
      if (!data.in2.isFullyDefined) return {
 -      out: _vl.Vector3vl.xes(bits.out)
 +      out: _vl.Vector4vl.xes(bits.out)
      };
-     const am = data.in2.toNumber(sgn.in2) * this.shiftdir;
+-    const am = data.in2.toNumber(sgn.in2) * this.shiftdir;
++    // toNumber() asserts bits < 32, but yosys can hand us a wider amount
++    // (e.g. a 34-bit signed $shift from `a[i*W +: W] <= d`). Any
++    // |amount| >= max(in1, out) gives the same all-fill result, so
++    // saturate instead of throwing (and never allocate a huge vector).
++    const lim = BigInt(Math.max(bits.in1, bits.out));
++    const raw = data.in2.toBigInt(sgn.in2);
++    const am = Number(raw > lim ? lim : raw < -lim ? -lim : raw) * this.shiftdir;
      return {
-@@ -275,10 +275,10 @@ const Compare = exports.Compare = BaseCompare.define('Compare', {}, {
+       out: shiftHelp(data.in1, am, bits.in1, bits.out, sgn.in1, sgn.out, fillx)
+     };
+@@ -275,10 +281,10 @@ const Compare = exports.Compare = BaseCompare.define('Compare', {}, {
      const bits = this.get('bits');
      const sgn = this.get('signed');
      if (!data.in1.isFullyDefined || !data.in2.isFullyDefined) return {
@@ -111,7 +120,7 @@ index 82c329f..563dab4 100644
      };
    },
    _operationHelpers: BaseCompare.prototype._operationHelpers.concat(['arithcomp'])
-@@ -289,8 +289,8 @@ const EqCompare = exports.EqCompare = BaseCompare.define('EqCompare', {}, {
+@@ -289,8 +295,8 @@ const EqCompare = exports.EqCompare = BaseCompare.define('EqCompare', {}, {
    operation(data) {
      const bits = this.get('bits');
      const sgn = this.get('signed');
@@ -122,7 +131,7 @@ index 82c329f..563dab4 100644
      return {
        out: this.bincomp(in1, in2)
      };
-@@ -561,12 +561,12 @@ const ArithConst = exports.ArithConst = OpConst.define('ArithConst', {
+@@ -561,12 +567,12 @@ const ArithConst = exports.ArithConst = OpConst.define('ArithConst', {
      const sgn = this.get('signed');
      const constant = this.get('constant');
      if (!data.in.isFullyDefined) return {
@@ -138,20 +147,25 @@ index 82c329f..563dab4 100644
      };
    },
    _operationHelpers: OpConst.prototype._operationHelpers.concat(['arithop'])
-@@ -607,10 +607,10 @@ const ShiftConst = exports.ShiftConst = OpConst.define('ShiftConst', {
+@@ -607,10 +613,14 @@ const ShiftConst = exports.ShiftConst = OpConst.define('ShiftConst', {
      const constant = this.get('constant');
      if (this.get('leftOp')) {
        if (!data.in.isFullyDefined) return {
 -        out: _vl.Vector3vl.xes(bits.out)
 +        out: _vl.Vector4vl.xes(bits.out)
        };
-       const am = data.in.toNumber(sgn.in);
+-      const am = data.in.toNumber(sgn.in);
 -      const sig = _vl.Vector3vl.fromNumber(constant);
 +      const sig = _vl.Vector4vl.fromNumber(constant);
++      // same saturation as Shift.operation(): toNumber() would assert
++      // on a wide amount, and |amount| >= max(sig, out) is all-fill.
++      const lim = BigInt(Math.max(sig.bits, bits.out));
++      const raw = data.in.toBigInt(sgn.in);
++      const am = Number(raw > lim ? lim : raw < -lim ? -lim : raw);
        return {
          out: shiftHelp(sig, am * this.shiftdir, sig.bits, bits.out, constant < 0, sgn.out, fillx)
        };
-@@ -657,12 +657,12 @@ const CompareConst = exports.CompareConst = BaseCompareConst.define('CompareCons
+@@ -657,12 +667,12 @@ const CompareConst = exports.CompareConst = BaseCompareConst.define('CompareCons
      const sgn = this.get('signed');
      const constant = this.get('constant');
      if (!data.in.isFullyDefined) return {
@@ -167,7 +181,7 @@ index 82c329f..563dab4 100644
      };
    },
    _operationHelpers: BaseCompareConst.prototype._operationHelpers.concat(['arithcomp'])
-@@ -675,9 +675,9 @@ const EqCompareConst = exports.EqCompareConst = BaseCompareConst.define('EqCompa
+@@ -675,9 +685,9 @@ const EqCompareConst = exports.EqCompareConst = BaseCompareConst.define('EqCompa
      const sgn = this.get('signed');
      const constant = this.get('constant');
      if (this.get('leftOp')) return {
@@ -180,7 +194,7 @@ index 82c329f..563dab4 100644
    },
    _operationHelpers: BaseCompareConst.prototype._operationHelpers.concat(['bincomp'])
 diff --git a/node_modules/digitaljs/lib/cells/base.js b/node_modules/digitaljs/lib/cells/base.js
-index 3ca5527..5e7f14b 100644
+index 3ca5527..95106ef 100644
 --- a/node_modules/digitaljs/lib/cells/base.js
 +++ b/node_modules/digitaljs/lib/cells/base.js
 @@ -3,13 +3,24 @@
@@ -348,7 +362,7 @@ index 3ca5527..5e7f14b 100644
    },
    // Quick-and-dirty performance fix
 diff --git a/node_modules/digitaljs/lib/cells/bus.js b/node_modules/digitaljs/lib/cells/bus.js
-index ab33314..7e72ac8 100644
+index ab33314..e96eb69 100644
 --- a/node_modules/digitaljs/lib/cells/bus.js
 +++ b/node_modules/digitaljs/lib/cells/bus.js
 @@ -5,7 +5,7 @@ Object.defineProperty(exports, "__esModule", {
@@ -379,7 +393,7 @@ index ab33314..7e72ac8 100644
    }
  });
 diff --git a/node_modules/digitaljs/lib/cells/dff.js b/node_modules/digitaljs/lib/cells/dff.js
-index a940148..a318ff2 100644
+index a940148..e672371 100644
 --- a/node_modules/digitaljs/lib/cells/dff.js
 +++ b/node_modules/digitaljs/lib/cells/dff.js
 @@ -5,7 +5,7 @@ Object.defineProperty(exports, "__esModule", {
@@ -426,7 +440,7 @@ index a940148..a318ff2 100644
        if (this.get('no_data')) return apply_sr(this.get('outputSignals').out);
        return apply_sr(data.in);
 diff --git a/node_modules/digitaljs/lib/cells/display7.js b/node_modules/digitaljs/lib/cells/display7.js
-index 4c6d747..086b1e5 100644
+index 4c6d747..f404221 100644
 --- a/node_modules/digitaljs/lib/cells/display7.js
 +++ b/node_modules/digitaljs/lib/cells/display7.js
 @@ -6,8 +6,8 @@ Object.defineProperty(exports, "__esModule", {
@@ -441,7 +455,7 @@ index 4c6d747..086b1e5 100644
  /*
   * This is a standard 7-segment display element.
 diff --git a/node_modules/digitaljs/lib/cells/fsm.js b/node_modules/digitaljs/lib/cells/fsm.js
-index ec13773..4944f89 100644
+index ec13773..bc3189b 100644
 --- a/node_modules/digitaljs/lib/cells/fsm.js
 +++ b/node_modules/digitaljs/lib/cells/fsm.js
 @@ -8,7 +8,7 @@ var _jquery = _interopRequireDefault(require("jquery"));
@@ -474,7 +488,7 @@ index ec13773..4944f89 100644
        while (results.length > 1) {
          const other = results.pop();
 diff --git a/node_modules/digitaljs/lib/cells/gates.js b/node_modules/digitaljs/lib/cells/gates.js
-index 7424f83..5176b79 100644
+index 7424f83..6727536 100644
 --- a/node_modules/digitaljs/lib/cells/gates.js
 +++ b/node_modules/digitaljs/lib/cells/gates.js
 @@ -3,11 +3,12 @@
@@ -492,7 +506,7 @@ index 7424f83..5176b79 100644
  const xor_arc_path_markup = {
    tagName: 'path',
 diff --git a/node_modules/digitaljs/lib/cells/io.js b/node_modules/digitaljs/lib/cells/io.js
-index 30675da..d5fe269 100644
+index 30675da..e36618f 100644
 --- a/node_modules/digitaljs/lib/cells/io.js
 +++ b/node_modules/digitaljs/lib/cells/io.js
 @@ -3,11 +3,11 @@
@@ -818,7 +832,7 @@ index 0000000..e1af6d2
 +  }
 +});
 diff --git a/node_modules/digitaljs/lib/cells/memory.js b/node_modules/digitaljs/lib/cells/memory.js
-index 5ade418..e8c1847 100644
+index 5ade418..0050d0f 100644
 --- a/node_modules/digitaljs/lib/cells/memory.js
 +++ b/node_modules/digitaljs/lib/cells/memory.js
 @@ -7,7 +7,7 @@ exports.MemoryView = exports.Memory = void 0;
@@ -879,7 +893,20 @@ index 5ade418..e8c1847 100644
      };
      const update_last_clk = (portname, port) => {
        if ('clock_polarity' in port) {
-@@ -319,7 +319,7 @@ const MemoryView = exports.MemoryView = _base.BoxView.extend({
+@@ -279,7 +279,11 @@ const Memory = exports.Memory = _base.Box.define('Memory', {
+   },
+   _calcaddr(sig) {
+     if (!sig.isFullyDefined) return -1;
+-    return sig.toNumber() - this.get('offset');
++    // toNumber() asserts bits < 32, but yosys keeps the width of the index
++    // expression (a 32-bit signal into a 16-word memory gives ABITS=32).
++    // Past 2^53 precision is moot: it's out of range either way.
++    const addr = sig.bits < 32 ? sig.toNumber() : Number(sig.toBigInt());
++    return addr - this.get('offset');
+   },
+   *_memrdports() {
+     for (const [num, port] of this.get('rdports').entries()) yield ["rd" + num, port];
+@@ -319,7 +323,7 @@ const MemoryView = exports.MemoryView = _base.BoxView.extend({
    _displayEditor(evt) {
      evt.stopPropagation();
      const model = this.model;
@@ -888,7 +915,7 @@ index 5ade418..e8c1847 100644
      const div = (0, _jquery.default)('<div>', {
        title: "Memory contents: " + model.get('label')
      }).appendTo('html > body');
-@@ -328,7 +328,7 @@ const MemoryView = exports.MemoryView = _base.BoxView.extend({
+@@ -328,7 +332,7 @@ const MemoryView = exports.MemoryView = _base.BoxView.extend({
      //            '<button type="button" class="btn btn-secondary" title="Load contents">Load</button>' +
      //            '<button type="button" class="btn btn-secondary" title="Save contents">Save</button>' +
      //            '</div>' + 
@@ -897,7 +924,7 @@ index 5ade418..e8c1847 100644
      const words = model.get('words');
      const memdata = model.memdata;
      const ahex = Math.ceil(model.get('abits') / 4);
-@@ -371,15 +371,15 @@ const MemoryView = exports.MemoryView = _base.BoxView.extend({
+@@ -371,15 +375,15 @@ const MemoryView = exports.MemoryView = _base.BoxView.extend({
          col = col.next();
          for (let c = 0; c < columns; c++, col = col.next()) {
            if (address + r * columns + c >= words) break;
@@ -916,7 +943,7 @@ index 5ade418..e8c1847 100644
        columns = Math.min(words, 16, Math.ceil(32 / ds));
        address = Math.max(0, Math.min(words - rows * columns, address));
        const table = div.find('table');
-@@ -417,8 +417,8 @@ const MemoryView = exports.MemoryView = _base.BoxView.extend({
+@@ -417,8 +421,8 @@ const MemoryView = exports.MemoryView = _base.BoxView.extend({
        const r = target.closest('tr').index();
        const addr = address + r * columns + c;
        const bits = model.get('bits');
@@ -927,7 +954,7 @@ index 5ade418..e8c1847 100644
          memdata.set(addr, val);
          model.trigger('manualMemChange', model, addr, val);
          target.removeClass('invalid');
-@@ -429,7 +429,7 @@ const MemoryView = exports.MemoryView = _base.BoxView.extend({
+@@ -429,7 +433,7 @@ const MemoryView = exports.MemoryView = _base.BoxView.extend({
      const mem_change_cb = (addr, data) => {
        if (addr < address || addr > address + rows * columns) return;
        const numbase = get_numbase();
@@ -937,7 +964,7 @@ index 5ade418..e8c1847 100644
          z.addClass('flash');
        }, 10);
 diff --git a/node_modules/digitaljs/lib/cells/mux.js b/node_modules/digitaljs/lib/cells/mux.js
-index 1db63cf..df7474e 100644
+index 1db63cf..9ea1604 100644
 --- a/node_modules/digitaljs/lib/cells/mux.js
 +++ b/node_modules/digitaljs/lib/cells/mux.js
 @@ -6,7 +6,7 @@ Object.defineProperty(exports, "__esModule", {
@@ -1169,7 +1196,7 @@ index 0000000..d5a06fe
 +});
 +const TriMergeView = exports.TriMergeView = _base.BoxView;
 diff --git a/node_modules/digitaljs/lib/circuit.js b/node_modules/digitaljs/lib/circuit.js
-index 4511409..855c43e 100644
+index 4511409..ff0a5c2 100644
 --- a/node_modules/digitaljs/lib/circuit.js
 +++ b/node_modules/digitaljs/lib/circuit.js
 @@ -7,7 +7,7 @@ exports.engines = exports.cells = exports.HeadlessCircuit = void 0;
@@ -1247,7 +1274,7 @@ index 4511409..855c43e 100644
        this.monitor(cell, port, (tick, sig) => {
          resolve(tick);
 diff --git a/node_modules/digitaljs/lib/elkjs.js b/node_modules/digitaljs/lib/elkjs.js
-index bdb9b09..206ba26 100644
+index bdb9b09..bf9ba6e 100644
 --- a/node_modules/digitaljs/lib/elkjs.js
 +++ b/node_modules/digitaljs/lib/elkjs.js
 @@ -7,6 +7,23 @@ exports.elk_layout = elk_layout;
@@ -1284,7 +1311,7 @@ index bdb9b09..206ba26 100644
              'port.index': -i
            }
 diff --git a/node_modules/digitaljs/lib/engines/worker-worker.js b/node_modules/digitaljs/lib/engines/worker-worker.js
-index e0fc9ce..cc45690 100644
+index e0fc9ce..f48f7b6 100644
 --- a/node_modules/digitaljs/lib/engines/worker-worker.js
 +++ b/node_modules/digitaljs/lib/engines/worker-worker.js
 @@ -339,7 +339,16 @@ class WorkerEngineWorker {
@@ -1306,7 +1333,7 @@ index e0fc9ce..cc45690 100644
        tick,
        stopOnAlarm,
 diff --git a/node_modules/digitaljs/lib/engines/worker.js b/node_modules/digitaljs/lib/engines/worker.js
-index 1ea806b..50e19d9 100644
+index 1ea806b..09e6768 100644
 --- a/node_modules/digitaljs/lib/engines/worker.js
 +++ b/node_modules/digitaljs/lib/engines/worker.js
 @@ -6,7 +6,7 @@ Object.defineProperty(exports, "__esModule", {
@@ -1387,7 +1414,7 @@ index 1ea806b..50e19d9 100644
    _handle_ack(reqid, response) {
      this._resolvePromise(reqid, response);
 diff --git a/node_modules/digitaljs/lib/help.js b/node_modules/digitaljs/lib/help.js
-index 9fa0cc5..4149850 100644
+index 9fa0cc5..5ce81e8 100644
 --- a/node_modules/digitaljs/lib/help.js
 +++ b/node_modules/digitaljs/lib/help.js
 @@ -3,12 +3,12 @@
@@ -1443,7 +1470,7 @@ index 9fa0cc5..4149850 100644
  }
  ;
 diff --git a/node_modules/digitaljs/lib/iopanel.js b/node_modules/digitaljs/lib/iopanel.js
-index 3aba3d7..f6f9472 100644
+index 3aba3d7..8e35f1b 100644
 --- a/node_modules/digitaljs/lib/iopanel.js
 +++ b/node_modules/digitaljs/lib/iopanel.js
 @@ -7,7 +7,7 @@ exports.IOPanelView = void 0;
@@ -1537,7 +1564,7 @@ index 3aba3d7..f6f9472 100644
        });
      }
 diff --git a/node_modules/digitaljs/lib/monitor.js b/node_modules/digitaljs/lib/monitor.js
-index 829fd07..f7a9f1d 100644
+index 829fd07..f6a7a36 100644
 --- a/node_modules/digitaljs/lib/monitor.js
 +++ b/node_modules/digitaljs/lib/monitor.js
 @@ -7,7 +7,7 @@ exports.MonitorView = exports.Monitor = void 0;
@@ -1629,7 +1656,7 @@ index 829fd07..f7a9f1d 100644
      const row = (0, _jquery.default)('<tr><td class="name"></td><td>' + base_sel + '</td><td>' + trigger + '</td><td>' + this._removeButtonMarkup + '</td><td><canvas class="wavecanvas" height="30" draggable="true"></canvas></td></tr>');
      row.attr('wireid', wireid);
 diff --git a/node_modules/digitaljs/lib/transform.js b/node_modules/digitaljs/lib/transform.js
-index 7f0e172..81272f2 100644
+index 7f0e172..3caa95b 100644
 --- a/node_modules/digitaljs/lib/transform.js
 +++ b/node_modules/digitaljs/lib/transform.js
 @@ -13,7 +13,7 @@ exports.removeRepeater = removeRepeater;
@@ -1671,7 +1698,7 @@ index 9b290fe..9fa4f29 100644
 +export * from "./cells/trimerge.mjs";
 +export * from "./cells/tribuf.mjs";
 diff --git a/node_modules/digitaljs/src/cells/arith.mjs b/node_modules/digitaljs/src/cells/arith.mjs
-index ca5f960..23965f4 100644
+index ca5f960..5a36b07 100644
 --- a/node_modules/digitaljs/src/cells/arith.mjs
 +++ b/node_modules/digitaljs/src/cells/arith.mjs
 @@ -1,7 +1,7 @@
@@ -1723,16 +1750,24 @@ index ca5f960..23965f4 100644
      return out.slice(0, bits_out);
  }
  
-@@ -140,7 +140,7 @@ export const Shift = Arith.define('Shift', {
+@@ -140,8 +140,14 @@ export const Shift = Arith.define('Shift', {
          const sgn = this.get('signed');
          const fillx = this.get('fillx');
          if (!data.in2.isFullyDefined)
 -            return { out: Vector3vl.xes(bits.out) };
+-        const am = data.in2.toNumber(sgn.in2) * this.shiftdir;
 +            return { out: Vector4vl.xes(bits.out) };
-         const am = data.in2.toNumber(sgn.in2) * this.shiftdir;
++        // toNumber() asserts bits < 32, but yosys can hand us a wider amount
++        // (e.g. a 34-bit signed $shift from `a[i*W +: W] <= d`). Any
++        // |amount| >= max(in1, out) gives the same all-fill result, so
++        // saturate instead of throwing (and never allocate a huge vector).
++        const lim = BigInt(Math.max(bits.in1, bits.out));
++        const raw = data.in2.toBigInt(sgn.in2);
++        const am = Number(raw > lim ? lim : raw < -lim ? -lim : raw) * this.shiftdir;
          return { out: shiftHelp(data.in1, am, bits.in1, bits.out, sgn.in1, sgn.out, fillx) };
      },
-@@ -177,9 +177,9 @@ export const Compare = BaseCompare.define('Compare', {}, {
+     _gateParams: Arith.prototype._gateParams.concat(['fillx']),
+@@ -177,9 +183,9 @@ export const Compare = BaseCompare.define('Compare', {}, {
          const bits = this.get('bits');
          const sgn = this.get('signed');
          if (!data.in1.isFullyDefined || !data.in2.isFullyDefined)
@@ -1744,7 +1779,7 @@ index ca5f960..23965f4 100644
                      data.in1.toBigInt(sgn.in1 && sgn.in2),
                      data.in2.toBigInt(sgn.in1 && sgn.in2)))
          };
-@@ -193,9 +193,9 @@ export const EqCompare = BaseCompare.define('EqCompare', {}, {
+@@ -193,9 +199,9 @@ export const EqCompare = BaseCompare.define('EqCompare', {}, {
          const bits = this.get('bits');
          const sgn = this.get('signed');
          const in1 = bits.in1 >= bits.in2 ? data.in1 : 
@@ -1756,7 +1791,7 @@ index ca5f960..23965f4 100644
          return {
              out: this.bincomp(in1, in2)
          };
-@@ -429,16 +429,16 @@ export const ArithConst = OpConst.define('ArithConst', {
+@@ -429,16 +435,16 @@ export const ArithConst = OpConst.define('ArithConst', {
          const sgn = this.get('signed');
          const constant = this.get('constant');
          if (!data.in.isFullyDefined)
@@ -1776,19 +1811,24 @@ index ca5f960..23965f4 100644
                      data.in.toBigInt(sgn.in), BigInt(constant)), bits.out)
              };
      },
-@@ -468,9 +468,9 @@ export const ShiftConst = OpConst.define('ShiftConst', {
+@@ -468,9 +474,13 @@ export const ShiftConst = OpConst.define('ShiftConst', {
          const constant = this.get('constant');
          if (this.get('leftOp')) {
              if (!data.in.isFullyDefined)
 -                return { out: Vector3vl.xes(bits.out) };
-+                return { out: Vector4vl.xes(bits.out) };
-             const am = data.in.toNumber(sgn.in);
+-            const am = data.in.toNumber(sgn.in);
 -            const sig = Vector3vl.fromNumber(constant);
++                return { out: Vector4vl.xes(bits.out) };
 +            const sig = Vector4vl.fromNumber(constant);
-             return { 
++            // same saturation as Shift.operation(): toNumber() would assert
++            // on a wide amount, and |amount| >= max(sig, out) is all-fill.
++            const lim = BigInt(Math.max(sig.bits, bits.out));
++            const raw = data.in.toBigInt(sgn.in);
++            const am = Number(raw > lim ? lim : raw < -lim ? -lim : raw);
+             return {
                  out: shiftHelp(sig, am * this.shiftdir, sig.bits, bits.out, constant < 0, sgn.out, fillx) 
              };
-@@ -509,16 +509,16 @@ export const CompareConst = BaseCompareConst.define('CompareConst', {}, {
+@@ -509,16 +519,16 @@ export const CompareConst = BaseCompareConst.define('CompareConst', {}, {
          const sgn = this.get('signed');
          const constant = this.get('constant');
          if (!data.in.isFullyDefined)
@@ -1808,7 +1848,7 @@ index ca5f960..23965f4 100644
                      data.in.toBigInt(sgn.in), 
                      BigInt(constant)))
              };
-@@ -534,11 +534,11 @@ export const EqCompareConst = BaseCompareConst.define('EqCompareConst', {}, {
+@@ -534,11 +544,11 @@ export const EqCompareConst = BaseCompareConst.define('EqCompareConst', {}, {
          const constant = this.get('constant');
          if (this.get('leftOp'))
              return {
@@ -2442,7 +2482,7 @@ index 0000000..5d2b14d
 +    },
 +});
 diff --git a/node_modules/digitaljs/src/cells/memory.mjs b/node_modules/digitaljs/src/cells/memory.mjs
-index fb7f101..b69a1f4 100644
+index fb7f101..92704a9 100644
 --- a/node_modules/digitaljs/src/cells/memory.mjs
 +++ b/node_modules/digitaljs/src/cells/memory.mjs
 @@ -3,7 +3,7 @@
@@ -2512,7 +2552,20 @@ index fb7f101..b69a1f4 100644
          };
          const update_last_clk = (portname, port) => {
              if ('clock_polarity' in port) {
-@@ -271,7 +271,7 @@ export const MemoryView = BoxView.extend({
+@@ -230,7 +230,11 @@ export const Memory = Box.define('Memory', {
+     },
+     _calcaddr(sig) {
+         if (!sig.isFullyDefined) return -1;
+-        return sig.toNumber() - this.get('offset');
++        // toNumber() asserts bits < 32, but yosys keeps the width of the index
++        // expression (a 32-bit signal into a 16-word memory gives ABITS=32).
++        // Past 2^53 precision is moot: it's out of range either way.
++        const addr = sig.bits < 32 ? sig.toNumber() : Number(sig.toBigInt());
++        return addr - this.get('offset');
+     },
+     * _memrdports() {
+         for (const [num, port] of this.get('rdports').entries())
+@@ -271,7 +275,7 @@ export const MemoryView = BoxView.extend({
      _displayEditor(evt) {
          evt.stopPropagation();
          const model = this.model;
@@ -2521,7 +2574,7 @@ index fb7f101..b69a1f4 100644
          const div = $('<div>', {
              title: "Memory contents: " + model.get('label')
          }).appendTo('html > body');
-@@ -286,7 +286,7 @@ export const MemoryView = BoxView.extend({
+@@ -286,7 +290,7 @@ export const MemoryView = BoxView.extend({
  //            '<button type="button" class="btn btn-secondary" title="Save contents">Save</button>' +
  //            '</div>' + 
              '<div class="input-group">' +
@@ -2530,7 +2583,7 @@ index fb7f101..b69a1f4 100644
              '</div>' +
              '</div>' +
              '<table class="memeditor">' +
-@@ -332,7 +332,7 @@ export const MemoryView = BoxView.extend({
+@@ -332,7 +336,7 @@ export const MemoryView = BoxView.extend({
                  col = col.next();
                  for (let c = 0; c < columns; c++, col = col.next()) {
                      if (address + r * columns + c >= words) break;
@@ -2539,7 +2592,7 @@ index fb7f101..b69a1f4 100644
                                       .removeClass('invalid');
                  }
              }
-@@ -340,8 +340,8 @@ export const MemoryView = BoxView.extend({
+@@ -340,8 +344,8 @@ export const MemoryView = BoxView.extend({
          };
          const redraw = () => {
              const numbase = get_numbase();
@@ -2550,7 +2603,7 @@ index fb7f101..b69a1f4 100644
              columns = Math.min(words, 16, Math.ceil(32/ds));
              address = Math.max(0, Math.min(words - rows * columns, address));
              const table = div.find('table');
-@@ -383,8 +383,8 @@ export const MemoryView = BoxView.extend({
+@@ -383,8 +387,8 @@ export const MemoryView = BoxView.extend({
              const r = target.closest('tr').index();
              const addr = address + r * columns + c;
              const bits = model.get('bits');
@@ -2561,7 +2614,7 @@ index fb7f101..b69a1f4 100644
                  memdata.set(addr, val);
                  model.trigger('manualMemChange', model, addr, val);
                  target.removeClass('invalid');
-@@ -396,7 +396,7 @@ export const MemoryView = BoxView.extend({
+@@ -396,7 +400,7 @@ export const MemoryView = BoxView.extend({
              if (addr < address || addr > address + rows * columns) return;
              const numbase = get_numbase();
              const z = getCell(addr)
