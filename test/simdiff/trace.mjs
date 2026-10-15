@@ -1,7 +1,7 @@
 // Differential simulation harness, digitaljs side: runs a circuit on
-// digitaljs's own engine (HeadlessCircuit + SynchEngine, src/ tree) and
-// writes a trace that hdlstudio's engine must reproduce line for line.
-// Temporary: it goes away with digitaljs.
+// digitaljs's own engine (HeadlessCircuit + the WorkerEngine the extension
+// uses, src/ tree) and writes a trace that hdlstudio's engine must
+// reproduce line for line. Temporary: it goes away with digitaljs.
 //
 // Trace format, one line per value:
 //   init <path>.<port> <value>   every cell output after construction
@@ -11,7 +11,7 @@
 // Only end-of-tick values are compared: glitches inside a tick depend on the
 // order zero-delay cells run in, which the engines don't have to share.
 
-import { HeadlessCircuit, Vector4vl } from './digitaljs_src.mjs';
+import { HeadlessCircuit, WorkerEngine, Vector4vl, workerURL } from './digitaljs_src.mjs';
 
 // mulberry32, so a seed always gives the same stimulus
 function rng(seed) {
@@ -49,9 +49,14 @@ export function makeStimulus(circuit, { ticks, seed = 1, every = 300 }) {
     return events.sort((a, b) => a[0] - b[0]);
 }
 
-export function digitaljsTrace(circuitJson, { ticks, stimulus, defaultcomb = false }) {
-    const circuit = new HeadlessCircuit(JSON.parse(JSON.stringify(circuitJson)),
-        defaultcomb ? { defaultCombinationalPropagation: 0 } : {});
+export async function digitaljsTrace(circuitJson, { ticks, stimulus, defaultcomb = false }) {
+    const circuit = new HeadlessCircuit(JSON.parse(JSON.stringify(circuitJson)), {
+        engine: WorkerEngine,
+        engineOptions: { workerURL },
+        ...(defaultcomb ? { defaultCombinationalPropagation: 0 } : {}),
+    });
+    let failure;
+    circuit._engine._worker.addEventListener('error', (e) => { failure = e.error ?? e; });
     const lines = [];
     const last = new Map();
     const touched = new Set();
@@ -64,8 +69,11 @@ export function digitaljsTrace(circuitJson, { ticks, stimulus, defaultcomb = fal
             if (cell.get('type') === 'Subcircuit')
                 walk(cell.get('graph'), path + '/');
         }
+        // the worker only reports the outputs of observed graphs
+        circuit._engine.observeGraph(graph);
     };
     walk(circuit._graph, '');
+    await circuit.synchronize();
     const byPath = new Map(cells);
     const emit = (tick, path) => {
         const sigs = byPath.get(path).get('outputSignals');
@@ -88,7 +96,8 @@ export function digitaljsTrace(circuitJson, { ticks, stimulus, defaultcomb = fal
             const [, id, v] = stimulus[next];
             circuit.setInput(id, Vector4vl.fromBin(v, v.length));
         }
-        circuit.updateGates();
+        await circuit.updateGates({ synchronous: true });
+        if (failure) throw failure;
         lines.push(...[...touched].sort().flatMap((p) => emit(t, p)));
         touched.clear();
     }
