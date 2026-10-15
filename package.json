@@ -357,6 +357,7 @@
         "postinstall": "patch-package",
         "vscode:prepublish": "npm run compile",
         "compile": "npm-run-all compile:*",
+        "compile:rust": "cargo build --release",
         "compile:views": "webpack --mode production",
         "watch": "npm-run-all watch:*",
         "watch:webpack": "webpack --watch --mode development",

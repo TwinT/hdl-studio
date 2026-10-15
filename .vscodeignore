@@ -20,3 +20,7 @@ imgs/screenshots/
 node_modules/
 !node_modules/@vscode/webview-ui-toolkit/dist/toolkit.min.js
 !node_modules/@vscode/codicons/dist/
+crates/**
+target/**
+Cargo.toml
+Cargo.lock

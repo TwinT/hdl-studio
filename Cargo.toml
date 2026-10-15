@@ -1,0 +1,11 @@
+[workspace]
+resolver = "3"
+members = ["crates/*"]
+
+[workspace.package]
+version = "0.7.0"
+edition = "2024"
+license = "BSD-2-Clause"
+
+[profile.release]
+debug = "line-tables-only"

@@ -1,0 +1,8 @@
+[package]
+name = "hdlstudio"
+description = "HDL Studio engine: yosys import, simulation and Lua, driven by the VS Code extension over stdio"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
