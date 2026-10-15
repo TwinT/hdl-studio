@@ -333,6 +333,26 @@ endmodule
         }
     });
 
+    // Regression: the WorkerEngine's worker-side Gate never runs a cell's
+    // initialize(); it only calls cell.prepare.call(gate) and copies the
+    // _operationHelpers. MuxSparse (what `transform` makes of a one-hot mux)
+    // used to compute _inputsBigInt in initialize(), so its first evaluation
+    // threw inside the worker and froze the clock at tick 0 (board/soc/micro
+    // showed nothing). SynchEngine builds real cells, so only this emulation
+    // of the worker's gate sees it.
+    it('MuxSparse.muxInput works on a worker-style gate (prepare, no initialize)', function () {
+        const require = createRequire(import.meta.url);
+        const { MuxSparse } = require('../node_modules/digitaljs/lib/cells.js');
+        const { Vector4vl } = require('@twint/4vl');
+        const params = { inputs: [1, 5], default_input: false };
+        const gate = { get: (k) => params[k] };
+        MuxSparse.prototype.prepare.call(gate);
+        const muxInput = (v) => MuxSparse.prototype.muxInput.call(gate, v);
+        assert.strictEqual(muxInput(Vector4vl.fromNumber(5, 3)), 1);
+        assert.strictEqual(muxInput(Vector4vl.fromNumber(2, 3)), undefined);
+        assert.strictEqual(muxInput(Vector4vl.xes(3)), undefined);
+    });
+
     // The micro's memory.hex used to be a 2-word placeholder: the CPU fetched
     // two zero words, then an uninitialized (x) one, and everything went x
     // forever. It now holds a small RV32I program (sum 5+4+3+2+1 in x2, store

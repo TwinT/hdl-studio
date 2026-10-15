@@ -964,7 +964,7 @@ index 5ade418..0050d0f 100644
          z.addClass('flash');
        }, 10);
 diff --git a/node_modules/digitaljs/lib/cells/mux.js b/node_modules/digitaljs/lib/cells/mux.js
-index 1db63cf..9ea1604 100644
+index 1db63cf..abbc11b 100644
 --- a/node_modules/digitaljs/lib/cells/mux.js
 +++ b/node_modules/digitaljs/lib/cells/mux.js
 @@ -6,7 +6,7 @@ Object.defineProperty(exports, "__esModule", {
@@ -985,15 +985,21 @@ index 1db63cf..9ea1604 100644
      };
      return {
        out: data['in' + i]
-@@ -196,7 +196,7 @@ const MuxSparse = exports.MuxSparse = GenMux.define('MuxSparse', {
+@@ -194,10 +194,10 @@ const MuxSparse = exports.MuxSparse = GenMux.define('MuxSparse', {
+   inputs: undefined,
+   default_input: false
  }, {
-   initialize() {
-     const inputs = this.get('inputs');
+-  initialize() {
+-    const inputs = this.get('inputs');
 -    for (let i = 0; i < inputs.length; i++) if (typeof inputs[i] != 'bigint') inputs[i] = BigInt(inputs[i]);
-+    this._inputsBigInt = inputs.map(x => typeof x === 'bigint' ? x : BigInt(x));
-     GenMux.prototype.initialize.apply(this, arguments);
+-    GenMux.prototype.initialize.apply(this, arguments);
++  // prepare(), not initialize(): the WorkerEngine's worker-side Gate never runs
++  // initialize(), only cell.prepare.call(gate), and muxInput() needs this there.
++  prepare() {
++    this._inputsBigInt = this.get('inputs').map(x => typeof x === 'bigint' ? x : BigInt(x));
    },
    muxInputs(n) {
+     if (this.get('default_input')) return ['*'].concat(this.get('inputs'));else return this.get('inputs');
 @@ -205,7 +205,7 @@ const MuxSparse = exports.MuxSparse = GenMux.define('MuxSparse', {
    muxInput(i) {
      const deflt = this.get('default_input');
@@ -2624,7 +2630,7 @@ index fb7f101..92704a9 100644
                  .removeClass('flash');
              setTimeout(() => { z.addClass('flash') }, 10);
 diff --git a/node_modules/digitaljs/src/cells/mux.mjs b/node_modules/digitaljs/src/cells/mux.mjs
-index a8e6a67..2302ada 100644
+index a8e6a67..fb41dab 100644
 --- a/node_modules/digitaljs/src/cells/mux.mjs
 +++ b/node_modules/digitaljs/src/cells/mux.mjs
 @@ -2,7 +2,7 @@
@@ -2645,17 +2651,23 @@ index a8e6a67..2302ada 100644
          return { out: data['in' + i] };
      },
      getLayoutSize() {
-@@ -165,9 +165,7 @@ export const MuxSparse = GenMux.define('MuxSparse', {
+@@ -163,12 +163,10 @@ export const MuxSparse = GenMux.define('MuxSparse', {
+     inputs: undefined,
+     default_input: false
  }, {
-     initialize() {
-         const inputs = this.get('inputs');
+-    initialize() {
+-        const inputs = this.get('inputs');
 -        for (let i = 0; i < inputs.length; i++)
 -            if (typeof inputs[i] != 'bigint')
 -                inputs[i] = BigInt(inputs[i]);
-+        this._inputsBigInt = inputs.map(x => typeof x === 'bigint' ? x : BigInt(x));
-         GenMux.prototype.initialize.apply(this, arguments);
+-        GenMux.prototype.initialize.apply(this, arguments);
++    // prepare(), not initialize(): the WorkerEngine's worker-side Gate never runs
++    // initialize(), only cell.prepare.call(gate), and muxInput() needs this there.
++    prepare() {
++        this._inputsBigInt = this.get('inputs').map(x => typeof x === 'bigint' ? x : BigInt(x));
      },
      muxInputs(n) {
+         if (this.get('default_input'))
 @@ -179,7 +177,7 @@ export const MuxSparse = GenMux.define('MuxSparse', {
      muxInput(i) {
          const deflt = this.get('default_input');
