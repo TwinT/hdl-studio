@@ -547,6 +547,38 @@ class DialogContext {
     }
 }
 
+// Memory contents per `<subcircuit type>|<device id>` ('' for the top level).
+function collect_memdata(data) {
+    const mem = new Map();
+    const scan = (type, devices) => {
+        for (const [id, dev] of Object.entries(devices || {})) {
+            if (dev.type === 'Memory')
+                mem.set(`${type}|${id}`, dev.memdata?.slice()); // flat array (Mem4vl.toJSON)
+        }
+    };
+    scan('', data.devices);
+    for (const [type, sub] of Object.entries(data.subcircuits || {}))
+        scan(type, sub.devices);
+    return mem;
+}
+
+function restore_memdata(data, mem) {
+    const restore = (type, devices) => {
+        for (const [id, dev] of Object.entries(devices || {})) {
+            if (dev.type !== 'Memory')
+                continue;
+            const key = `${type}|${id}`;
+            if (mem.get(key) === undefined)
+                delete dev.memdata;
+            else
+                dev.memdata = mem.get(key).slice();
+        }
+    };
+    restore('', data.devices);
+    for (const [type, sub] of Object.entries(data.subcircuits || {}))
+        restore(type, sub.devices);
+}
+
 class DigitalJS {
     #iopanel
     #monitor
@@ -563,6 +595,9 @@ class DigitalJS {
     #dialog_key_count = 0
     #latest_dialog
     #restoreDialogKey
+    #speed = 100 // ticks/s; null = as fast as possible (startFast)
+    #lastOpts = {}
+    #initialMem = new Map()
     constructor() {
         this.circuit = undefined;
         this.#lua = new LuaRunner(this);
@@ -619,7 +654,19 @@ class DigitalJS {
         }
         switch (message.command) {
             case 'showcircuit':
+                if ('speed' in message.opts)
+                    this.#speed = message.opts.speed;
+                this.#lastOpts = message.opts;
                 this.#mkCircuit(message.circuit, message.opts);
+                return;
+            case 'setspeed':
+                this.#setSpeed(message.speed);
+                return;
+            case 'resetsim':
+                this.#resetSim();
+                return;
+            case 'runfor':
+                this.#runFor(message.ticks);
                 return;
             case 'pausesim':
                 this.pauseSim();
@@ -632,9 +679,6 @@ class DigitalJS {
                 return;
             case 'nexteventsim':
                 this.#nextEventSim();
-                return;
-            case 'fastforwardsim':
-                this.#fastForwardSim();
                 return;
             case 'runlua':
                 this.#lua.run(message.name, message.script, message.isrepl, message.label);
@@ -1119,9 +1163,10 @@ class DigitalJS {
         const circuit_opts = {
             layoutEngine: opts.layout === 'dagre' ? 'dagre' : 'elkjs',
             engine: Engine,
+            // a reset keeps the dialogs (keep) but not the simulation state
             engineOptions: { workerURL: window.simWorkerUri,
-                             signals: opts.keep ? old_states.signals : undefined,
-                             initTick: opts.keep ? old_states.tick : undefined },
+                             signals: opts.keep && !opts.reset ? old_states.signals : undefined,
+                             initTick: opts.keep && !opts.reset ? old_states.tick : undefined },
             windowCallback: (type, div, close_cb, opts) => {
                 // digitaljs 0.14.2 does not pass the model object here, so opts
                 // may be undefined. Derive what we need from the paper attached
@@ -1310,8 +1355,10 @@ class DigitalJS {
         this.circuit.on('postUpdateGates', (tick) => {
             vscode.postMessage({ command: "tick", tick });
         });
+        if (!opts.keep)
+            this.#initialMem = collect_memdata(data);
         if (run_circuit)
-            this.circuit.start();
+            this.startSim();
         this.#monitor = new Monitor(this.circuit);
         if (this.#monitormem) {
             this.#monitor.loadWiresDesc(this.#monitormem, opts.keep);
@@ -1436,7 +1483,43 @@ class DigitalJS {
         this.circuit.stop();
     }
     startSim() {
+        if (this.#speed === null) {
+            this.circuit.startFast();
+            return;
+        }
+        this.circuit.interval = 1000 / this.#speed;
         this.circuit.start();
+    }
+    #setSpeed(speed) {
+        this.#speed = speed;
+        // stop + start also covers switching between start() and startFast()
+        if (this.circuit?.running) {
+            this.circuit.stop();
+            this.startSim();
+        }
+    }
+    // Run `ticks` ticks flat out, then pause (an alarm with stopOnAlarm;
+    // returning true keeps the engine stopped, see _resumeAfterCallback).
+    async #runFor(ticks) {
+        if (!this.circuit)
+            return;
+        if (this.circuit.running)
+            await this.circuit.stop({ synchronous: true });
+        this.circuit.alarm(this.circuit.tick + ticks, () => true, { stopOnAlarm: true });
+        this.circuit.startFast();
+    }
+    // Rebuild the circuit at tick 0: registers back to their initial values,
+    // memories back to what they held when the circuit was built (toJSON()
+    // serializes Memory's *current* contents), while keeping the layout, the
+    // open dialogs and edited parameters such as a Clock's period. Runtime
+    // only: the document isn't touched.
+    async #resetSim() {
+        if (!this.circuit)
+            return;
+        const data = this.circuit.toJSON();
+        restore_memdata(data, this.#initialMem);
+        await this.#mkCircuit(data, { ...this.#lastOpts, keep: true, reset: true, run: false, pause: true });
+        vscode.postMessage({ command: 'tick', tick: 0 });
     }
     #singleStepSim() {
         this.circuit.updateGates();
@@ -1444,10 +1527,6 @@ class DigitalJS {
     }
     #nextEventSim() {
         this.circuit.updateGatesNext();
-        this.updateRunStates();
-    }
-    #fastForwardSim() {
-        this.circuit.startFast();
         this.updateRunStates();
     }
 }

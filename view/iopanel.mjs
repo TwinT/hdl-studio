@@ -81,6 +81,11 @@ export class RemoteIOPanel extends Backbone.View {
     _addOutput(cell) {
         const row = this._createRow(cell);
         row.dir = 'output';
+        row.type = cell.get('type');
+        if (row.type === 'LEDMatrix') { // drawn as a small LED grid in the control panel
+            row.rows = cell.get('rows');
+            row.cols = cell.get('cols');
+        }
         this.view.push(row);
         const bits = cell.get('bits');
         row.bits = bits;

@@ -224,6 +224,15 @@ three call sites in `digitaljs/src` and all are now safe for wide values: `Shift
   `patch-package` re-diffs the whole package), then run `node --check` on
   the touched `lib/*.js` files after a fresh install regardless of how small
   the edit looks.
+  Known instance: the stock `lib/*.js` files have no trailing newline, and the
+  patch appends to the end of `lib/cells.js` (the tribuf export block).
+  Applying the patch leaves that file without a final `\n`. So **before every
+  `npx patch-package digitaljs`, run `echo >> node_modules/digitaljs/lib/cells.js`**.
+  Otherwise the regenerated patch records "No newline at end of file" and the
+  next install drops its last `});` (`node --check` fails). The reliable
+  check is a round trip: copy `node_modules/digitaljs` aside, regenerate,
+  `rm -rf` + `npm install`, then `diff -r`. Only the missing final newline of
+  `lib/cells.js` should differ.
 
 ## Lua script execution lifecycle
 
@@ -350,14 +359,96 @@ nothing about steps 2-4 of the loop cares what triggered the *initial*
 `change:outputSignals`, this bug was reachable by a single real user click
 on a control-panel checkbox too, not just by a Lua script.
 
-**Still-unfixed, unrelated latent bugs found along the way** (neither is the
-above bug's mechanism, just worth a one-line fix eventually): `alarm()`'s
-`this._pq.add(tick-1)` (`worker-worker.mjs:336`, and the same in `synch.mjs`)
-is unguarded against a duplicate entry at that tick, unlike `_enqueue()`'s
-own guarded version — a collision would silently orphan-freeze all future
-combinational recomputation. And `HeadlessCircuit.unobserveGraph`
-(`circuit.mjs:346-347`) calls `observeGraph` instead of `unobserveGraph` — a
-real typo/leak.
+**Still-unfixed, unrelated latent bug found along the way**:
+`HeadlessCircuit.unobserveGraph` (`circuit.mjs:346-347`) calls `observeGraph`
+instead of `unobserveGraph` — a real typo/leak. (The other one listed here,
+`alarm()`'s unguarded `_pq.add(tick-1)`, is fixed — see "Simulation controls".)
+
+## Simulation controls: speed, run-for, reset, timescale
+
+The control panel (`src/status_provider.mjs` HTML + `view/status_view.mjs`)
+does **all** time <-> tick conversion (`src/time_units.mjs`, vscode-free,
+tested in `test/pipeline.spec.mjs`). The circuit webview and the worker only
+ever see ticks.
+
+- **Timescale** (`1 tick = 1 ns` default) is a per-project option,
+  `synth_options.timescale`, saved with the document. It's set from the
+  control panel via `document.setTimescale()`, which also fires
+  `synthOptionUpdated`: the plain setter doesn't (it assumes the synthesis
+  panel is the source), and the synthesis panel would otherwise write its
+  stale copy of the options back.
+- **Speed** (ticks/s, `null` = max) is global, in the extension's
+  `globalState` (`DigitalJS.simSpeed` in `extension.mjs`), pushed to **every**
+  open circuit view (`setspeed`) and sent with `showcircuit`. `view/main.mjs`
+  `startSim()` maps it to `circuit.interval = 1000/speed` + `start()`, or to
+  `startFast()` for max (what the removed fast-forward button did). Everything
+  that starts the sim goes through `startSim()`, Lua included, so scripts run
+  at slider speed (1 to 1e9 ticks/s, 4 steps per decade, then max). This
+  needs the patched worker `start()` (`engines/worker-worker.mjs`): stock
+  digitaljs runs exactly 1 tick per `setInterval(interval)`, capped at
+  ~250 ticks/s. The patch uses a fixed 10 ms timer, works out how many ticks
+  are owed (fractional `interval` is fine), processes only the *events* before
+  that target tick and then jumps `_tick` there. That's the same as N
+  `_updateGates()` calls, but empty ticks cost nothing, so a quiet circuit
+  isn't capped by a per-tick loop. Alarms (`tick-1` in the pq) still stop it.
+  It has a 10 ms work budget per call and drops the backlog.
+- **Speed limits** (measured, `startFast`, Node + WorkerEngine): `04_counter`
+  ~26M ticks/s; `board` (CPU + RAM + LED matrix) ~870k ticks/s, which is
+  ~4.3k clock cycles/s, or ~0.87 ms of simulated time per second at
+  1 tick = 1 ns. The ceiling is gate events per second in JS, not the UI. The
+  panel shows the *measured* speed (`actual ≈ …/s`, from the `tick` updates the
+  worker's 25 ms `_sender` produces) under the requested one, so a user can see
+  that their circuit, not the slider, is the limit.
+- **Run for N** = `circuit.alarm(tick+N, () => true, {stopOnAlarm: true})` +
+  `startFast()`. The callback returning `true` keeps it stopped
+  (`_resumeAfterCallback`). It always runs flat out, like `run 100ns` in an
+  HDL simulator. This exposed the `alarm()` bug, now fixed in `worker-worker`
+  and `synch` (src+lib): `_pq.add(tick-1)` ran even when `tick-1` already had
+  queued events, so the duplicate entry was polled twice and the second
+  `_updateGatesNext()` threw on `_queue.get(k) === undefined`. That killed the
+  worker, and it was reachable from Lua's `sim.sleep` too. Covered by a test in
+  `test/pipeline.spec.mjs`.
+- **toJSON() round-trip rule**: every cell attribute needed to rebuild a
+  cell must be listed in that cell's `_gateParams`. `toJSON()` serializes only
+  those, and its output is what the document stores after every edit or
+  autolayout (`updatecircuit`), what undo/redo reloads and what Reset
+  rebuilds from. Our patched cells broke this: `TriMerge` dropped `bits` (it
+  came back 1-bit, so the 32-bit bus wires got width warnings) and
+  `LEDMatrix` dropped `rows`/`cols` (it came back 1×1). Separately,
+  `_makeGraph` read `this.running` for a cell with a warning before
+  `_engine` existed, so the rebuild threw half-way and left an **empty
+  schematic** (the "Reset erases the circuit" bug). Both are fixed (the
+  `running` getter tolerates a missing engine). `test/pipeline.spec.mjs` "circuit.toJSON()
+  round-trip" rebuilds every example from its own `toJSON()` and compares
+  every cell's port widths and rows/cols: run it for any new or patched cell.
+- **Reset** (`resetsim`, runtime only, no document edit) rebuilds the circuit
+  from `circuit.toJSON()` with `{keep: true, reset: true}`. `keep` restores the
+  dialogs/zoom, `reset` drops `signals`/`initTick`, so it restarts at tick 0
+  with registers at their initial values. `toJSON()` serializes a Memory's
+  *current* contents (`Memory.getGateParams`, e.g. the board's VRAM), so
+  `#initialMem` (captured on every non-`keep` build, keyed
+  `subcircuit-type|device-id`) is written back first. A Clock period edited
+  in the panel survives (it's a parameter); waveforms don't. Lua scripts are
+  stopped (`#destroyCircuit`).
+- **Panel layout/styling** lives in `status_provider.mjs`'s `<style>` and uses
+  only `--vscode-*` variables (light and dark themes). The I/O table is laid out
+  as a CSS grid (`tr`/`tbody` `display: contents`) so fields can shrink in a
+  narrow sidebar. That also needs `--input-min-width: 0px`: the toolkit's
+  design token defaults to 100px and pushes the 3rd column out. An `LEDMatrix`
+  output is drawn as a small canvas grid (`#newLedMatrixWidget`; `iopanel.mjs`
+  `_addOutput` sends `type`/`rows`/`cols`). Outputs wider than the field are cut
+  off with an ellipsis, with the full value in the tooltip.
+- **Looking at the panel without VS Code**: call
+  `StatusProvider.resolveWebviewView` with a fake view (capture the `html`
+  setter; `asWebviewUri: p => 'http://harness' + p`) and a fake `djs` (paths,
+  `runStates`, `synth_options`, `simSpeed`, events returning `{dispose(){}}`).
+  Inject `--vscode-*` theme variables on `<html>`, VS Code's default
+  `body { padding: 0 20px; … }` and an `acquireVsCodeApi` stub. Then load it
+  with Playwright (installed, Chromium included) using
+  `page.route('http://harness/**', r => r.fulfill({path}))` (module scripts
+  don't load from `file://`), `window.postMessage` sample
+  `iopanel:view`/`tick`/`runstate` messages, and take screenshots at 240 and
+  320 px wide.
 
 ## Misc
 

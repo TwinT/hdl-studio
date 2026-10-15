@@ -18,6 +18,7 @@ import { execFileSync } from 'child_process';
 import { yosys2digitaljs, io_ui } from 'yosys2digitaljs/core';
 import { build_yosys_script, isHdlFile, data_file_paths } from '../src/yosys_script.mjs';
 import { split_inout_ports } from '../src/inout_split.mjs';
+import { parseTime, formatTime, formatFreq } from '../src/time_units.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const verilogDir = path.resolve(__dirname, 'verilog');
@@ -66,6 +67,23 @@ function synthDir(dir, opts = {}, ui = true) {
     } finally {
         fs.rmSync(tmp, { recursive: true, force: true });
     }
+}
+
+// Each example lives in its own subfolder, named after its main module
+// (test/verilog/<name>/<name>.sv), alongside a sim.lua. Only pick up
+// single-file examples here: a subfolder qualifies if it contains exactly
+// one .sv file, which excludes multi-file designs like test/verilog/alu/
+// (whose own alu.sv is just one of several interdependent sources, not a
+// standalone top-level design).
+function singleFileExamples() {
+    return fs.readdirSync(verilogDir, { withFileTypes: true })
+        .filter((e) => e.isDirectory())
+        .flatMap((e) => {
+            const dir = path.join(verilogDir, e.name);
+            const svFiles = fs.readdirSync(dir).filter((f) => f.endsWith('.sv'));
+            return svFiles.length === 1 ? [path.join(dir, svFiles[0])] : [];
+        })
+        .sort();
 }
 
 function yosysAvailable() {
@@ -117,20 +135,7 @@ describe('Synthesis pipeline (yosys -> yosys2digitaljs)', function () {
         }
     });
 
-    // Each example lives in its own subfolder, named after its main module
-    // (test/verilog/<name>/<name>.sv), alongside a sim.lua. Only pick up
-    // single-file examples here: a subfolder qualifies if it contains exactly
-    // one .sv file, which excludes multi-file designs like test/verilog/alu/
-    // (whose own alu.sv is just one of several interdependent sources, not a
-    // standalone top-level design).
-    const files = fs.readdirSync(verilogDir, { withFileTypes: true })
-        .filter((e) => e.isDirectory())
-        .flatMap((e) => {
-            const dir = path.join(verilogDir, e.name);
-            const svFiles = fs.readdirSync(dir).filter((f) => f.endsWith('.sv'));
-            return svFiles.length === 1 ? [path.join(dir, svFiles[0])] : [];
-        })
-        .sort();
+    const files = singleFileExamples();
     assert.ok(files.length > 0, 'no .sv examples found in test/verilog');
 
     for (const f of files) {
@@ -913,4 +918,106 @@ describe('@twint/4vl Display4vlDec/Dec2c distinguish a fully-z value from x', fu
         assert.strictEqual(display4vl.show('dec', Vector4vl.xes(4)), 'x');
         assert.strictEqual(display4vl.show('dec', Vector4vl.fromBin('z0z1')), 'x');
     });
+});
+
+// Control panel time units (src/time_units.mjs): the project's timescale says
+// how long a tick is; the panel converts both ways.
+describe('time units', function () {
+    const close = (a, b) => Math.abs(a - b) <= Math.abs(b) * 1e-12;
+    it('parses a number with an optional unit (default ns)', function () {
+        assert.ok(close(parseTime('1ns'), 1e-9));
+        assert.ok(close(parseTime(' 2.5 us '), 2.5e-6));
+        assert.ok(close(parseTime('2.5µs'), 2.5e-6));
+        assert.ok(close(parseTime('200'), 200e-9));
+        assert.ok(close(parseTime('10 ps'), 1e-11));
+        assert.ok(close(parseTime('1s'), 1));
+        assert.ok(close(parseTime('1e3 fs'), 1e-12));
+    });
+    it('rejects garbage, negative and zero times', function () {
+        for (const bad of ['', 'ns', '1 ks', '-1ns', '0', '1 n s', 'abc'])
+            assert.strictEqual(parseTime(bad), undefined, bad);
+    });
+    it('formats with the biggest unit >= 1 and 4 significant digits', function () {
+        assert.strictEqual(formatTime(200 * 1e-9), '200 ns');
+        assert.strictEqual(formatTime(12345 * 1e-9), '12.35 µs');
+        assert.strictEqual(formatTime(1e-9), '1 ns');
+        assert.strictEqual(formatTime(1e-3), '1 ms');
+        assert.strictEqual(formatTime(0), '0 s');
+        assert.strictEqual(formatTime(5e-16), '0.5 fs');
+        assert.strictEqual(formatFreq(1 / 200e-9), '5 MHz');
+        assert.strictEqual(formatFreq(50), '50 Hz');
+    });
+    it('round-trips through format and parse', function () {
+        for (const t of [1e-15, 3e-12, 1e-9, 7.5e-6, 2e-3, 42])
+            assert.ok(close(parseTime(formatTime(t)), t), formatTime(t));
+    });
+});
+
+// Regression: alarm() added tick-1 to the priority queue even when that tick
+// already had events queued. The duplicate entry got polled twice and the
+// second updateGatesNext() found no _queue map for it -> TypeError (in the
+// webview, the worker died and the clock froze). "Run for" in the control
+// panel lands on such ticks all the time; Lua's sim.sleep could too.
+describe('digitaljs alarm on a tick that already has events', function () {
+    before(function () {
+        if (!yosysAvailable()) {
+            console.warn('  yosys not found on PATH - skipping pipeline tests');
+            this.skip();
+        }
+    });
+
+    it('fires once without corrupting the event queue (SynchEngine)', function () {
+        const require = createRequire(import.meta.url);
+        const { HeadlessCircuit } = require('../node_modules/digitaljs/lib/circuit.js');
+        const circuit = new HeadlessCircuit(synth(path.join(verilogDir, '04_counter', '04_counter.sv')));
+        for (let i = 0; i < 5; i++) circuit.updateGatesNext();
+        const k = circuit._engine._pq.peek(); // a tick with events already queued
+        let fired = 0;
+        circuit.alarm(k + 1, () => { fired++; });
+        for (let i = 0; i < 20; i++) circuit.updateGatesNext();
+        assert.strictEqual(fired, 1);
+        assert.ok(circuit.tick > k + 1);
+    });
+});
+
+// circuit.toJSON() is what the document stores after every edit/autolayout
+// (updatecircuit), what undo/redo reloads, and what the control panel's
+// Reset rebuilds from. A cell attribute missing from its _gateParams is
+// silently dropped there: TriMerge lost `bits` (came back 1-bit, so the
+// 32-bit bus wires got width warnings and rebuilding threw before the
+// engine existed - Reset left an empty schematic) and LEDMatrix lost
+// `rows`/`cols` (came back 1x1).
+describe('circuit.toJSON() round-trip', function () {
+    this.timeout(60000);
+    before(function () {
+        if (!yosysAvailable()) {
+            console.warn('  yosys not found on PATH - skipping pipeline tests');
+            this.skip();
+        }
+    });
+
+    const require = createRequire(import.meta.url);
+    const { HeadlessCircuit } = require('../node_modules/digitaljs/lib/circuit.js');
+    const shape = (graph) => {
+        const cells = {};
+        for (const e of graph.getElements()) {
+            cells[e.id] = { type: e.get('type'), rows: e.get('rows'), cols: e.get('cols'),
+                            ports: e.getPorts().map((p) => `${p.id}:${p.bits}`).join(',') };
+            if (e.get('type') === 'Subcircuit')
+                cells[e.id].sub = shape(e.get('graph'));
+        }
+        return cells;
+    };
+    const warnings = (graph) => graph.getLinks().filter((l) => l.get('warning')).length +
+        graph.getElements().filter((e) => e.get('type') === 'Subcircuit')
+             .reduce((n, e) => n + warnings(e.get('graph')), 0);
+
+    for (const f of singleFileExamples()) {
+        it(`rebuilds ${path.basename(f)} unchanged from its own toJSON()`, function () {
+            const circuit = new HeadlessCircuit(synth(f));
+            const rebuilt = new HeadlessCircuit(JSON.parse(JSON.stringify(circuit.toJSON())));
+            assert.deepStrictEqual(shape(rebuilt._graph), shape(circuit._graph));
+            assert.strictEqual(warnings(rebuilt._graph), 0);
+        });
+    }
 });
