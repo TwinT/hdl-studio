@@ -10,7 +10,7 @@ for i = 0, 7 do
     sim.setinput("a", a);
     sim.setinput("b", b);
     sim.setinput("cin", cin);
-    sim.sleep(2);
+    sim.sleep(10); -- let the gates settle (each takes a tick)
     print(string.format("a=%d b=%d cin=%d -> sum=%d cout=%d\n",
         a and 1 or 0, b and 1 or 0, cin and 1 or 0,
         sim.getoutput("sum"):tointeger(), sim.getoutput("cout"):tointeger()));

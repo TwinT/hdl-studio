@@ -10,10 +10,10 @@ sim.setinput("rst", false);
 sim.wait(sim.posedge("clk"));
 
 for i = 1, 5 do
-    sim.setinput("btn", true);
+    sim.setinput("pushbutton", true);
     sim.wait(sim.posedge("clk"));
     sim.wait(sim.posedge("clk"));
-    sim.setinput("btn", false);
+    sim.setinput("pushbutton", false);
     sim.wait(sim.posedge("clk"));
     print(string.format("pulsacion %d: count=%s\n", i, sim.getoutput("count"):tohex()));
 end
