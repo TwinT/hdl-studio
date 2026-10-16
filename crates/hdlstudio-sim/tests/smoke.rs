@@ -4,7 +4,7 @@
 
 use hdlstudio_logic::LogicVec;
 use hdlstudio_netlist::{Cell, Circuit};
-use hdlstudio_sim::Sim;
+use hdlstudio_sim::{Event, Sim};
 use serde_json::Value;
 
 fn golden() -> Vec<(String, Circuit)> {
@@ -77,4 +77,24 @@ fn a_zero_delay_loop_that_never_settles_is_an_error() {
     sim.set_input("dev0", LogicVec::ones(1)).unwrap();
     let err = sim.update_gates().expect_err("the loop should be reported");
     assert!(err.contains("did not settle"), "{err}");
+}
+
+#[test]
+fn an_alarm_on_a_tick_that_has_events_fires_once() {
+    // digitaljs queued that tick twice and broke its event queue; "Run for"
+    // lands on such ticks all the time
+    let (_, circuit) = golden().into_iter().find(|(n, _)| n == "04_counter").unwrap();
+    let mut sim = Sim::new(&circuit, false).unwrap();
+    for _ in 0..5 {
+        sim.update_gates_next().unwrap();
+    }
+    let k = sim.next_event_tick().unwrap();
+    sim.alarm(1, k + 1, false);
+    let mut fired = 0;
+    for _ in 0..20 {
+        sim.update_gates_next().unwrap();
+        fired += sim.take_events().0.iter().filter(|e| matches!(e, Event::Alarm { id: 1, .. })).count();
+    }
+    assert_eq!(fired, 1);
+    assert!(sim.tick() > k + 1);
 }

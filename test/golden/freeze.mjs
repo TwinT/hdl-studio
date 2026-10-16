@@ -78,7 +78,7 @@ for (const d of designs) {
               { design: d.name, circuit, stimulus, ticks: d.ticks, defaultcomb, trace, ports: ports(circuit) });
         console.log(d.name, mode, trace.length, 'lines');
     }
-    const scripts = (d.lua ?? []).concat(d.name === '12_inout_bus' ? [path.join(dir, '../simdiff/lua_api.lua')] : []);
+    const scripts = (d.lua ?? []).concat(d.name === '12_inout_bus' ? [path.join(dir, '../simdiff/lua_api.lua'), path.join(dir, 'inout_bus.lua')] : []);
     for (const file of scripts) {
         const circuit = JSON.parse(convert(yosys, true));
         const script = fs.readFileSync(file, 'utf8');

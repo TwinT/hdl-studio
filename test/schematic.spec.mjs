@@ -14,6 +14,7 @@ import { spawn } from 'child_process';
 import { fileURLToPath } from 'url';
 import { level, read, show } from '../view/schematic/values.ts';
 import { route } from '../view/schematic/route.ts';
+import { ledLayout } from '../view/schematic/cells.ts';
 import { hdlstudio_bin } from '../src/hdlstudio_bin.mjs';
 import { formatTimeAt } from '../src/time_units.mjs';
 import { designs, synthesize, slangAvailable, convert } from './simdiff/designs.mjs';
@@ -46,6 +47,15 @@ describe('schematic values', function () {
     });
     it('classifies levels like digitaljs', function () {
         assert.deepStrictEqual(['111', '000', '010', 'zzz', 'z1z', 'x00'].map(level), ['high', 'low', 'def', 'highz', 'undef', 'undef']);
+    });
+});
+
+describe('LED matrix layout', function () {
+    it('a bigger grid gets smaller LEDs, not a bigger widget', function () {
+        const small = ledLayout(8, 8), big = ledLayout(32, 32);
+        assert.ok(Math.abs(small.w - big.w) < 20, `${small.w} vs ${big.w}`);
+        assert.ok(big.r < small.r);
+        assert.deepStrictEqual([ledLayout(2, 4).w > ledLayout(2, 4).h, ledLayout(16, 32).w], [true, 32 * ledLayout(16, 32).pitch + 16]);
     });
 });
 
