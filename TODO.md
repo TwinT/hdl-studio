@@ -132,4 +132,8 @@
       (`dist/digitaljs-sym-worker.js`, `simWorkerUri` in the circuit view HTML,
       `djs.simWorker`), and `digitaljs_lua`/`fengari-web` (only the Lua diff test
       uses them).
+- [X] `view/monitor.mjs` called `_.extend` without importing lodash: it only
+      worked because digitaljs_lua loaded lodash, which left a global `_`.
+      Removing digitaljs_lua from the webview broke the whole view at load.
+      Fixed with `Object.assign` (found by the webview test on the engine).
 

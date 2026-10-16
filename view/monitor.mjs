@@ -108,7 +108,7 @@ export class Monitor {
     }
 }
 
-_.extend(Monitor.prototype, Backbone.Events);
+Object.assign(Monitor.prototype, Backbone.Events);
 
 export class MonitorView extends Backbone.View {
     initialize(args) {
