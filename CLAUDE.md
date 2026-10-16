@@ -74,8 +74,11 @@ view (`view/main.mjs`, which still has wire editing) until the cutover. `src/cir
   (`memory.ts`), FSM diagram (`fsm.ts`, the next transition is computed in
   the view), image export (`view/imgutils.mjs`). `view/lua_runner.ts` is
   shared by both views.
-- The waveform monitor (`waves.ts`, phase 6): double-click a wire to watch
-  its driver. The engine records every end-of-tick change of a watched
+- The waveform monitor (`waves.ts`, phase 6): the button shown on a hovered
+  wire (or a double-click on it) watches its driver. Pan captures the pointer
+  only once it drags: capturing on pointerdown sends the click/dblclick to the
+  svg instead of the wire (a bug that synthetic events in tests didn't catch;
+  `test:schematic` uses real mouse events for it). The engine records every end-of-tick change of a watched
   output (`watch`/`unwatch`, `crates/hdlstudio/src/wave.rs`, up to 1M changes
   per signal); after each update the view asks for the window it shows
   (`wave {from, to, bins}`, one entry per pixel column, several changes in

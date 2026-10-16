@@ -92,7 +92,8 @@ svg.schematic .cell {
 }
 
 svg.schematic .button,
-svg.schematic .open {
+svg.schematic .open,
+svg.schematic .wiretool {
     cursor: pointer;
 }
 

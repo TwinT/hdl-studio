@@ -2,7 +2,7 @@
 // live with the engine's values. Pan with a drag on the background or the
 // wheel, zoom with ctrl+wheel or a pinch, drag cells to move them.
 
-import { CellView, Connector, Device, GraphData, Shape, draw, el, shape, text } from './cells';
+import { CellView, Connector, Device, GraphData, Point, Shape, draw, el, shape, text } from './cells';
 import { Rect, midpoint, pathD, route } from './route';
 import { Level, level, levelColor, show, xes } from './values';
 
@@ -16,8 +16,20 @@ export interface SchematicHooks {
 }
 
 interface Wire {
-    c: Connector; i: number; src: string; bits: number;
+    c: Connector; i: number; src: string; bits: number; pts: Point[];
     path: SVGPathElement; hit: SVGPathElement; label?: SVGTextElement;
+}
+
+// The point of a polyline nearest to `p`.
+function nearest(pts: Point[], p: Point): Point {
+    let best = pts[0], bd = Infinity;
+    for (let i = 1; i < pts.length; i++) {
+        const a = pts[i - 1], b = pts[i], dx = b.x - a.x, dy = b.y - a.y;
+        const t = Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / (dx * dx + dy * dy || 1)));
+        const q = { x: a.x + t * dx, y: a.y + t * dy }, d = Math.hypot(q.x - p.x, q.y - p.y);
+        if (d < bd) { bd = d; best = q; }
+    }
+    return best;
 }
 
 const tooltip = (() => {
@@ -46,6 +58,10 @@ export class Schematic {
     #viewport: SVGGElement;
     #wireLayer: SVGGElement;
     #cellLayer: SVGGElement;
+    // the "add to the waveform" button shown on a hovered wire
+    #tool: SVGGElement;
+    #toolWire?: Wire;
+    #toolHide = 0;
     #shapes = new Map<string, Shape>();
     #cells = new Map<string, CellView>();
     #wires: Wire[] = [];
@@ -69,6 +85,18 @@ export class Schematic {
         this.#viewport = el('g', {}, this.svg);
         this.#wireLayer = el('g', {}, this.#viewport);
         this.#cellLayer = el('g', {}, this.#viewport);
+        this.#tool = el('g', { class: 'wiretool', visibility: 'hidden' }, this.#viewport);
+        el('rect', { x: 6, y: -24, width: 18, height: 16, rx: 2, fill: 'white', stroke: '#888' }, this.#tool);
+        el('path', { d: 'M8 -11 H11 V-21 H15 V-11 H19 V-21 H22', fill: 'none', stroke: 'black', 'stroke-width': 1.5 }, this.#tool);
+        el('title', {}, this.#tool).textContent = 'Add to the waveform monitor';
+        this.#tool.addEventListener('pointerdown', (e) => e.stopPropagation());
+        this.#tool.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (this.#toolWire) this.#hooks.watch(this.#toolWire.c);
+            this.#showTool(undefined);
+        });
+        this.#tool.addEventListener('pointerenter', () => clearTimeout(this.#toolHide));
+        this.#tool.addEventListener('pointerleave', () => this.#hideTool());
         for (const [id, d] of Object.entries(graph.devices))
             this.#shapes.set(id, shape(d, this.#top, this.#subcircuits));
         this.#panZoom();
@@ -125,15 +153,15 @@ export class Schematic {
             const src = `${c.from.id}:${c.from.port}`;
             this.#drivers.set(`${c.to.id}:${c.to.port}`, src);
             const w: Wire = {
-                c, i, src, bits: from.bits,
+                c, i, src, bits: from.bits, pts: [],
                 path: el('path', { fill: 'none', stroke: levelColor.undef, 'stroke-width': from.bits > 1 ? 4 : 2 }, this.#wireLayer),
                 hit: el('path', { fill: 'none', stroke: 'transparent', 'stroke-width': 10, class: 'wirehit' }, this.#wireLayer),
             };
             // one name per net, not one per connector (they overlap)
             if (c.name && !this.#readers.get(src)?.wires.length) w.label = text(this.#wireLayer, 0, 0, c.name, { 'text-anchor': 'middle', 'dominant-baseline': 'central', 'pointer-events': 'none' });
-            w.hit.addEventListener('pointerenter', (e) => { this.#hooks.marker(c); this.#hoverWire(w, e); });
-            w.hit.addEventListener('pointermove', (e) => this.#hoverWire(w, e));
-            w.hit.addEventListener('pointerleave', () => { this.#hooks.marker(null); this.#hover = undefined; tooltip.hide(); });
+            w.hit.addEventListener('pointerenter', (e) => { this.#hooks.marker(c); this.#hoverWire(w, e); this.#showTool(w, e); });
+            w.hit.addEventListener('pointermove', (e) => { this.#hoverWire(w, e); this.#showTool(w, e); });
+            w.hit.addEventListener('pointerleave', () => { this.#hooks.marker(null); this.#hover = undefined; tooltip.hide(); this.#hideTool(); });
             w.hit.addEventListener('dblclick', (e) => { e.stopPropagation(); this.#hooks.watch(c); });
             this.#wires.push(w);
             const r = readers(src);
@@ -157,6 +185,7 @@ export class Schematic {
         const pa = this.#port(w.c.from.id, w.c.from.port)!, pb = this.#port(w.c.to.id, w.c.to.port)!;
         const pts = route({ x: a.x + pa.x, y: a.y + pa.y }, pa.side, { x: b.x + pb.x, y: b.y + pb.y }, pb.side, w.c.vertices,
                           w.c.vertices || fast ? undefined : this.#obstacles());
+        w.pts = pts;
         const d = pathD(pts);
         w.path.setAttribute('d', d);
         w.hit.setAttribute('d', d);
@@ -222,7 +251,26 @@ export class Schematic {
         const v = this.#values.get(w.src) ?? xes(w.bits);
         const lines = w.bits === 1 ? [`Value: ${v}`]
             : ['hex', 'dec', 'oct', 'bin'].map((b) => `${b[0].toUpperCase() + b.slice(1)}: ${show(b, v)}`);
-        tooltip.show(this.#hover!.x, this.#hover!.y, [...lines, '<i>Double-click: add to the waveform</i>'].join('<br>'));
+        tooltip.show(this.#hover!.x, this.#hover!.y, lines.join('<br>'));
+    }
+
+    // The waveform button next to the point of `w` nearest the pointer, the
+    // same size at any zoom.
+    #showTool(w: Wire | undefined, e?: PointerEvent) {
+        clearTimeout(this.#toolHide);
+        this.#toolWire = w;
+        if (!w || !e) {
+            this.#tool.setAttribute('visibility', 'hidden');
+            return;
+        }
+        const r = this.svg.getBoundingClientRect(), t = this.#t;
+        const p = nearest(w.pts, { x: (e.clientX - r.left - t.x) / t.k, y: (e.clientY - r.top - t.y) / t.k });
+        this.#tool.setAttribute('transform', `translate(${p.x},${p.y}) scale(${1 / t.k})`);
+        this.#tool.setAttribute('visibility', 'visible');
+    }
+    #hideTool() {
+        clearTimeout(this.#toolHide);
+        this.#toolHide = window.setTimeout(() => this.#showTool(undefined), 400);
     }
 
     // Moving a cell drops the routes of its wires (they go straight then).
@@ -305,22 +353,31 @@ export class Schematic {
             if (k >= 0.99 && k <= 2) this.#zoomAt(k * 1.5, p.x, p.y);
             else this.home();
         });
-        // drag on the background pans, two fingers pinch
+        // drag on the background (or a wire) pans, two fingers pinch. The
+        // pointer is captured only once it moves: capturing on pointerdown
+        // would send the click and dblclick to the svg, not the wire.
         const pointers = new Map<number, { x: number, y: number }>();
         let pinch: { d: number, k: number } | undefined;
+        let dragging = false;
         svg.addEventListener('pointerdown', (e) => {
-            if ((e.target as Element).closest('.cell, foreignObject')) return;
-            svg.setPointerCapture(e.pointerId);
+            if ((e.target as Element).closest('.cell, foreignObject, .wiretool')) return;
             pointers.set(e.pointerId, local(e));
+            dragging = false;
             if (pointers.size === 2) {
                 const [a, b] = [...pointers.values()];
                 pinch = { d: Math.hypot(a.x - b.x, a.y - b.y), k: this.#t.k };
+                for (const id of pointers.keys()) svg.setPointerCapture(id);
             }
         });
         svg.addEventListener('pointermove', (e) => {
             const last = pointers.get(e.pointerId);
             if (!last) return;
             const p = local(e);
+            if (!dragging && pointers.size === 1) {
+                if (Math.hypot(p.x - last.x, p.y - last.y) < 3) return;
+                dragging = true;
+                svg.setPointerCapture(e.pointerId);
+            }
             pointers.set(e.pointerId, p);
             if (pointers.size === 2 && pinch) {
                 const [a, b] = [...pointers.values()];

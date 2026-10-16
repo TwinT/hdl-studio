@@ -166,9 +166,25 @@ describe('schematic webview on the engine', function () {
 
     it('records waveforms, and a trigger stops the simulation', async function () {
         const view = await show('04_counter');
-        await page.evaluate(() => { for (const h of document.querySelectorAll('.wirehit')) h.dispatchEvent(new MouseEvent('dblclick', { bubbles: true })); });
+        // real mouse events (synthetic ones once hid a bug: the pan captured
+        // the pointer, so a double-click on a wire zoomed instead)
+        const mids = await page.evaluate(() => [...document.querySelectorAll('.wirehit')].map((h) => {
+            const p = h.getPointAtLength(h.getTotalLength() / 2).matrixTransform(h.getScreenCTM());
+            return { x: p.x, y: p.y };
+        }));
+        const zoom = () => page.evaluate(() => document.querySelector('svg.schematic > g').getAttribute('transform'));
+        const before = await zoom();
+        await page.mouse.dblclick(mids[0].x, mids[0].y);
+        assert.strictEqual(await zoom(), before, 'a double-click on a wire zoomed');
+        // the others through the button shown on a hovered wire
+        for (const m of mids.slice(1)) {
+            await page.mouse.move(m.x, m.y);
+            const r = await page.evaluate(() => document.querySelector('.wiretool rect').getBoundingClientRect().toJSON());
+            await page.mouse.move(r.x + r.width / 2, r.y + r.height / 2, { steps: 3 });
+            await page.mouse.click(r.x + r.width / 2, r.y + r.height / 2);
+        }
         const rows = await page.evaluate(() => [...document.querySelectorAll('#monitor .row .name')].map((n) => n.textContent));
-        assert.ok(rows.includes('count') && rows.includes('clk'), rows.join());
+        assert.ok(rows.includes('count') && rows.includes('clk') && rows.length >= 4, rows.join());
         const rst = view.find((r) => r.label === 'rst').id, count = view.find((r) => r.label === 'count').id;
         await post({ command: 'iopanel:update', id: rst, value: '1' });
         await post({ command: 'setspeed', speed: 5000 });
