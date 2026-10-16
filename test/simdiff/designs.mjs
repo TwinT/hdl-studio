@@ -42,6 +42,8 @@ designs.push(
     { name: 'alu', dir: path.join(verilog, 'alu'), files: ['tp1_pkg.sv', 'alu_if.sv', 'alu.sv', 'reg_file.sv', 'fsm.sv', 'top_module.sv'], top: 'top_module', ticks: 20000 },
     { name: 'soc cpu_ram', dir: path.join(verilog, 'soc/rtl'), top: 'cpu_ram', ticks: 20000 },
     { name: 'soc board', dir: path.join(verilog, 'soc/rtl'), top: 'board', ticks: 60000, lua: [path.join(verilog, 'soc/rtl/board_sim.lua')] },
+    // small values of `a` matter (in range), so its stimulus is limited to 0..31 half the time (see makeStimulus)
+    { name: 'wide_idx', dir: path.join(root, 'test/golden/wide_idx'), top: 'wide_idx', ticks: 20000 },
 );
 
 export function synthesize(d) {

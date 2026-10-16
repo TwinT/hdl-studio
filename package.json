@@ -397,10 +397,11 @@
         "watch-prod:webpack": "webpack --watch --mode production",
         "lint": "eslint . && tsc",
         "pretest": "npm run lint",
-        "test": "npm-run-all test:rust test:pipeline test:simdiff test:schematic test:vscode",
+        "test": "npm-run-all test:rust test:pipeline test:golden test:simdiff test:schematic test:vscode",
         "test:rust": "cargo test --workspace",
         "test:pipeline": "npm run compile:rust && mocha test/pipeline.spec.mjs",
         "test:simdiff": "npm run compile:rust && mocha test/simdiff/simdiff.spec.mjs test/simdiff/luadiff.spec.mjs",
+        "test:golden": "npm run compile:rust && mocha test/golden.spec.mjs",
         "test:schematic": "npm run compile:rust && webpack --mode development --config-name schematic-view && mocha test/schematic.spec.mjs",
         "test:vscode": "node ./test/runTest.js",
         "open-in-browser": "vscode-test-web --extensionDevelopmentPath=. ."

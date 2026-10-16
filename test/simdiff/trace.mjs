@@ -68,7 +68,10 @@ export function makeStimulus(circuit, { ticks, seed = 1, every = 300 }) {
     for (let t = 1 + Math.floor(rand() * every); random.length && t < ticks; t += 1 + Math.floor(rand() * every)) {
         const [id, bits] = random[Math.floor(rand() * random.length)];
         let v = '';
-        for (let i = 0; i < bits; i++) v += rand() < 0.5 ? '0' : '1';
+        // a wide input (an address, a shift amount) is small half the time,
+        // or it would never be in range
+        if (bits >= 16 && rand() < 0.5) v = Math.floor(rand() * 32).toString(2).padStart(bits, '0');
+        else for (let i = 0; i < bits; i++) v += rand() < 0.5 ? '0' : '1';
         events.push([t, id, v]);
     }
     return events.sort((a, b) => a[0] - b[0]);
