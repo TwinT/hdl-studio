@@ -19,7 +19,7 @@ export function hdlstudio_bin() {
     return path.join(root, 'target', 'release', process.platform === 'win32' ? 'hdlstudio.exe' : 'hdlstudio');
 }
 
-// yosys JSON netlist -> digitaljs circuit (split inout ports, convert,
+// yosys JSON netlist -> circuit (split inout ports, convert,
 // io_ui unless `ui` is false, then transform if asked).
 export function convert_yosys_json(raw, options = {}, ui = true) {
     if (!child_process.execFileSync)

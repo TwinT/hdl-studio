@@ -1,6 +1,5 @@
 // The circuit view: the schematic of the document's circuit, simulated by
 // the extension's engine (`hdlstudio serve`, through the extension host).
-// Speaks the host protocol the digitaljs view (view/main.mjs) did.
 
 import './style.css';
 import * as imgutils from '../imgutils.mjs';
@@ -423,8 +422,8 @@ class App {
         }
     }
 
-    // The waveform of the output at `path`.`port`, named like digitaljs did:
-    // the subcircuit labels, then the net's name (or the cell label and port).
+    // The waveform of the output at `path`.`port`, named by the subcircuit
+    // labels, then the net's name (or the cell label and port).
     #watchSpec(path: string, port: string): WatchSpec | undefined {
         const prefix = graphOf(path), id = path.slice(prefix.length);
         const graph = prefix === '' ? this.circuit : this.#graphAt(prefix);

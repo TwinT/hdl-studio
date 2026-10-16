@@ -1,4 +1,4 @@
-//! Port of digitaljs's `transform.mjs`: rewrites that make the schematic
+//! Rewrites that make the schematic
 //! smaller (repeaters out, negations folded into gates, small constants
 //! folded into arithmetic, n-ary gates, binary muxes from one-hot ones,
 //! flip-flops with enable). Each runs to a fixpoint, always rewriting the
@@ -379,7 +379,7 @@ impl MuxWalk {
                     return false;
                 }
                 self.group_ids.push(prev.clone());
-                // digitaljs checks `groups` of the OrReduce here (meaning
+                // the original checks `groups` of the OrReduce here (meaning
                 // the BusGroup's?), which it doesn't have, so it passes.
                 m.inputs(&prev).iter().all(|c| self.traverse(m, &c.from.id, base))
             }
@@ -402,7 +402,7 @@ fn make_binary_muxes(m: &mut Model, id: &str) -> bool {
     if bits > 9 {
         return false;
     }
-    // digitaljs also goes sparse when fewer than 2**(dev.bits-1) values are
+    // the original also goes sparse when fewer than 2**(dev.bits-1) values are
     // mapped, but `dev.bits` is an object there, so that test is always false.
     let sparse = bits > 6;
     let outs = m.output_port(id, "out");

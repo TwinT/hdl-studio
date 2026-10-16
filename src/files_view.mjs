@@ -58,19 +58,19 @@ class SourceFile extends vscode.TreeItem {
 }
 
 export class FilesView {
-    #djs
+    #studio
     #onDidChangeTreeData
     #circuitsChangedListener
-    constructor(djs) {
-        this.#djs = djs;
+    constructor(studio) {
+        this.#studio = studio;
         this.#onDidChangeTreeData = new vscode.EventEmitter();
         this.onDidChangeTreeData = this.#onDidChangeTreeData.event;
         vscode.commands.executeCommand('setContext', 'hdl-studio.script_running', []);
         vscode.commands.executeCommand('setContext', 'hdl-studio.script_not_running', []);
-        this.#circuitsChangedListener = djs.circuitsChanged(() => {
+        this.#circuitsChangedListener = studio.circuitsChanged(() => {
             const running = [];
             const not_running = [];
-            for (const view of djs.circuitViews) {
+            for (const view of studio.circuitViews) {
                 running.push(...view.document.sources.scriptRunning);
                 not_running.push(...view.document.sources.scriptNotRunning);
             }
@@ -89,8 +89,8 @@ export class FilesView {
     }
     async getChildren(element) {
         if (!element) {
-            const active = this.#djs.activeCircuitView;
-            return this.#djs.circuitViews.map((view) => new CircuitFile(view, view === active));
+            const active = this.#studio.activeCircuitView;
+            return this.#studio.circuitViews.map((view) => new CircuitFile(view, view === active));
         }
         console.assert(element instanceof CircuitFile);
         const document = element.document;

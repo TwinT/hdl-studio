@@ -1,6 +1,5 @@
-//! Integer arithmetic on fully defined vectors, as digitaljs does it with
-//! JS BigInts: operands exact (signed or not), results cut to the output
-//! width in two's complement (`Vector4vl.fromNumber(n, bits)`).
+//! Integer arithmetic on fully defined vectors, as JavaScript BigInts do it: operands exact (signed or not), results cut to the output
+//! width in two's complement.
 //! i128 for operands up to 64 bits, num-bigint past that.
 
 use hdlstudio_logic::{Bit, LogicVec};
@@ -111,7 +110,7 @@ pub fn arith(op: ArithOp, i: Int, j: Int, bits: usize) -> LogicVec {
     from_int(&Int::Big(r), bits)
 }
 
-/// `i ** j` for j < 0, as digitaljs does it.
+/// `i ** j` for j < 0, as BigInt does it.
 fn neg_pow(one: bool, minus_one: bool, odd: bool) -> i128 {
     if one {
         1

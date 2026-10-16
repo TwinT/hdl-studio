@@ -27,7 +27,7 @@ async function slang_available(yosysBin) {
     }
 }
 
-const rand_prefix = 'djs-IxU5De4QZDxUgn43Zwj1-_';
+const rand_prefix = 'hdls-IxU5De4QZDxUgn43Zwj1-_';
 const rand_suffix = '_-hbtdHFLoSvFPbPLnGSp8';
 const match_regex = new RegExp(`${rand_prefix}(\\d+)${rand_suffix}`, 'g');
 

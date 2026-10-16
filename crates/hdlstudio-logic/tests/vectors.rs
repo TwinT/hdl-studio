@@ -1,4 +1,5 @@
-//! Replays the golden cases computed by @twint/4vl (`gen_4vl_fixtures.mjs`).
+//! Replays golden cases computed by the JavaScript library HDL Studio used
+//! before (its generator is in git history).
 #![allow(clippy::type_complexity)]
 
 use hdlstudio_logic::{Bit, LogicMem, LogicVec, MemItem};
@@ -12,7 +13,7 @@ fn nbits(c: &Value) -> Option<usize> {
     c["nbits"].as_u64().map(|n| n as usize)
 }
 
-// 4vl's encoding: -1 is 0, 0 is x, 1 is 1, 2 is z.
+// The fixtures' encoding: -1 is 0, 0 is x, 1 is 1, 2 is z.
 fn bit_num(b: Bit) -> i64 {
     match b {
         Bit::Zero => -1,
@@ -58,10 +59,9 @@ fn check(c: &Value) -> Vec<String> {
                 ("isFullyDefined", LogicVec::is_fully_defined),
             ];
             for (name, f) in preds {
-                // Known 4vl 1.0.2 bug, deliberately not ported: for a width
-                // that is a multiple of 32, `_lastmask` is 4294967295 but
-                // `word & _lastmask` is -1 in JS, so an all-ones vector isn't
-                // isHigh and an all-z one isn't isZ.
+                // A known bug of that library, deliberately not reproduced:
+                // for a width that is a multiple of 32, an all-ones vector
+                // wasn't isHigh and an all-z one wasn't isZ.
                 let bug = matches!(name, "isHigh" | "isZ") && v.bits() > 0 && v.bits().is_multiple_of(32) && f(&v);
                 let want = if bug { &json!(true) } else { &out[name] };
                 expect(name, json!(f(&v)), want);
@@ -130,8 +130,8 @@ fn check(c: &Value) -> Vec<String> {
 }
 
 #[test]
-fn matches_4vl() {
-    let cases: Vec<Value> = serde_json::from_str(include_str!("4vl_fixtures.json")).unwrap();
+fn matches_the_fixtures() {
+    let cases: Vec<Value> = serde_json::from_str(include_str!("vectors.json")).unwrap();
     let mut failures = Vec::new();
     for c in &cases {
         for e in check(c) {
@@ -140,7 +140,7 @@ fn matches_4vl() {
     }
     assert!(
         failures.is_empty(),
-        "{} mismatches with 4vl, first 20:\n{}",
+        "{} mismatches, first 20:\n{}",
         failures.len(),
         failures[..failures.len().min(20)].join("\n")
     );

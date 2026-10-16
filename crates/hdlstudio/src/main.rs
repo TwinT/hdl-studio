@@ -33,7 +33,7 @@ fn main() -> ExitCode {
     }
 }
 
-/// Yosys JSON on stdin to a circuit on stdout (digitaljs's format for now).
+/// Yosys JSON on stdin to a circuit on stdout.
 fn yosys2hdlstudio(args: &[String]) -> Result<(), String> {
     let (mut transform, mut io_ui) = (false, true);
     for a in args {
@@ -48,7 +48,7 @@ fn yosys2hdlstudio(args: &[String]) -> Result<(), String> {
     let mut design: hdlstudio_yosys::Design =
         serde_json::from_str(&input).map_err(|e| format!("not a yosys JSON netlist: {e}"))?;
     hdlstudio_yosys::split_inout_ports(&mut design);
-    let mut circuit = hdlstudio_yosys::yosys2digitaljs(&design)?;
+    let mut circuit = hdlstudio_yosys::convert(&design)?;
     if io_ui {
         hdlstudio_yosys::io_ui(&mut circuit);
     }

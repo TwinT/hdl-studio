@@ -321,7 +321,7 @@ export class Schematic {
     bbox() {
         return this.#viewport.getBBox();
     }
-    // Content at the top left, at zoom 1 (digitaljs's initial view), or
+    // Content at the top left, at zoom 1, or
     // smaller if it doesn't fit in `fit` (a window's size).
     home(fit?: { w: number, h: number }) {
         const b = this.bbox();

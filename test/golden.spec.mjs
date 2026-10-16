@@ -1,9 +1,9 @@
 //
 'use strict';
 
-// The engine and the schematic against what digitaljs did, frozen in
-// test/golden/ before digitaljs went away (by test/golden/freeze.mjs, in git
-// history): per example and mode (t: transform, nt: none, dc: zero
+// The engine and the schematic against frozen references in test/golden/,
+// recorded from the previous (JavaScript) simulator before it went away (by
+// test/golden/freeze.mjs, in git history): per example and mode (t: transform, nt: none, dc: zero
 // combinational delay), the converted circuit, a seeded stimulus, the
 // end-of-tick trace and the ports of every cell; per Lua script (`file`, run
 // as it is now), what it printed. Needs only the hdlstudio binary.
@@ -46,7 +46,7 @@ function same(expected, actual) {
             assert.fail(`differ at line ${i + 1}:\n  expected: ${expected[i]}\n  engine:   ${actual[i]}`);
 }
 
-describe('engine traces match the frozen ones (digitaljs)', function () {
+describe('engine traces match the frozen ones', function () {
     this.timeout(300000);
     for (const file of fixtures('.')) {
         it(path.basename(file, '.json.gz'), function () {
@@ -60,7 +60,7 @@ describe('engine traces match the frozen ones (digitaljs)', function () {
     }
 });
 
-describe('schematic cell ports match the frozen ones (digitaljs)', function () {
+describe('schematic cell ports match the frozen ones', function () {
     for (const file of fixtures('.').filter((f) => !f.endsWith('.dc.json.gz'))) {
         it(path.basename(file, '.json.gz'), function () {
             const { circuit, ports } = read(file);
@@ -75,7 +75,7 @@ describe('schematic cell ports match the frozen ones (digitaljs)', function () {
     }
 });
 
-describe('Lua scripts print what they did on digitaljs_lua', function () {
+describe('Lua scripts print what they printed before', function () {
     this.timeout(300000);
     for (const file of fixtures('lua')) {
         it(path.basename(file, '.json.gz'), function () {

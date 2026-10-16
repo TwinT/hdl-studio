@@ -160,7 +160,7 @@ export class Document {
         delete data.options;
 
         // Raw yosys netlist JSON (e.g. from `json -o` in an external build),
-        // as opposed to an already-saved digitaljs circuit: convert it here so
+        // as opposed to an already-saved circuit: convert it here so
         // "Open as circuit in HDL Studio" works on either.
         if (data.modules && !data.devices && !data.connectors && !data.subcircuits)
             data = convert_yosys_json(data, { transform: this.#synth_options.transform });

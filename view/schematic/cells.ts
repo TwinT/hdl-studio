@@ -1,7 +1,7 @@
 // What each cell looks like: its ports, size and SVG drawing, and how the
-// drawing follows the simulation. The geometry is digitaljs's (same sizes,
-// port positions and leads), so a layout saved by either UI works in the
-// other: a device's `position` is its body's top-left corner.
+// drawing follows the simulation. The geometry (sizes, port positions,
+// 25px leads) is the one HDL Studio always had, so layouts saved before 1.0
+// still fit: a device's `position` is its body's top-left corner.
 
 import { level, levelColor, show, xes, read as readValue } from './values.ts';
 
@@ -53,7 +53,7 @@ const inputTypes = new Set(['Input', 'Button', 'NumEntry', 'PushButton']);
 const outputTypes = new Set(['Output', 'Lamp', 'NumDisplay']);
 export const isInput = (d: Device) => inputTypes.has(d.type);
 export const isOutput = (d: Device) => outputTypes.has(d.type) || d.type === 'Display7' || d.type === 'LEDMatrix';
-// ELK puts these in the first/last layer (digitaljs's instanceof Input/Clock/Output).
+// ELK puts these in the first/last layer (inputs and clocks first, plain outputs last).
 export const layer = (d: Device) => isInput(d) || d.type === 'Clock' ? 'FIRST' : outputTypes.has(d.type) ? 'LAST' : 'NONE';
 
 const gatePaths: Record<string, string> = {
@@ -81,8 +81,8 @@ const checkDecor = 'M2 0 L5 5 L10 -5';
 
 type Spec = { id: string; bits: number; label?: string; overline?: boolean; clock?: boolean; idx?: number };
 
-// Ports spread along a side like jointjs's left/right layouts, or stacked
-// every 16 (digitaljs's _getStackedPosition). `inset` is where the lead
+// Ports spread evenly along a side, or stacked
+// every 16. `inset` is where the lead
 // starts inside the body, `lead` how far out the circle is from there.
 function side(specs: Spec[], s: 'left' | 'right', dir: 'in' | 'out', w: number, h: number,
               { stacked = false, inset = 0, lead = 25, dy = 0 } = {}): Port[] {
@@ -123,7 +123,7 @@ function labelsWidth(ports: Port[], dir: 'in' | 'out') {
     const ws = ports.filter((p) => p.dir === dir && p.label !== undefined).map((p) => textWidth(p.label!));
     return ws.length ? Math.max(...ws) : -5;
 }
-// digitaljs's _autoResizeBox: the widest label on each side + 25.
+// Auto width: the widest label on each side + 25.
 const autoWidth = (ports: Port[]) => labelsWidth(ports, 'in') + labelsWidth(ports, 'out') + 25;
 
 export function subcircuitIOs(sub: GraphData) {
@@ -355,12 +355,12 @@ export function draw(d: Device, s: Shape, top: boolean, hooks: CellHooks): CellV
     let update: CellView['update'];
     if (t in gates) {
         const [kind, arc, neg] = gates[t];
-        // only the multi-input gates are scaled (digitaljs's GateX1)
+        // only the multi-input gates are scaled
         const x1 = /^(N?And|N?Or|Xn?or)$/.test(t);
         const sc = x1 ? s.w / 60 : 1;
         const gg = el('g', x1 ? { transform: `translate(-4,0) scale(${sc})` } : {}, body);
-        // 2px however the shape is scaled (digitaljs's non-scaling-stroke
-        // also kept it at 2 screen pixels when zoomed out)
+        // 2px however the shape is scaled (a non-scaling-stroke would also
+        // keep it at 2 screen pixels when zoomed out)
         const attrs = { stroke: 'black', 'stroke-width': 2 / sc };
         el('path', { d: gatePaths[kind], fill: 'white', ...attrs }, gg);
         if (arc) el('path', { d: xorArc, fill: 'black' }, gg);

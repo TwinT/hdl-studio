@@ -2,17 +2,15 @@
 
 VS Code extension that synthesizes SystemVerilog with the `yosys` CLI and shows
 the synthesized circuit as an interactive schematic, simulated by its own engine
-`hdlstudio` (Rust, `crates/`). Educational focus (examples in `test/verilog/`).
-It began as a fork of digitaljs_code (DigitalJS, yosys2digitaljs, digitaljs_lua);
-the Rust migration (branch `rust-migration`, plan and history in `TODO.md`'s
-"Pending, noted during the Rust migration") replaced all of them. The circuit
-JSON is still digitaljs's format, so old `.digitaljs` files open as they are.
+`hdlstudio` (Rust, `crates/`). Educational focus (examples in `test/verilog/`). Projects are `.hdls` files
+(JSON); `.digitaljs` files, from before 1.0, have the same content and open too.
+Third-party origins and their license notices: `NOTICE`.
 
 ## The engine (`crates/`)
 
-Cargo workspace. `hdlstudio-logic` (4-state vectors, a port of @twint/4vl),
-`hdlstudio-netlist` (the circuit model; its serde form is digitaljs's circuit JSON,
-field for field), `hdlstudio-yosys` (yosys JSON → circuit: the converter, `io_ui`,
+Cargo workspace. `hdlstudio-logic` (4-state vectors),
+`hdlstudio-netlist` (the circuit model; its serde form is the project files' circuit
+JSON, field for field), `hdlstudio-yosys` (yosys JSON → circuit: the converter, `io_ui`,
 the inout split, the `transform` simplifications), `hdlstudio-sim` (the event-driven
 simulator), `hdlstudio` (the binary).
 
@@ -23,13 +21,13 @@ simulator), `hdlstudio` (the binary).
 - `hdlstudio yosys2hdlstudio [--transform] [--no-io-ui] < yosys.json` prints the
   circuit. `crates/hdlstudio-yosys/tests/golden.json` freezes its output for the
   small examples plus cell-coverage netlists (`BLESS=1 cargo test` rewrites it after
-  an intended change). It reproduces yosys2digitaljs's quirks on purpose (device
+  an intended change). It reproduces the original converter's quirks on purpose (device
   numbering, a Map typo that makes `$_DFF_P_` invalid...); semantic changes go in
   their own commits (`TODO.md` lists them).
-- `hdlstudio-sim` has digitaljs's WorkerEngine semantics: per-cell `propagation`
+- `hdlstudio-sim`: per-cell `propagation`
   delays, a per-tick event queue, end-of-tick values. It flattens the hierarchy
   (subcircuits add neither delay nor events) and copies a queued cell's inputs
-  lazily. Deliberate differences from digitaljs: memory transparency compares
+  lazily. Deliberate differences from the previous (JavaScript) simulator: memory transparency compares
   addresses by value, ticks are u64, a zero-delay loop that never settles is an
   error. Speed: `cargo run --release -p hdlstudio-sim --example bench --
   circuit.json TICKS` (the `board` runs ~39k clock cycles/s); `--profile profiling`
@@ -42,7 +40,7 @@ simulator), `hdlstudio` (the binary).
   slice, processes only the events before the target tick and jumps there, so empty
   ticks cost nothing; the backlog is dropped.
 - Lua runs inside the engine (`crates/hdlstudio/src/lua.rs`, mlua + Lua 5.4): the
-  `vec`/`sim` API of digitaljs_lua (its USAGE.md on GitHub), scripts as coroutines;
+  `vec`/`sim` API (documented in the README), scripts as coroutines;
   `sim.sleep`/`sim.wait` register an alarm/monitor and yield, and the engine resumes
   the script after the step where it fires. `hdlstudio lua [--json] circuit.json
   script.lua [MAX_TICKS]` runs one headless. Differences: `tointeger` takes up to
@@ -58,9 +56,9 @@ simulator), `hdlstudio` (the binary).
 SVG drawn by hand, laid out by `elkjs`, simulated by the engine through the host
 (`command: 'engine'` messages carry requests and events).
 
-- `cells.ts`: each cell's ports, size and drawing, with digitaljs's geometry
-  (sizes, port positions, 25px leads): a device's `position` is its body's top-left,
-  so layouts saved by digitaljs still fit. `schematic.ts`: one graph as SVG, live
+- `cells.ts`: each cell's ports, size and drawing, with the geometry HDL Studio
+  always had (sizes, port positions, 25px leads): a device's `position` is its
+  body's top-left, so layouts saved before 1.0 still fit. `schematic.ts`: one graph as SVG, live
   values (applied once per animation frame), pan/zoom, wire tooltips and the
   waveform button, dragging cells. `layout.ts`: ELK, a node is the body plus its
   leads (ports on the border). `route.ts` (no DOM): wires through their saved
@@ -127,7 +125,7 @@ build: the engine is a native process.
   `test/verilog/<name>/<name>.sv` plus a `*_sim.lua`; only subfolders with exactly one
   `.sv` are single-file examples (`micro`, `soc`, `alu` are multi-file).
 - `test:golden` (`test/golden.spec.mjs`): the engine and the schematic against
-  what digitaljs did, frozen in `test/golden/` before it went away: per example and
+  the previous simulator's results, frozen in `test/golden/` before it went away: per example and
   mode (t: transform, nt: none, dc: zero combinational delay) the converted circuit,
   a seeded stimulus, the end-of-tick trace and every cell's ports; per Lua script
   (run as the file is now) what it printed. Needs only the engine (no yosys).
@@ -141,7 +139,7 @@ build: the engine is a native process.
   playwright install chromium`; skips without). The same harness shape is handy for
   looking at the view by hand.
 - `test:vscode` (`node test/runTest.js`) — `@vscode/test-electron` mocha suite.
-- Rust tests: `crates/*/tests` (golden converter output, 4vl fixtures, cell
+- Rust tests: `crates/*/tests` (golden converter output, vector fixtures, cell
   semantics the random stimulus rarely reaches: z operands, alarms on busy ticks).
 - Lint: ESLint flat config (`eslint.config.js`), all rules `warn`, plus `tsc`.
 
@@ -212,8 +210,8 @@ The view's `LuaRunner` (`view/lua_runner.ts`) allows one Lua execution (a script
 the REPL) at a time: running one stops every other, starts the simulation if it is
 paused, and the simulation pauses when it ends; the REPL queues its inputs. While one
 runs, the `runstate`'s `luaActive` disables the Control panel's run buttons. Since
-scripts run inside the engine there are no cross-thread races (the digitaljs era had
-several: stale ticks lost `sim.sleep` wake-ups, two runners fought over an input).
+scripts run inside the engine there are no cross-thread races (the JavaScript engine
+had several: stale ticks lost `sim.sleep` wake-ups, two runners fought over an input).
 
 ## Simulation controls (Control panel)
 
@@ -224,7 +222,7 @@ only see ticks.
 - **Timescale** (`1 tick = 1 ns` by default): a per-project option saved with the
   document, set via `document.setTimescale()`, which also fires `synthOptionUpdated`
   (the plain setter doesn't, and the Synthesis panel would write its stale copy back).
-- **Speed** (ticks/s, `null` = max) is global (`globalState`, `DigitalJS.simSpeed` in
+- **Speed** (ticks/s, `null` = max) is global (`globalState` `simSpeed`, in
   `extension.mjs`), pushed to every circuit view (`setspeed`) and sent with
   `showcircuit`. Start sends `interval {ms: 1000/speed}` + `start`, or `start_fast`.
   Lua starts the simulation the same way. The panel shows the measured speed too
@@ -240,7 +238,7 @@ only see ticks.
   shrink in a narrow sidebar; wide outputs end in an ellipsis with the value in the
   tooltip. To look at a panel without VS Code: call its provider's
   `resolveWebviewView` with a fake view (capture the `html` setter; `asWebviewUri: p
-  => 'http://harness' + p`) and a fake `djs`, inject `--vscode-*` variables and an
+  => 'http://harness' + p`) and a fake `studio` (the extension object), inject `--vscode-*` variables and an
   `acquireVsCodeApi` stub, load it in Playwright with `page.route('http://harness/**',
   …)` and post sample `iopanel:view`/`tick`/`runstate` messages.
 

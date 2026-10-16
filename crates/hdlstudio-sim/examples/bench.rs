@@ -1,6 +1,5 @@
 //! Speed check: `cargo run --release -p hdlstudio-sim --example bench -- circuit.json TICKS`
-//! Pulses `rst` if there is one, then runs flat out (like digitaljs's
-//! startFast) and prints ticks/s and the LED matrix's lit LEDs, if any.
+//! Pulses `rst` if there is one, then runs flat out and prints ticks/s and the LED matrix's lit LEDs, if any.
 
 use hdlstudio_logic::LogicVec;
 use hdlstudio_netlist::{Cell, Circuit};

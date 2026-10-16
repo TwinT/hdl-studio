@@ -1,6 +1,6 @@
 [package]
 name = "hdlstudio-sim"
-description = "Event-driven four-valued simulator of HDL Studio circuits, with digitaljs's semantics"
+description = "Event-driven four-valued simulator of HDL Studio circuits"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

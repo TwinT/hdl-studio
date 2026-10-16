@@ -17,9 +17,8 @@ export interface Sim {
 
 type Handler = (...args: any[]) => void;
 
-// One script (or the REPL) in the engine, with the interface digitaljs_lua's
-// LuaRunner had. Events come back asynchronously, except that stopping a
-// script reports it at once, as digitaljs_lua did.
+// One script (or the REPL) in the engine. Events come back asynchronously,
+// except that stopping a script reports it at once.
 export class EngineLuaRunner {
     #channel: Channel;
     #repl: boolean;

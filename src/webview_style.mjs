@@ -3,7 +3,7 @@
 'use strict';
 
 // Native form controls styled like VS Code's, with its theme variables only
-// (light and dark): what the deprecated webview-ui-toolkit gave the panels.
+// (light and dark).
 export const nativeControls = `
     input[type=text], select {
       background: var(--vscode-input-background); color: var(--vscode-input-foreground);

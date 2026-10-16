@@ -52,13 +52,15 @@ Contributions are welcome!
     and the explorer context menu, or using the `Add Files` button from the `Files` view
     in the HDL Studio side panel.
 
-    ![files sidepanel](./imgs/screenshots/digitaljs-files-sidepanel.png)
+    ![files sidepanel](./imgs/screenshots/files-sidepanel.png)
 
-    Files with extension `.digitaljs` will automatically be opened by HDL Studio.
-    Opening files with `.json` is also supported using either the explorer context menu
-    or the `Open With` VS Code command, including circuits saved by
-    [DigitalJS Online](https://digitaljs.tilk.eu/) or a raw Yosys JSON netlist.
-    Without source files only simulation is available; synthesis needs sources.
+    Circuits are saved as `.hdls` files, which HDL Studio opens automatically.
+    Projects saved by versions before 1.0 (`.digitaljs`) open too; use `Save As`
+    to give one the new extension. Opening `.json` files is also supported using
+    either the explorer context menu or the `Open With` VS Code command, including
+    circuits saved by [DigitalJS Online](https://digitaljs.tilk.eu/) or a raw Yosys
+    JSON netlist. Without source files only simulation is available; synthesis
+    needs sources.
 
     Note that the circuit file contains relative paths to the source files.
     If the circuit is to be copied to a different machine, the source files
@@ -149,9 +151,35 @@ Contributions are welcome!
     run button in the HDL Studio files view to start it. The run button will change
     into a stop button to abort the script while it is running. Running a script
     starts the simulation, and the simulation pauses when the script ends.
-    The API is digitaljs_lua's (https://github.com/tilk/digitaljs_lua/blob/master/docs/USAGE.md):
-    `sim.setinput`, `sim.getoutput`, `sim.sleep`, `sim.wait` with `sim.posedge`/`sim.negedge`,
-    the `vec` type and so on, except `sim.registerdisplay`.
+
+    The `sim` library talks to the circuit. Inputs, outputs and wires are named
+    as in the sources (a wire inside a subcircuit by the subcircuit labels first:
+    `sim.getvalue("core_i", "pc")`).
+    * `sim.setinput(name, value)`, `sim.getoutput(name)`: the top module's ports.
+    * `sim.getvalue(..., wire)`: any named wire.
+    * `sim.tick()`: the current tick.
+    * `sim.sleep(n)`: wait `n` ticks.
+    * `sim.wait(event[, n])`: wait for an event, at most `n` ticks. Events are
+      `sim.posedge(..., wire)`, `sim.negedge(..., wire)` and
+      `sim.value(v, ..., wire)` (the wire takes value `v`), and `e1 | e2`
+      waits for either.
+
+    The `vec` library is 4-valued vectors:
+    * Making one: `vec(5)`, `vec(-3, 8)`, `vec(true)`, `vec("8ha5")`,
+      `vec("4b1x0z")`, `vec.frombin("1x0z")`, `vec.fromhex("f0", 12)`,
+      `vec.fromoct(s[, bits])`, `vec.frombool(b[, bits])`,
+      `vec.frominteger(n[, bits])`.
+    * Reading one: `v:tobin()`, `v:tohex()`, `v:tooct()`, `v:tointeger()`,
+      `v:tointegersigned()`, `#v` (its width), `v(i)` (bit `i`, negative from the
+      top) and `v(i, n)` (`n` bits from `i`).
+    * Operators: `& | ~` (xor), `~v` (not), `..` (concatenation, `a .. b` puts `a`
+      on top as in `{a, b}`) and `==`.
+    * Bitwise methods: `band bor bxor bnand bnor bxnor bnot`. Reductions:
+      `rand ror rxor rnand rnor rxnor`.
+    * Tests: `ishigh islow isdefined isfullydefined`, and `xmask`.
+
+    Values given to `sim` can be vecs, booleans, integers or strings like
+    `"8hff"`. `print` shows its arguments.
 
     By default, the output of the script will be shown as notification messages in VS Code.
     Alternatively, you can open a Lua terminal for the circuit using the `Lua Terminal` button

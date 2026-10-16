@@ -1,6 +1,6 @@
 // A memory indexed by a 32-bit signal (yosys keeps the index's width:
-// ABITS=32) and a constant shifted by a 32-bit amount: digitaljs used to
-// assert on both even for small values. Also exercises shift amounts past
+// ABITS=32) and a constant shifted by a 32-bit amount: the previous
+// simulator asserted on both even for small values. Also exercises shift amounts past
 // the output width (all-fill) and out-of-range addresses (x).
 module wide_idx (
     input  logic        clk,

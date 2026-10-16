@@ -1,7 +1,7 @@
 //
 'use strict';
 
-// Simulated-time units for the control panel. digitaljs only knows ticks; the
+// Simulated-time units for the control panel. The engine only knows ticks; the
 // project's `timescale` option (e.g. "1ns") says how long one tick is.
 // Kept free of `vscode` so the webview bundle and the tests can import it.
 

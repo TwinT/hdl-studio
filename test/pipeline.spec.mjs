@@ -173,7 +173,7 @@ describe('Synthesis pipeline (yosys -> yosys2hdlstudio)', function () {
         assert.strictEqual(merges[0].bits, 4);
     });
 
-    // `inout` ports: digitaljs ports are one-directional, so the converter
+    // `inout` ports: circuit ports are one-directional, so the converter
     // (crates/hdlstudio-yosys/src/inout.rs) turns each inout P into an
     // input P (what the insides read) plus an output P__out that carries only
     // the module's own drivers.

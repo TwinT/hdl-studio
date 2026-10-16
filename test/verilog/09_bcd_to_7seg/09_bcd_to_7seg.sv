@@ -8,7 +8,7 @@ EXACTAMENTE 8 bits llamada "display7" (o que empiece con "display7_") se
 renderiza como un display de siete segmentos en vez de un NumDisplay
 genérico.
 
-El cell Display7 de digitaljs NO decodifica BCD internamente: espera el
+La celda Display7 NO decodifica BCD internamente: espera el
 patrón de segmentos ya armado, un bit por segmento, bit 7 = punto decimal y
 bits 6..0 = segmentos a,b,c,d,e,f,g (en ese orden, de más a menos
 significativo). Por eso este módulo arma ese patrón a mano con un case.

@@ -1,6 +1,6 @@
 //! Every circuit in the converter's golden file builds and runs; a counter
-//! counts. The real check is the differential test against digitaljs
-//! (test/simdiff), which needs Node and yosys.
+//! counts. The real check is test/golden (npm run test:golden): every
+//! example's trace, frozen.
 
 use hdlstudio_logic::LogicVec;
 use hdlstudio_netlist::{Cell, Circuit};
@@ -54,7 +54,7 @@ fn counter_counts() {
 #[test]
 fn a_zero_delay_loop_that_never_settles_is_an_error() {
     // y = sel ? ~y : 0 with no delay: once sel is 1 it toggles forever in the
-    // same tick (digitaljs hangs on it); until then it settles at 0
+    // same tick; until then it settles at 0
     let circuit: Circuit = serde_json::from_value(serde_json::json!({
         "devices": {
             "dev0": { "type": "Button", "net": "sel", "order": 0, "bits": 1 },
@@ -81,8 +81,8 @@ fn a_zero_delay_loop_that_never_settles_is_an_error() {
 
 #[test]
 fn an_alarm_on_a_tick_that_has_events_fires_once() {
-    // digitaljs queued that tick twice and broke its event queue; "Run for"
-    // lands on such ticks all the time
+    // the previous simulator queued that tick twice and broke its event
+    // queue; "Run for" lands on such ticks all the time
     let (_, circuit) = golden().into_iter().find(|(n, _)| n == "04_counter").unwrap();
     let mut sim = Sim::new(&circuit, false).unwrap();
     for _ in 0..5 {

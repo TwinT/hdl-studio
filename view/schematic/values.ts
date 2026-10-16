@@ -1,11 +1,10 @@
 // 4-state values as the engine sends them: binary strings of 0 1 x z, most
-// significant bit first. Display rules follow @twint/4vl's (and
-// hdlstudio-logic's): a hex/oct digit is 'z' only if all its bits are z,
-// 'x' if any bit is x or z.
+// significant bit first. Display rules are hdlstudio-logic's: a hex/oct
+// digit is 'z' only if all its bits are z, 'x' if any bit is x or z.
 
 export type Level = 'high' | 'low' | 'def' | 'highz' | 'undef';
 
-// What a wire, port or lamp is drawn as (digitaljs's colours).
+// What a wire, port or lamp is drawn as.
 export function level(v: string): Level {
     let ones = 0, zeros = 0, zs = 0;
     for (const c of v) {
@@ -48,7 +47,7 @@ function digits(v: string, g: number): string {
 
 export type Base = 'hex' | 'bin' | 'oct' | 'dec' | 'dec2c';
 
-// digitaljs's order (Display4vl.usableDisplays sorts by name).
+// By name.
 export const bases: Base[] = ['bin', 'dec', 'dec2c', 'hex', 'oct'];
 
 export function show(base: string, v: string): string {
@@ -64,7 +63,7 @@ export function show(base: string, v: string): string {
     }
 }
 
-// Characters a value takes in `base` (digitaljs's Display4vl size()).
+// Characters a value takes in `base`.
 export function size(base: string, bits: number): number {
     switch (base) {
         case 'bin': return bits;
@@ -80,8 +79,8 @@ const patterns: Record<string, RegExp> = {
 };
 
 // Text typed in `base` as a `bits`-wide value, or undefined if invalid.
-// Shorter input is extended like 4vl does: with its top bit if that is x or
-// z, else with zeros.
+// Shorter input is extended with its top bit if that is x or z, else with
+// zeros.
 export function read(base: string, text: string, bits: number): string | undefined {
     text = text.trim().toLowerCase();
     if (!(patterns[base] ?? patterns.hex).test(text)) return undefined;

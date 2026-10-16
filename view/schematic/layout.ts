@@ -1,5 +1,4 @@
-// Automatic layout with ELK's layered algorithm (the options digitaljs
-// used). A node is a cell's body with its port leads, so the ports (the
+// Automatic layout with ELK's layered algorithm. A node is a cell's body with its port leads, so the ports (the
 // circles, fixed) are on its border; its labels only reserve room.
 
 import ELK from 'elkjs/lib/elk.bundled.js';

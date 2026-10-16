@@ -17,24 +17,24 @@ export class CircuitView {
     #document
     #queue
     #init
-    #djs
+    #studio
     #subcircuits = {}
     // the simulation engine of this view (`hdlstudio serve`), started on
     // the webview's first request
     #engine
     #engineSession
     #disposed = false
-    constructor(djs, panel, document) {
-        this.#djs = djs;
+    constructor(studio, panel, document) {
+        this.#studio = studio;
         this.#panel = panel;
         this.#document = document;
         this.#queue = new WebviewMsgQueue(this.#panel.webview);
-        this.#panel.iconPath = djs.iconPath; // currently no effect for custom editor
+        this.#panel.iconPath = studio.iconPath; // currently no effect for custom editor
         this.onDidDispose = this.#panel.onDidDispose;
         this.onDidChangeViewState = this.#panel.onDidChangeViewState;
         this.#panel.webview.onDidReceiveMessage((msg) => {
             this.#queue.release();
-            this.#processCommand(djs, msg);
+            this.#processCommand(studio, msg);
         });
         let circuit_listener = this.#document.circuitUpdated(opts => {
             this.#showCircuit({ ...opts, pause: false });
@@ -54,7 +54,7 @@ export class CircuitView {
             this.#disposed = true;
             this.#engine?.kill();
         });
-        this.#panel.webview.html = this.#getViewContent(djs, this.#panel.webview);
+        this.#panel.webview.html = this.#getViewContent(studio, this.#panel.webview);
         this.#init = Promise.resolve();
         this.#showCircuit({ run: false, pause: true }); // force pause
     }
@@ -100,7 +100,7 @@ export class CircuitView {
             `the engine is missing (${hdlstudio_bin()}). Run "npm run compile".` : e.message));
         proc.on('exit', (code, signal) => fail(`the engine stopped (${signal || code})`));
     }
-    #processCommand(djs, msg) {
+    #processCommand(studio, msg) {
         switch (msg.command) {
             case 'engine':
                 this.#engineSend(msg.req);
@@ -122,7 +122,7 @@ export class CircuitView {
                 }
             }
             case 'img-exts':
-                djs.image_exts = msg.exts;
+                studio.image_exts = msg.exts;
                 return;
             case 'focus':
                 this.reveal();
@@ -140,18 +140,18 @@ export class CircuitView {
                     defaultcomb: this.#document.synth_options.defaultcomb,
                     timescale: this.#document.synth_options.timescale,
                     waveColors: waveColors(),
-                    speed: this.#djs.simSpeed }
+                    speed: this.#studio.simSpeed }
         });
     }
-    #getViewContent(djs, webview) {
+    #getViewContent(studio, webview) {
         return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <script>window.getImageSupport = ${!djs.image_exts_set};</script>
-  <script type="module" src="${webview.asWebviewUri(djs.schematicJSPath)}"></script>
-  <link href="${webview.asWebviewUri(djs.codIconsPath)}" rel="stylesheet"/>
+  <script>window.getImageSupport = ${!studio.image_exts_set};</script>
+  <script type="module" src="${webview.asWebviewUri(studio.schematicJSPath)}"></script>
+  <link href="${webview.asWebviewUri(studio.codIconsPath)}" rel="stylesheet"/>
   <title>HDL Studio</title>
 </head>
 <body><div id="paper"></div></body>

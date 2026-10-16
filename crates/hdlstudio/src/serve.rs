@@ -1,10 +1,10 @@
 //! `hdlstudio serve`: the engine as a child process, one JSON object per
-//! line both ways. It runs like digitaljs's simulation worker: a free
+//! line both ways. It runs a free
 //! running loop (rate-limited or flat out) in 10 ms slices, an `update` with
 //! the changed outputs of the observed (sub)circuits every 25 ms, monitors
 //! and alarms checked after each step.
 //!
-//! Requests (`op`), all addressed by digitaljs path ("dev3/dev12"; a
+//! Requests (`op`), all addressed by cell path ("dev3/dev12"; a
 //! subcircuit's graph is its path plus "/", the top level is ""):
 //!   load {session, circuit, defaultcomb}   step {id, next, sync}
 //!   start   start_fast   stop {id, sync}   interval {ms}   ping {id, sync}
@@ -181,7 +181,7 @@ impl Server {
                 }
             }
             Mode::Interval { last, owed } => {
-                // as digitaljs's worker: run the ticks owed since the last
+                // run the ticks owed since the last
                 // slice; empty ticks cost nothing; a backlog is dropped
                 *owed += start.duration_since(*last).as_secs_f64() * 1000.0 / self.interval;
                 *last = start;

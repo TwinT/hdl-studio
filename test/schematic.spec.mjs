@@ -22,7 +22,7 @@ import { designs, synthesize, slangAvailable, convert } from './designs.mjs';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 describe('schematic values', function () {
-    it('formats like 4vl', function () {
+    it('formats hex, oct and decimal with x and z', function () {
         assert.strictEqual(show('hex', '0000101'), '05');
         assert.strictEqual(show('hex', 'zzzz0001'), 'z1');
         assert.strictEqual(show('hex', 'zzz0001'), 'x1'); // a short top digit isn't all z
@@ -32,7 +32,7 @@ describe('schematic values', function () {
         assert.strictEqual(show('dec', '1x11'), 'x');
         assert.strictEqual(show('dec', 'zzzz'), 'z');
     });
-    it('reads like 4vl', function () {
+    it('reads typed values, extending them', function () {
         assert.strictEqual(read('hex', '5', 8), '00000101');
         assert.strictEqual(read('hex', 'x5', 12), 'xxxxxxxx0101');
         assert.strictEqual(read('hex', '1ff', 8), '11111111');
@@ -45,7 +45,7 @@ describe('schematic values', function () {
         assert.strictEqual(formatTimeAt(4e-6, 1e-6), '4 µs');
         assert.strictEqual(formatTimeAt(0, 1e-9), '0');
     });
-    it('classifies levels like digitaljs', function () {
+    it('classifies levels for the wire colours', function () {
         assert.deepStrictEqual(['111', '000', '010', 'zzz', 'z1z', 'x00'].map(level), ['high', 'low', 'def', 'highz', 'undef', 'undef']);
     });
 });

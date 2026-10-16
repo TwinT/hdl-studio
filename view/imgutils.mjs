@@ -5,8 +5,8 @@
 import { extension_formats } from '../lib/image_formats.mjs';
 
 function get_content_rect(svg, svgrect) {
-    // jointjs's paper size is larger than the content size,
-    // first figure out the content size and offset.
+    // the svg is larger than its content: first figure out the content's
+    // size and offset
     let realrect;
     for (const child of svg.children) {
         const rect = child.getBoundingClientRect();
@@ -78,13 +78,6 @@ function clone_node(node, parent, in_foreign, opts = {}) {
         for (let i = 0; i < nattrs; i++) {
             const name = cloned.attributes[i].name;
             if (name === 'class') { // we'll replace it with explicit styles
-                to_remove.push(name);
-            }
-            else if (name.startsWith('joint-')) {
-                to_remove.push(name);
-            }
-            else if (name === 'model-id' || name === 'data-type') {
-                // These are joint specific afaict
                 to_remove.push(name);
             }
         }

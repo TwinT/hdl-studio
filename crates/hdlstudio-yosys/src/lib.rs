@@ -1,11 +1,11 @@
 //! Yosys JSON netlist (`write_json`) to an HDL Studio circuit.
 //!
-//! A port of yosys2digitaljs 0.10.3 (`core.ts`) with this project's patch
-//! (multi-driver nets merged by TriMerge, `$tribuf`, `$bmux`, `$buf`, the
-//! LEDMatrix/momentary port attributes), plus `io_ui`, the inout split
-//! (`inout.rs`) and digitaljs's `transform.mjs` (`transform.rs`). The output
-//! is identical to what the JS chain produces, device numbering included.
-// Copyright (c) Marek Materzok (yosys2digitaljs, digitaljs), BSD-2-Clause.
+//! The converter (multi-driver nets merged by TriMerge, `$tribuf`, `$bmux`,
+//! `$buf`, the LEDMatrix/momentary port attributes), plus `io_ui`, the inout
+//! split (`inout.rs`) and the simplifications (`transform.rs`). Its output is
+//! identical to the JavaScript converter's it replaced, device numbering
+//! included (tests/golden.json).
+// Portions Copyright (c) 2018 Marek Materzok, BSD-2-Clause (see NOTICE).
 
 mod inout;
 mod transform;
@@ -227,7 +227,7 @@ const DFFS: &[&str] = &[
 ];
 
 /// Gate-level flip-flops (simcells.v): name prefix, control ports, data ports.
-// yosys2digitaljs builds this from a Map in which `$_DFF_` and `$_DFFE_`
+// The original builds this from a Map in which `$_DFF_` and `$_DFFE_`
 // appear twice, so the later entries (with `arst`) win and plain `$_DFF_P_`
 // / `$_DFFE_PP_` are "Invalid cell type". Kept that way.
 const TECHMAP_DFF_KINDS: &[(&str, &[&str], &[&str])] = &[
@@ -278,7 +278,7 @@ fn techmap_dff(ty: &str) -> Option<(&'static str, &'static [&'static str], &'sta
     })
 }
 
-/// `order_ports`: digitaljs port name for each yosys port of a cell type.
+/// The circuit's port name for each yosys port of a cell type.
 fn portmap(ty: &str, modules: &IndexMap<String, Module>) -> Option<HashMap<String, String>> {
     let m = |pairs: &[(&str, &str)]| Some(pairs.iter().map(|(a, b)| (a.to_string(), b.to_string())).collect());
     if let Some(module) = modules.get(ty) {
@@ -330,10 +330,10 @@ struct BitInfo {
     num: usize,
 }
 
-/// One module's conversion (`yosys_to_digitaljs_mod`).
+/// One module's conversion.
 struct Conv<'a> {
     name: &'a str,
-    // Insertion-ordered like yosys2digitaljs's HashMap: its order decides
+    // Insertion-ordered like the original's map: its order decides
     // the device numbering.
     nets: IndexMap<Vec<Bit>, Net>,
     netnames: HashMap<Vec<Bit>, Vec<String>>,
@@ -411,7 +411,7 @@ impl Conv<'_> {
             let pad = if signed { con.last().cloned().unwrap_or(Bit::Str("0".into())) } else { Bit::Str("0".into()) };
             con.resize(sz, pad);
             if !con.iter().all(Bit::is_const) && self.get_net(con).sources.is_empty() {
-                // yosys2digitaljs: "potentially troublesome hack for readability"
+                // "potentially troublesome hack for readability" (the original)
                 let extend = Extend { input: ccon.len() as u32, output: con.len() as u32 };
                 let ext = self.add_device(if signed { Cell::SignExtend { extend } } else { Cell::ZeroExtend { extend } });
                 self.add_net_target(&ccon, &ext, "in");
@@ -1226,7 +1226,7 @@ fn bitwise(ty: &str, g: Gate) -> Cell {
     }
 }
 
-/// yosys2digitaljs's module order (the `topsort` npm package): the last one
+/// The original's module order (the `topsort` npm package): the last one
 /// is the top level.
 // ponytail: JS sorts each node's successors with a comparator that calls the
 // Infinity sentinel equal to every name; plain string order here. Only the
@@ -1269,9 +1269,9 @@ fn module_order(modules: &IndexMap<String, Module>) -> Vec<String> {
     sorted
 }
 
-/// `yosys2digitaljs`: every module converted, the top level one with the
-/// others as its subcircuits.
-pub fn yosys2digitaljs(design: &Design) -> R<Circuit> {
+/// Every module converted, the top level one with the others as its
+/// subcircuits.
+pub fn convert(design: &Design) -> R<Circuit> {
     let mut out = IndexMap::new();
     for (name, module) in &design.modules {
         let conv = Conv {

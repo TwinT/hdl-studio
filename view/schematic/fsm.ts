@@ -13,7 +13,7 @@ export function transitions(d: Device): Trans[] {
 }
 
 // The transition taken from `state` with input `input` (x bits of its
-// condition are don't-cares), like digitaljs's FSM.
+// condition are don't-cares).
 export function nextTransition(trans: Trans[], state: number, input: string) {
     return trans.find((t) => t.from === state && [...t.ctrlIn].every((c, i) => c === 'x' || c === input[i]));
 }

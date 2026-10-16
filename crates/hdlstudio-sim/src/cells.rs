@@ -1,5 +1,5 @@
-//! Cell behaviour: each digitaljs cell's `operation()` (src/cells/*.mjs,
-//! with this project's patch), its ports and its initial outputs.
+//! Cell behaviour: each cell's operation, its ports and its initial outputs.
+// Portions Copyright (c) 2018 Marek Materzok, BSD-2-Clause (see NOTICE).
 
 use crate::Args;
 use crate::int::{self, ArithOp, CmpOp};
@@ -98,7 +98,7 @@ pub struct Memory {
     rd: Vec<RdPort>,
     wr: Vec<WrPort>,
     pub mem: LogicMem,
-    /// Words the circuit changed in the last run (digitaljs's `memChange`).
+    /// Words the circuit changed in the last run.
     pub writes: Vec<(usize, LogicVec)>,
 }
 
@@ -154,7 +154,7 @@ pub struct Spec {
     pub op: Op,
     pub inputs: Vec<Port>,
     pub outputs: Vec<Port>,
-    /// Initial value of each output (digitaljs's `_resetPortValue`).
+    /// Initial value of each output.
     pub initial: Vec<LogicVec>,
     pub propagation: u32,
     /// Skipped when its turn comes (the worker's `specialGates`).
@@ -162,7 +162,7 @@ pub struct Spec {
 }
 
 impl Op {
-    /// digitaljs's `_gateKind == 'combinational'` (what `defaultcomb` affects).
+    /// A combinational cell (what `defaultcomb` affects).
     pub fn combinational(&self) -> bool {
         !matches!(
             self,
@@ -544,7 +544,7 @@ fn fsm(f: &hdlstudio_netlist::Fsm) -> Result<Spec, String> {
     Ok(Spec::new(Op::Fsm(Box::new(op)), inputs, one("out", bout), 1))
 }
 
-/// digitaljs's `shiftHelp`.
+/// A shift by `am` (negative: the other way), extended to `bits_out`.
 fn shift_help(in1: &LogicVec, am: i64, bits_in: usize, bits_out: usize, sgn_in: bool, sgn_out: bool, fillx: bool) -> LogicVec {
     let msb = |v: &LogicVec| v.bits().checked_sub(1).map_or(Bit::Zero, |i| v.get(i));
     let fill = |signed: bool, v: &LogicVec| if fillx { Bit::X } else if signed { msb(v) } else { Bit::Zero };
@@ -555,7 +555,7 @@ fn shift_help(in1: &LogicVec, am: i64, bits_in: usize, bits_out: usize, sgn_in: 
     my_in.shift(am, pad).slice(0, bits_out)
 }
 
-/// A 4vl bit by its index; out of range reads as 0, like `get`.
+/// Bit 0 (out of range reads as 0, like `get`).
 fn bit0(v: &LogicVec) -> Bit {
     v.get(0)
 }
@@ -564,8 +564,7 @@ impl Op {
     /// Runs the cell on its inputs (`cur` holds its current outputs) and
     /// returns its output, for the cells with one, and whether it must run
     /// again after its propagation delay (the clock). Memory pushes
-    /// `(output index, value)` to `multi` instead, in the order digitaljs's
-    /// `operation()` returns them.
+    /// `(output index, value)` to `multi` instead, in port order.
     pub(crate) fn eval(&mut self, args: &Args, cur: &Args, multi: &mut Vec<(usize, LogicVec)>) -> (Option<LogicVec>, bool) {
         let v = match self {
             Op::Nop => None,
@@ -857,10 +856,9 @@ impl Memory {
                         Some(PortMask::Each(v)) => v.get(j).copied().unwrap_or(false),
                         None => false,
                     };
-                    // Divergence: digitaljs compares the addresses with JS `==`, by
-                    // object, which only holds when both came through the same
-                    // objects (a Mux or Dff passes its input object on). By value
-                    // here, which is what yosys's transparency means.
+                    // the same address by value, which is what yosys's
+                    // transparency means (the previous simulator compared
+                    // objects, so it depended on how the address got there)
                     let writing = active(w.clk, w.last_clk) && enabled(w.en) && args[p.addr] == args[w.addr];
                     if hit(&p.transparent) && writing {
                         data[k] = write_value(w, &data[k], &args[w.data]);

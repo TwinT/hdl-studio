@@ -1,6 +1,6 @@
 [package]
 name = "hdlstudio-yosys"
-description = "Yosys JSON netlist to HDL Studio circuit; port of yosys2digitaljs, io_ui, the inout split and digitaljs's transform"
+description = "Yosys JSON netlist to HDL Studio circuit: conversion, I/O widgets, inout split, simplifications"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

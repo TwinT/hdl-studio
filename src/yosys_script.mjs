@@ -72,8 +72,8 @@ export function build_yosys_script(files, opts = {}) {
     cmds.push('bwmuxmap');
     // Converts tri-state muxes (`assign x = en ? val : 'z;`) into $tribuf
     // cells with a genuine enable + high-Z output, instead of leaving them
-    // as an inferred mux. The converter turns $tribuf into a Tribuf (native
-    // Z/4vl support), and a net with more than one driver - the norm for a
+    // as an inferred mux. The converter turns $tribuf into a Tribuf (z is a
+    // value like 0, 1 and x), and a net with more than one driver - the norm for a
     // shared bus - gets merged via a synthesized TriMerge device.
     cmds.push('tribuf');
     cmds.push(opts.optimize ? 'opt' : 'opt_clean');

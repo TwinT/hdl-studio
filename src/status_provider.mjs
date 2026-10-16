@@ -6,13 +6,13 @@ import { WebviewMsgQueue } from './webview_msg_queue.mjs';
 import { nativeControls } from './webview_style.mjs';
 
 export class StatusProvider {
-    #djs
-    constructor(djs) {
-        this.#djs = djs;
+    #studio
+    constructor(studio) {
+        this.#studio = studio;
     }
     resolveWebviewView(view, context, _token) {
-        const status_uri = view.webview.asWebviewUri(this.#djs.statusJSPath);
-        const icon_uri = view.webview.asWebviewUri(this.#djs.codIconsPath);
+        const status_uri = view.webview.asWebviewUri(this.#studio.statusJSPath);
+        const icon_uri = view.webview.asWebviewUri(this.#studio.codIconsPath);
         view.webview.options = {
             enableScripts: true
         };
@@ -23,51 +23,51 @@ export class StatusProvider {
             queue.release();
             switch (msg.command) {
                 case 'iopanel:update':
-                    this.#djs.postPanelMessage({ command: 'iopanel:update',
+                    this.#studio.postPanelMessage({ command: 'iopanel:update',
                                                  id: msg.id, value: msg.value });
                     return;
                 case 'panel-cmd':
                     // extra fields (e.g. runfor's `ticks`) travel with the command
-                    this.#djs.postPanelMessage({ ...msg, command: msg.panel_cmd });
+                    this.#studio.postPanelMessage({ ...msg, command: msg.panel_cmd });
                     return;
                 case 'settimescale':
-                    this.#djs.setTimescale(msg.value);
+                    this.#studio.setTimescale(msg.value);
                     return;
                 case 'setspeed':
-                    this.#djs.simSpeed = msg.speed;
+                    this.#studio.simSpeed = msg.speed;
                     return;
             }
         });
         const listeners = [];
-        listeners.push(this.#djs.tickUpdated(async (tick) => {
+        listeners.push(this.#studio.tickUpdated(async (tick) => {
             queue.post({ command: 'tick', tick });
         }));
-        listeners.push(this.#djs.iopanelMessage(async (message) => {
+        listeners.push(this.#studio.iopanelMessage(async (message) => {
             queue.post(message);
         }));
-        listeners.push(this.#djs.runStatesUpdated(async (state) => {
+        listeners.push(this.#studio.runStatesUpdated(async (state) => {
             queue.post({ command: 'runstate', state });
         }));
         // also fires on document switch
-        listeners.push(this.#djs.synthOptionUpdated(async () => {
-            queue.post({ command: 'timescale', value: this.#djs.synth_options.timescale || '1ns' });
+        listeners.push(this.#studio.synthOptionUpdated(async () => {
+            queue.post({ command: 'timescale', value: this.#studio.synth_options.timescale || '1ns' });
         }));
         view.onDidDispose(() => {
             for (const listener of listeners) {
                 listener.dispose();
             }
         });
-        const rs = this.#djs.runStates;
+        const rs = this.#studio.runStates;
         const enabled = b => b ? '' : 'disabled';
         view.webview.html = `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <script>
-    window.init_view = ${JSON.stringify(this.#djs.iopanelViews)};
-    window.init_timescale = ${JSON.stringify(this.#djs.synth_options.timescale || '1ns')};
-    window.init_speed = ${JSON.stringify(this.#djs.simSpeed)};
-    window.init_tick = ${JSON.stringify(this.#djs.tick || 0)};
+    window.init_view = ${JSON.stringify(this.#studio.iopanelViews)};
+    window.init_timescale = ${JSON.stringify(this.#studio.synth_options.timescale || '1ns')};
+    window.init_speed = ${JSON.stringify(this.#studio.simSpeed)};
+    window.init_tick = ${JSON.stringify(this.#studio.tick || 0)};
     window.init_runstate = ${JSON.stringify(rs)};
   </script>
   <script type="module" src="${status_uri}"></script>

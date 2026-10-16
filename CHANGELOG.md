@@ -5,7 +5,7 @@ All notable changes to HDL Studio will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.0.0] - Unreleased
+## [1.0.0] - 2026-10-16
 
 HDL Studio no longer uses DigitalJS: the simulator, the netlist converter and
 the Lua engine are its own, written in Rust (`hdlstudio`, a native process),
@@ -25,6 +25,9 @@ file format, so projects saved by earlier versions open as they are.
 - The FSM window highlights the transition the next clock edge takes.
 
 ### Changed
+- Projects are saved as `.hdls` files (the same JSON). Projects saved by
+  earlier versions (`.digitaljs`) still open; `Save As` gives them the new
+  extension.
 - Much faster simulation (about 9x on the `soc` board).
 - Moving cells, and undo/redo of it, no longer restart the simulation.
 - The Synthesis panel has Synthesis/Diagram tabs under the Synthesize button;

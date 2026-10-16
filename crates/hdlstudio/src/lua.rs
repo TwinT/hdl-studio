@@ -1,12 +1,12 @@
-//! Lua scripts inside the engine: digitaljs_lua's `vec` and `sim` libraries
-//! (node_modules/digitaljs_lua/docs/USAGE.md) on Lua 5.4. A script runs as a
+//! Lua scripts inside the engine: the `vec` and `sim` libraries (the API
+//! HDL Studio always had, see the README) on Lua 5.4. A script runs as a
 //! coroutine; `sim.sleep`/`sim.wait` register a wake-up (an alarm, one-shot
 //! monitors) and yield, and the engine resumes the script after the step
 //! where it fires, with the circuit stopped at that tick.
-//! Differences from digitaljs_lua (TODO.md): `tointeger` takes up to 63
-//! bits (JS numbers: 31), a string narrower than the input it is assigned
-//! to is zero-extended (digitaljs_lua crashed), the REPL prints the values
-//! of an expression, `sim.registerdisplay` isn't there yet.
+//! Since 1.0 (CHANGELOG): `tointeger` takes up to 63 bits, a string
+//! narrower than the input it is assigned to is zero-extended, the REPL
+//! prints the values of an expression, `sim.registerdisplay` isn't there.
+// Portions Copyright (c) 2018 Marek Materzok, BSD-2-Clause (see NOTICE).
 
 use hdlstudio_logic::{Bit, LogicVec};
 use hdlstudio_sim::{Event, Sim};
@@ -74,7 +74,7 @@ fn message(e: &mlua::Error) -> String {
     match e {
         mlua::Error::CallbackError { cause, .. } => message(cause),
         mlua::Error::WithContext { cause, .. } => message(cause),
-        // without mlua's traceback, as digitaljs_lua shows it
+        // without mlua's traceback
         mlua::Error::RuntimeError(s) => s.split("\nstack traceback:").next().unwrap_or_default().to_string(),
         mlua::Error::SyntaxError { message, .. } => message.clone(),
         e => e.to_string(),
@@ -109,7 +109,7 @@ impl UserData for LEvent {
     }
 }
 
-/// digitaljs_lua's `lua_to4vl`: a vec, a boolean, an integer or a string
+/// A vec, a boolean, an integer or a string
 /// ("8hff"), cut or zero-extended to `bits` when given.
 fn to_vec(v: &Value, bits: Option<usize>) -> mlua::Result<Option<LogicVec>> {
     let r = match v {

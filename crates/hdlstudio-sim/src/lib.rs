@@ -1,5 +1,5 @@
-//! Event-driven simulator of HDL Studio circuits, with the semantics of
-//! digitaljs's WorkerEngine (what the extension used to run):
+//! Event-driven simulator of HDL Studio circuits, with the semantics the
+//! extension's simulator always had:
 //! - each cell runs `propagation` ticks after an input changes, on a copy
 //!   of its inputs taken when it was queued (transport delay); queued again
 //!   for the same tick, its copy is refreshed and it keeps its place. The
@@ -8,8 +8,8 @@
 //! - a tick's queue runs in order, zero-delay cells joining at the end;
 //! - subcircuits add neither delay nor events, so the hierarchy is
 //!   flattened: a net goes from its real driver straight to every cell that
-//!   reads it, in digitaljs's propagation order.
-// Copyright (c) Marek Materzok (digitaljs), BSD-2-Clause.
+//!   reads it, in the original propagation order.
+// Portions Copyright (c) 2018 Marek Materzok, BSD-2-Clause (see NOTICE).
 
 mod cells;
 mod int;
@@ -47,13 +47,13 @@ const NONE: u64 = u64::MAX;
 
 struct Net {
     value: LogicVec,
-    /// Cells to queue when the value changes, in digitaljs's order.
+    /// Cells to queue when the value changes, in order.
     fanout: Vec<CellId>,
     changed: bool,
     monitored: bool,
 }
 
-/// What a step tells the engine's client (digitaljs's worker messages).
+/// What a step tells the engine's client.
 #[derive(Clone, Debug, PartialEq)]
 pub enum Event {
     /// A monitored output changed (to one of its trigger values, if given).
@@ -72,7 +72,7 @@ struct Monitor {
     once: bool,
 }
 
-/// Names in one (sub)circuit instance, for scripts: digitaljs's label index.
+/// Names in one (sub)circuit instance, for scripts.
 #[derive(Default)]
 struct Labels {
     /// Connector name to the net it carries.
@@ -121,7 +121,7 @@ struct TickQueue {
 
 const NO_COPY: u32 = u32::MAX;
 
-/// A digitaljs cell output, by hierarchical path ("dev3/dev12") and port.
+/// A cell output, by hierarchical path ("dev3/dev12") and port.
 pub struct Probe {
     pub path: String,
     pub port: String,
@@ -162,7 +162,7 @@ pub struct Sim {
 
 impl Sim {
     /// `defaultcomb`: combinational cells without their own propagation
-    /// settle in zero ticks (digitaljs's `defaultCombinationalPropagation: 0`).
+    /// settle in zero ticks.
     pub fn new(circuit: &Circuit, defaultcomb: bool) -> Result<Sim, String> {
         build::build(circuit, defaultcomb)
     }
@@ -191,7 +191,7 @@ impl Sim {
         &self.nets[probe.net as usize].value
     }
 
-    /// The probe of a cell output, by digitaljs path and port.
+    /// The probe of a cell output, by path and port.
     pub fn find_probe(&self, path: &str, port: &str) -> Option<usize> {
         self.probes.binary_search_by(|p| (p.path.as_str(), p.port.as_str()).cmp(&(path, port))).ok()
     }
@@ -246,8 +246,7 @@ impl Sim {
     /// Reports `net` changes as `id`: after each tick it changed in, if its
     /// value is one of `triggers` (any, if `None`); `once` drops the monitor
     /// when it fires, `stop` asks the client to stop running. Without
-    /// triggers the current value is reported right away (digitaljs's
-    /// worker `monitor`).
+    /// triggers the current value is reported right away.
     pub fn monitor(&mut self, id: u64, net: NetId, triggers: Option<Vec<LogicVec>>, stop: bool, once: bool) {
         if triggers.is_none() {
             let value = self.nets[net as usize].value.clone();
@@ -302,8 +301,7 @@ impl Sim {
         Ok(())
     }
 
-    /// After a step: monitored values and alarms (digitaljs's
-    /// `_postMonitors`).
+    /// After a step: monitored values and alarms.
     fn post_monitors(&mut self) {
         for (id, value) in std::mem::take(&mut self.checks) {
             let Some(m) = self.monitors.get(&id) else { continue };
@@ -349,7 +347,7 @@ impl Sim {
 
     /// Jumps to the next tick with events and runs it; returns how many
     /// cells ran. A zero-delay loop that never settles (each cell running
-    /// over and over in the same tick) is an error, where digitaljs hangs.
+    /// over and over in the same tick) is an error, not a hang.
     pub fn update_gates_next(&mut self) -> Result<usize, String> {
         let Some((k, entries)) = self.queue.pop_first() else {
             self.post_monitors();
@@ -547,7 +545,7 @@ mod build {
             }
             let nested = parent.is_some();
             self.insts.push(Inst { circuit, path, parent, cells: HashMap::new(), subs: HashMap::new(), into, from });
-            // preorder, the order digitaljs's worker gets its cells in
+            // preorder: the order cells are numbered in
             for (id, dev) in &circuit.devices {
                 let prefix = format!("{}{id}", self.insts[idx].path);
                 match &dev.cell {
@@ -626,7 +624,7 @@ mod build {
         }
 
         /// The cells to queue when output `port` of device `id` changes, in
-        /// digitaljs's order (connectors in order, through subcircuits).
+        /// order (connectors in order, through subcircuits).
         fn fanout(&self, inst: usize, id: &str, port: &str, out: &mut Vec<CellId>) {
             let i = &self.insts[inst];
             for (tid, tport) in i.from.get(&key(id, port)).into_iter().flatten() {
@@ -713,7 +711,7 @@ mod build {
             }
         }
         probes.sort_by(|a, b| (&a.path, &a.port).cmp(&(&b.path, &b.port)));
-        // names for scripts (digitaljs's makeLabelIndex)
+        // names for scripts
         let mut labels = vec![];
         for inst in 0..b.insts.len() {
             let mut l = Labels::default();

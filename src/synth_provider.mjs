@@ -8,33 +8,33 @@ import { nativeControls } from './webview_style.mjs';
 let view_id = 1;
 
 export class SynthProvider {
-    #djs
-    constructor(djs) {
-        this.#djs = djs;
+    #studio
+    constructor(studio) {
+        this.#studio = studio;
     }
     #processCommand(message, view, context) {
         switch (message.command) {
             case 'do-synth':
-                this.#djs.doSynth();
+                this.#studio.doSynth();
                 return;
             case 'update-options':
-                if (message.options._doc_id == this.#djs.doc_id) {
+                if (message.options._doc_id == this.#studio.doc_id) {
                     delete message.options._doc_id;
-                    this.#djs.synth_options = message.options;
+                    this.#studio.synth_options = message.options;
                 }
                 return;
         }
     }
     #extendedOptions() {
-        return { ...this.#djs.synth_options, _doc_id: this.#djs.doc_id };
+        return { ...this.#studio.synth_options, _doc_id: this.#studio.doc_id };
     }
     async #extendedState() {
         return { options: this.#extendedOptions(),
-                topModules: await this.#djs.topModuleCandidates() };
+                topModules: await this.#studio.topModuleCandidates() };
     }
     async resolveWebviewView(view, context, _token) {
-        const synth_uri = view.webview.asWebviewUri(this.#djs.synthJSPath);
-        const icon_uri = view.webview.asWebviewUri(this.#djs.codIconsPath);
+        const synth_uri = view.webview.asWebviewUri(this.#studio.synthJSPath);
+        const icon_uri = view.webview.asWebviewUri(this.#studio.codIconsPath);
         view.webview.options = {
             enableScripts: true
         };
@@ -60,8 +60,8 @@ export class SynthProvider {
             }
             this.#processCommand(msg, view.webview, context);
         });
-        const option_listener = this.#djs.synthOptionUpdated(refresh_options);
-        const sources_listener = this.#djs.sourcesUpdated(refresh_options);
+        const option_listener = this.#studio.synthOptionUpdated(refresh_options);
+        const sources_listener = this.#studio.sourcesUpdated(refresh_options);
         view.onDidDispose(() => {
             option_listener.dispose();
             sources_listener.dispose();

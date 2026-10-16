@@ -1,7 +1,7 @@
 use crate::{Bit, LogicVec};
 
-/// One item of 4vl's memory JSON representation (`Mem4vl.fromJSON`): a
-/// count repeats the value that follows it.
+/// One item of a memory's JSON representation (as project files save it):
+/// a count repeats the value that follows it.
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(untagged)]
 pub enum MemItem {
@@ -9,7 +9,7 @@ pub enum MemItem {
     Value(String),
 }
 
-/// A memory: `len` words of `bits` bits each (4vl's `Mem4vl`).
+/// A memory: `len` words of `bits` bits each.
 // ponytail: one LogicVec per word; flat planes if big memories get slow.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct LogicMem {
@@ -60,9 +60,8 @@ impl LogicMem {
         Some(LogicMem { bits, data })
     }
 
-    /// 4vl's `Mem4vl.toJSON`: words in binary, runs of equal words as a
-    /// count followed by the word. (4vl also has a hex form, but its check
-    /// for it is always false, so it never emits one.)
+    /// Words in binary, runs of equal words as a count followed by the
+    /// word. (The format also has a hex form, which this never writes.)
     pub fn to_json(&self) -> Vec<MemItem> {
         let mut rep = Vec::new();
         let words: Vec<String> = self.data.iter().map(LogicVec::to_bin).collect();

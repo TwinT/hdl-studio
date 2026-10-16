@@ -1,10 +1,9 @@
 //! The circuit model: devices (cells), connectors and subcircuits.
 //!
-//! Its serde form is digitaljs's circuit JSON, field for field, so the
-//! extension's digitaljs UI can keep loading what the engine produces until
-//! the new UI replaces it.
-// ponytail: fields mirror digitaljs, including its quirks (`bits` is a number
-// for some cells and an object for others); a cleaner .hdls form can come
+//! Its serde form is the project files' circuit JSON (the format HDL
+//! Studio always saved), field for field.
+// ponytail: fields keep that format's quirks (`bits` is a number
+// for some cells and an object for others); a cleaner form can come
 // with the new UI.
 
 use hdlstudio_logic::MemItem;
@@ -159,7 +158,7 @@ pub enum Cell {
     Subcircuit { celltype: String },
 }
 
-/// digitaljs doesn't save `net`, `order` or `bits` for a Clock.
+/// A saved Clock has no `net`, `order` or `bits`.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Io {
     #[serde(default)]
@@ -360,7 +359,7 @@ pub enum PortMask {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Fsm {
     pub polarity: FsmPolarity,
-    /// Not saved by digitaljs.
+    /// Not in saved files.
     #[serde(default)]
     pub wirename: serde_json::Value,
     pub bits: InOut,
@@ -375,7 +374,7 @@ pub struct FsmPolarity {
     pub arst: bool,
 }
 
-/// `None` states are what digitaljs gets as NaN (an empty state field).
+/// `None` states are an empty state field.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Transition {
     pub state_in: Option<i64>,

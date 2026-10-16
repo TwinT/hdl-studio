@@ -1,6 +1,5 @@
-//! The converter against what the JS chain it replaces (yosys2digitaljs
-//! 0.10.3 with this project's patch, `io_ui`, `src/inout_split.mjs`,
-//! digitaljs's `src/transform.mjs`) produced for the same yosys netlists:
+//! The converter against what the JavaScript converter it replaced
+//! produced for the same yosys netlists:
 //! the examples small enough to keep, a design written to cover more cell
 //! types (`coverage_*`) and hand-made netlists for cells our yosys script
 //! never emits (`handmade*`). Run with BLESS=1 to rewrite the expected
@@ -11,7 +10,7 @@ use serde_json::{Value, json};
 fn convert(yosys: &Value, transform: bool) -> Result<Value, String> {
     let mut design: hdlstudio_yosys::Design = serde_json::from_value(yosys.clone()).unwrap();
     hdlstudio_yosys::split_inout_ports(&mut design);
-    let mut c = hdlstudio_yosys::yosys2digitaljs(&design)?;
+    let mut c = hdlstudio_yosys::convert(&design)?;
     hdlstudio_yosys::io_ui(&mut c);
     if transform {
         c = hdlstudio_yosys::transform_circuit(c);
@@ -30,7 +29,7 @@ fn matches_the_js_chain() {
             (Ok(ui), Ok(transform)) => json!({ "ui": ui, "transform": transform }),
             (Err(e), _) | (_, Err(e)) => json!({ "error": e }),
         };
-        // the model also reads digitaljs JSON back unchanged
+        // the model also reads the circuit JSON back unchanged
         for key in ["ui", "transform"] {
             if let Some(v) = case.get(key) {
                 let c: hdlstudio_netlist::Circuit = serde_json::from_value(v.clone()).unwrap();
