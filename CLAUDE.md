@@ -74,17 +74,26 @@ view (`view/main.mjs`, which still has wire editing) until the cutover. `src/cir
   (`memory.ts`), FSM diagram (`fsm.ts`, the next transition is computed in
   the view), image export (`view/imgutils.mjs`). `view/lua_runner.ts` is
   shared by both views.
-- The waveform monitor (`waves.ts`, phase 6): the button shown on a hovered
-  wire (or a double-click on it) watches its driver. Pan captures the pointer
-  only once it drags: capturing on pointerdown sends the click/dblclick to the
-  svg instead of the wire (a bug that synthetic events in tests didn't catch;
-  `test:schematic` uses real mouse events for it). The engine records every end-of-tick change of a watched
-  output (`watch`/`unwatch`, `crates/hdlstudio/src/wave.rs`, up to 1M changes
-  per signal); after each update the view asks for the window it shows
-  (`wave {from, to, bins}`, one entry per pixel column, several changes in
-  one column come back as a dense block) and draws it. So a flat-out run
-  never streams its changes through JSON. Triggers are plain engine
-  `monitor`s with `stop`.
+- The waveform monitor (`waves.ts`, phase 6), laid out like Surfer/VaporView:
+  name, value (under the pointer, else at the view's right edge), waveform,
+  a time ruler in the project's timescale (the host sends `timescale` with
+  `showcircuit` and on change). Colours come from the `hdl-studio.waveform.colors`
+  setting (sent as `wavecolors`), Surfer's dark theme by default: one colour
+  for 0/1, a fill under 1, red x, yellow z. The button shown on a hovered
+  wire (or a double-click on it) watches its driver. On a waveform a click
+  toggles following the simulation, a drag scrolls back (and stops following),
+  Ctrl+wheel zooms. A row's menu (right-click or "…") picks the number format
+  and a pause condition ("rises", "equals 5"...): an engine `monitor` with
+  `stop` (triggers null = any change); when it fires the view marks the tick
+  and says why it paused. The engine records every end-of-tick change of a
+  watched output (`watch`/`unwatch`, `crates/hdlstudio/src/wave.rs`, up to 1M
+  changes per signal); after each update the view asks for the window it
+  shows (`wave {from, to, bins}`, one entry per pixel column, several changes
+  in one column come back as a dense block). So a flat-out run never streams
+  its changes through JSON. Pan captures the pointer only once it drags:
+  capturing on pointerdown sends click/dblclick to the svg instead of the
+  wire (a bug synthetic test events didn't catch; `test:schematic` uses real
+  mouse events for it).
 - The circuit stays in digitaljs's JSON (hdlstudio-netlist's serde form);
   layout lives in `devices[id].position` and `connectors[i].vertices` (ELK's
   bend points), in the top level and per subcircuit type. A `showcircuit`

@@ -183,7 +183,7 @@ describe('schematic webview on the engine', function () {
             await page.mouse.move(r.x + r.width / 2, r.y + r.height / 2, { steps: 3 });
             await page.mouse.click(r.x + r.width / 2, r.y + r.height / 2);
         }
-        const rows = await page.evaluate(() => [...document.querySelectorAll('#monitor .row .name')].map((n) => n.textContent));
+        const rows = await page.evaluate(() => [...document.querySelectorAll('#monitor .name > span:not(.pause)')].map((n) => n.textContent));
         assert.ok(rows.includes('count') && rows.includes('clk') && rows.length >= 4, rows.join());
         const rst = view.find((r) => r.label === 'rst').id, count = view.find((r) => r.label === 'count').id;
         await post({ command: 'iopanel:update', id: rst, value: '1' });
@@ -191,25 +191,32 @@ describe('schematic webview on the engine', function () {
         await post({ command: 'startsim' });
         await page.waitForTimeout(100);
         await post({ command: 'iopanel:update', id: rst, value: '0' });
-        // the count row gets a trigger: stop when it is 5
-        await page.evaluate(() => {
-            const row = [...document.querySelectorAll('#monitor .row')].find((r) => r.querySelector('.name').textContent === 'count');
-            const input = row.querySelector('input');
-            input.value = '5';
-            input.dispatchEvent(new Event('change'));
-        });
+        // the count row's menu: pause the simulation when it equals 5
+        const name = page.locator('#monitor .name', { hasText: /^count$/ });
+        await name.click({ button: 'right' });
+        await page.fill('.wavemenu input', '5');
+        await page.press('.wavemenu input', 'Enter');
         await until(() => window.__posted.filter((m) => m.command === 'runstate').at(-1)?.running === false);
         const shown = (await posted('iopanel:update')).filter((m) => m.id === count).at(-1).value;
         assert.strictEqual(shown, '0101');
-        // something was drawn: the clock's green and salmon
+        assert.match(await page.evaluate(() => document.querySelector('#monitor .status').textContent), /count equals 5 at/);
+        // something was drawn, in the signal colour (Surfer's green)
         const colours = await page.evaluate(() => {
-            const c = document.querySelector('#monitor .row canvas');
+            const c = document.querySelector('#monitor .grid canvas:not(.ruler)');
             const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
             const seen = new Set();
             for (let i = 0; i < d.length; i += 4) if (d[i + 3]) seen.add(`${d[i]},${d[i + 1]},${d[i + 2]}`);
             return [...seen];
         });
-        assert.ok(colours.includes('3,192,60') && colours.includes('252,124,104'), colours.slice(0, 20).join(' '));
+        assert.ok(colours.includes('86,193,38'), colours.slice(0, 20).join(' '));
+        // the trigger stopped following; a click on a waveform follows again, another stops
+        const following = () => page.evaluate(() => document.querySelector('#monitor [name=follow]').classList.contains('on'));
+        assert.strictEqual(await following(), false);
+        const wave = await page.evaluate(() => document.querySelector('#monitor .grid canvas:not(.ruler)').getBoundingClientRect().toJSON());
+        await page.mouse.click(wave.x + 40, wave.y + 10);
+        assert.strictEqual(await following(), true);
+        await page.mouse.click(wave.x + 40, wave.y + 10);
+        assert.strictEqual(await following(), false);
     });
 
     it('runs a Lua script in the engine', async function () {

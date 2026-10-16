@@ -151,12 +151,13 @@
       - no wire editing (on purpose for v1: an edited netlist no longer
         matches the SystemVerilog); the digitaljs view (setting
         `hdl-studio.useDigitaljsView`) still has it;
-      - the waveform monitor (phase 6) shows ticks, not time units (as
-        digitaljs's did; the control panel knows the timescale, the view
-        doesn't); its history is capped at 1M changes per signal (the oldest
-        quarter goes), which a clock fills in seconds at flat-out speed;
-        watched signals survive a re-synthesis only if the same cell id and
-        name still exist;
+      - the waveform monitor's history is capped at 1M changes per signal
+        (the oldest quarter goes), which a clock fills in seconds at
+        flat-out speed; watched signals survive a re-synthesis only if the
+        same cell id and name still exist; dragging a waveform scrolls back
+        and so stops following the simulation (a click follows again): Marcos
+        found that odd, to discuss; a light waveform theme, or one following
+        the VS Code theme, is a matter of the colours setting;
       - the synthesis panel's layout option (elkjs/dagre) does nothing in it:
         it only lays out with ELK. Remove the option with the digitaljs view;
       - a number base picked on a NumEntry/NumDisplay is kept in the circuit
@@ -181,3 +182,9 @@
       most of it. Implement them (a REPL `sim.start()` would have to outlive
       the line, and the UI would need a "running" event from the engine) or
       fix the README.
+- [X] The control panel's "Run until next event" (digitaljs's
+      updateGatesNext: to the next tick with anything queued) is gone: with
+      gate delays there is an event almost every tick, so it looked like a
+      single step, and it ignores triggers. "One clock cycle" runs one period
+      of the first clock (2 x its propagation) and pauses at the same phase,
+      everything settled. The views still answer `nexteventsim`.

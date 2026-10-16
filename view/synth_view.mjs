@@ -74,6 +74,15 @@ class Synth {
             });
         }
 
+        for (const tab of document.querySelectorAll('.tabs button')) {
+            tab.addEventListener('click', () => {
+                for (const t of document.querySelectorAll('.tabs button'))
+                    t.classList.toggle('active', t === tab);
+                for (const panel of document.querySelectorAll('.tab'))
+                    panel.hidden = panel.id !== tab.dataset.tab;
+            });
+        }
+
         const synth = document.getElementById("do-synth");
         synth.addEventListener("click", () => {
             vscode.postMessage({ command: "do-synth" });

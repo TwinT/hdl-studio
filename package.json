@@ -350,6 +350,32 @@
                     "default": "",
                     "description": "Path to the yosys executable. If empty, yosys from the PATH will be used."
                 },
+                "hdl-studio.waveform.colors": {
+                    "type": "object",
+                    "markdownDescription": "Colours of the waveform monitor, as CSS colours (any key can be left out). The default is [Surfer](https://surfer-project.org)'s dark theme.",
+                    "default": {
+                        "background": "#0b151d",
+                        "altBackground": "#1b252d",
+                        "foreground": "#d4d4d4",
+                        "grid": "#222222",
+                        "signal": "#56c126",
+                        "undefined": "#f44747",
+                        "highImpedance": "#c9e124",
+                        "cursor": "#b63935",
+                        "fillOpacity": 0.2
+                    },
+                    "properties": {
+                        "background": { "type": "string", "description": "Background." },
+                        "altBackground": { "type": "string", "description": "Background of every other group of three rows." },
+                        "foreground": { "type": "string", "description": "Text and the ruler." },
+                        "grid": { "type": "string", "description": "Vertical grid lines." },
+                        "signal": { "type": "string", "description": "A defined signal (one colour for 0 and 1)." },
+                        "undefined": { "type": "string", "description": "An x value." },
+                        "highImpedance": { "type": "string", "description": "A z value." },
+                        "cursor": { "type": "string", "description": "Where a trigger paused the simulation." },
+                        "fillOpacity": { "type": "number", "minimum": 0, "maximum": 1, "description": "Opacity of the fill under a high (1) bit." }
+                    }
+                },
                 "hdl-studio.useDigitaljsView": {
                     "type": "boolean",
                     "default": false,

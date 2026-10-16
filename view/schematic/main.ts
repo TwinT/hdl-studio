@@ -12,6 +12,7 @@ import { layout } from './layout';
 import { MemContents, memoryEditor } from './memory';
 import { Schematic } from './schematic';
 import { Monitor, WatchSpec } from './waves';
+import { parseTime } from '../../src/time_units.mjs';
 
 declare function acquireVsCodeApi(): { postMessage(msg: any): void };
 const vscode = acquireVsCodeApi();
@@ -80,6 +81,7 @@ class App {
             send: (req) => this.#send(req),
             request: (req) => this.#request(req),
             trigger: (path, port, values) => {
+                // values null: any change
                 const id = ++this.#reqId;
                 this.#triggers.add(id);
                 this.#send({ op: 'monitor', id, path, port, triggers: values, stop: true });
@@ -110,7 +112,11 @@ class App {
             case 'iopanel:update': return this.#ioFromPanel(m.id, m.value);
             case 'showcircuit':
                 if ('speed' in m.opts) this.#speed = m.opts.speed;
+                this.#monitor.setTimescale(m.opts.timescale, parseTime);
+                this.#monitor.setColors(m.opts.waveColors);
                 return this.#show(m.circuit, m.opts);
+            case 'timescale': return this.#monitor.setTimescale(m.value, parseTime);
+            case 'wavecolors': return this.#monitor.setColors(m.colors);
             case 'setspeed':
                 this.#speed = m.speed;
                 if (this.#running) {
@@ -178,9 +184,12 @@ class App {
             }
             case 'monitor':
                 // a waveform trigger fired: the engine stopped
-                if (ev.stop && this.#triggers.has(ev.id) && this.#running) {
-                    this.#running = false;
-                    this.updateRunStates();
+                if (ev.stop && this.#triggers.has(ev.id)) {
+                    this.#monitor.fired(ev.id, ev.tick);
+                    if (this.#running) {
+                        this.#running = false;
+                        this.updateRunStates();
+                    }
                 }
                 return;
             case 'ack':

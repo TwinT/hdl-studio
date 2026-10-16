@@ -68,6 +68,7 @@ export class StatusProvider {
     window.init_timescale = ${JSON.stringify(this.#djs.synth_options.timescale || '1ns')};
     window.init_speed = ${JSON.stringify(this.#djs.simSpeed)};
     window.init_tick = ${JSON.stringify(this.#djs.tick || 0)};
+    window.init_runstate = ${JSON.stringify(rs)};
   </script>
   <script type="module" src="${status_uri}"></script>
   <link href="${icon_uri}" rel="stylesheet"/>
@@ -152,8 +153,7 @@ ${nativeControls}
     <button id="start-sim" class="icon start-stop codicon codicon-run" title="Start" ${enabled(!rs.running && !rs.luaActive)}></button>
     <button id="pause-sim" class="icon start-stop codicon codicon-debug-pause" title="Pause" ${enabled(rs.running && !rs.luaActive)}></button>
     <button id="single-step-sim" class="icon codicon codicon-debug-step-over" title="Single step" ${enabled(!rs.running && !rs.luaActive)}></button>
-    <button id="next-event-sim" class="icon codicon codicon-debug-continue" title="Run until next event"
-            ${enabled(!rs.running && !rs.luaActive && rs.pendingEvents)}></button>
+    <button id="cycle-sim" class="icon codicon codicon-debug-continue" title="One clock cycle: run one period of the clock, then pause" disabled></button>
     <span class="sep"></span>
     <button id="reset-sim" class="icon codicon codicon-debug-restart" title="Reset: back to tick 0, registers and memories at their initial values"
             ${enabled(rs.hascircuit)}></button>

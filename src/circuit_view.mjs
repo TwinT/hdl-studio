@@ -10,6 +10,8 @@ import { hdlstudio_bin } from './hdlstudio_bin.mjs';
 import { WebviewMsgQueue } from './webview_msg_queue.mjs';
 import { write_txt_file } from './utils.mjs';
 
+const waveColors = () => vscode.workspace.getConfiguration('hdl-studio').get('waveform.colors');
+
 export class CircuitView {
     #panel
     #document
@@ -38,8 +40,17 @@ export class CircuitView {
             this.#showCircuit({ ...opts, pause: false });
             this.reveal();
         });
+        // the waveform monitor shows time in the project's units, in the user's colours
+        const timescale_listener = this.#document.synthOptionUpdated(() =>
+            this.post({ command: 'timescale', value: this.#document.synth_options.timescale }));
+        const colors_listener = vscode.workspace.onDidChangeConfiguration((e) => {
+            if (e.affectsConfiguration('hdl-studio.waveform'))
+                this.post({ command: 'wavecolors', colors: waveColors() });
+        });
         this.onDidDispose(() => {
             circuit_listener.dispose();
+            timescale_listener.dispose();
+            colors_listener.dispose();
             this.#disposed = true;
             this.#engine?.kill();
         });
@@ -130,6 +141,8 @@ export class CircuitView {
             opts: { ...opts,
                     defaultcomb: this.#document.synth_options.defaultcomb,
                     layout: this.#document.synth_options.layout,
+                    timescale: this.#document.synth_options.timescale,
+                    waveColors: waveColors(),
                     speed: this.#djs.simSpeed }
         });
     }

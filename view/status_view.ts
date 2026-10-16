@@ -7,7 +7,7 @@ import { read, show, size } from './schematic/values';
 
 declare function acquireVsCodeApi(): { postMessage(msg: any): void };
 declare global {
-    interface Window { init_view: Row[]; init_timescale: string; init_speed: number | null; init_tick: number }
+    interface Window { init_view: Row[]; init_timescale: string; init_speed: number | null; init_tick: number; init_runstate: any }
 }
 const vscode = acquireVsCodeApi();
 
@@ -17,7 +17,8 @@ interface Widget { cells: HTMLElement[]; update(value: any): void; refresh?(): v
 
 const MAX_POS = 37;
 const LED_ON = '#ff3b30'; // the LEDMatrix cell's colour
-const LED_OFF = 'rgba(128, 128, 128, 0.22)'; // readable on light and dark themes
+const LED_OFF = '#262626'; // on black, like the circuit's
+const LED_BODY = '#111111';
 // Log scale: position p < MAX_POS is 10^(p/4) ticks/s (1 .. 1G), MAX_POS is
 // "max" (null speed: flat out).
 const posToSpeed = (pos: number) => (pos >= MAX_POS ? null : 10 ** (pos / 4));
@@ -45,6 +46,9 @@ class Status {
     #samples: [number, number][] = []; // [ms, tick] over the last second, for the measured speed
     #tick = 0;
     #tickSec = 1e-9; // seconds per tick, from the project's timescale option
+    // the first clock (its propagation: ticks per half period), for "one clock cycle"
+    #cycleClock?: { id: string, value: number };
+    #state = { hascircuit: false, running: false, pendingEvents: false, luaActive: false };
 
     constructor() {
         window.addEventListener('message', (e) => this.#message(e.data));
@@ -54,8 +58,9 @@ class Status {
     #init() {
         window.addEventListener('resize', () => { for (const w of Object.values(this.#widgets)) w.refresh?.(); });
         for (const [id, c] of [['start-sim', 'startsim'], ['pause-sim', 'pausesim'], ['single-step-sim', 'singlestepsim'],
-                               ['next-event-sim', 'nexteventsim'], ['reset-sim', 'resetsim']])
+                               ['reset-sim', 'resetsim']])
             $(id).addEventListener('click', () => cmd(c));
+        $('cycle-sim').addEventListener('click', () => { if (this.#cycleClock) cmd('runfor', { ticks: 2 * this.#cycleClock.value }); });
         const runfor = $<HTMLInputElement>('runfor');
         const runFor = () => {
             const sec = parseTime(runfor.value);
@@ -75,6 +80,7 @@ class Status {
             if (sec !== undefined) post({ command: 'settimescale', value: formatTime(sec) });
         });
         this.#tick = window.init_tick;
+        this.#state = window.init_runstate;
         this.#setTimescale(window.init_timescale);
         // releases the host's queued messages
         post({ command: 'initialized' });
@@ -114,6 +120,9 @@ class Status {
     }
 
     #updateWidgets(rows: Row[]) {
+        const clock = rows.find((r) => r.dir === 'clock');
+        this.#cycleClock = clock && { id: clock.id, value: clock.value };
+        this.#enable();
         const old = this.#widgets, panel = $('iopanel');
         this.#widgets = {};
         panel.replaceChildren();
@@ -190,6 +199,7 @@ class Status {
             if (sec === undefined) input.classList.add('invalid');
             if (v === value) return;
             update(v);
+            if (this.#cycleClock?.id === row.id) this.#cycleClock.value = v;
             post({ command: 'iopanel:update', id: row.id, value: v });
         });
         return { cells: [nameCell(row.label), cell('io-value', input), cell('io-extra muted', freq)], update, refresh };
@@ -215,6 +225,8 @@ class Status {
             canvas.height = pitch * rows * dpr;
             const ctx = canvas.getContext('2d')!;
             ctx.scale(dpr, dpr);
+            ctx.fillStyle = LED_BODY;
+            ctx.fillRect(0, 0, pitch * cols, pitch * rows);
             for (let r = 0; r < rows; r++)
                 for (let c = 0; c < cols; c++) {
                     ctx.fillStyle = bin[bits - 1 - (r * cols + c)] === '1' ? LED_ON : LED_OFF;
@@ -258,6 +270,19 @@ class Status {
         return { cells: [nameCell(row.label), cell('io-value', input), cell('io-extra', base)], update };
     }
 
+    #enable() {
+        const s = this.#state, free = !s.luaActive;
+        const enable = (id: string, on: boolean) => { $<HTMLButtonElement>(id).disabled = !on; };
+        enable('start-sim', free && !s.running);
+        enable('pause-sim', free && s.running);
+        enable('single-step-sim', free && !s.running);
+        enable('cycle-sim', free && !s.running && !!this.#cycleClock);
+        enable('runfor-sim', free && !s.running);
+        enable('reset-sim', s.hascircuit);
+        $('cycle-sim').title = this.#cycleClock ? 'One clock cycle: run one period of the clock, then pause'
+            : 'One clock cycle (the circuit has no clock)';
+    }
+
     #message(m: any) {
         switch (m.command) {
             case 'tick': {
@@ -272,22 +297,16 @@ class Status {
             case 'timescale':
                 return this.#setTimescale(m.value);
             case 'runstate': {
-                const s = m.state, free = !s.luaActive;
-                this.#running = s.running;
-                if (!s.running) this.#samples = [];
+                this.#state = m.state;
+                this.#running = m.state.running;
+                if (!m.state.running) this.#samples = [];
                 this.#showActualSpeed();
-                const enable = (id: string, on: boolean) => { $<HTMLButtonElement>(id).disabled = !on; };
-                enable('start-sim', free && !s.running);
-                enable('pause-sim', free && s.running);
-                enable('single-step-sim', free && !s.running);
-                enable('next-event-sim', free && !s.running && s.pendingEvents);
-                enable('runfor-sim', free && !s.running);
-                enable('reset-sim', s.hascircuit);
-                return;
+                return this.#enable();
             }
             case 'iopanel:view':
                 return this.#updateWidgets(m.view);
             case 'iopanel:update':
+                if (m.id === this.#cycleClock?.id) this.#cycleClock!.value = m.value;
                 return this.#widgets[m.id]?.update(m.value);
         }
     }

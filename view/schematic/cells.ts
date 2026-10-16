@@ -72,6 +72,8 @@ const arithSymbols: Record<string, string> = {
     Modulo: '%', Power: '^', ShiftLeft: '≪', ShiftRight: '≫', Lt: '<', Le: '≤', Gt: '>', Ge: '≥', Eq: '=', Ne: '≠',
 };
 const clockDecor = 'M0 -6 L6 0 L0 6';
+// LEDs and 7-segment displays: red on black
+const LED_ON = '#ff3b30', LED_OFF = '#262626', LED_BODY = '#111111';
 const checkDecor = 'M2 0 L5 5 L10 -5';
 
 type Spec = { id: string; bits: number; label?: string; overline?: boolean; clock?: boolean; idx?: number };
@@ -385,30 +387,30 @@ export function draw(d: Device, s: Shape, top: boolean, hooks: CellHooks): CellV
             inputs.forEach((_, k) => checks.get('in' + k)?.setAttribute('visibility', k === i ? 'visible' : 'hidden'));
         };
     } else if (t === 'Display7') {
-        rect({ fill: '#333333', stroke: '#222222' });
+        rect({ fill: LED_BODY, stroke: '#000000' });
         const segs = ['1,1 2,0 8,0 9,1 8,2 2,2', '9,1 10,2 10,8 9,9 8,8 8,2', '9,9 10,10 10,16 9,17 8,16 8,10',
             '9,17 8,18 2,18 1,17 2,16 8,16', '1,17 0,16 0,10 1,9 2,10 2,16', '1,9 0,8 0,2 1,1 2,2 2,8', '1,9 2,8 8,8 9,9 8,10 2,10'];
         const leds = el('g', { transform: 'translate(1,1) scale(6)' }, body);
         // bit 7 is the decimal point, bits 6..0 segments a..g
-        const parts = segs.map((p) => el('polygon', { points: p, fill: '#dddddd' }, leds) as SVGElement)
-            .concat([el('circle', { cx: 11.3, cy: 16.9, r: 1.1, fill: '#dddddd' }, leds)]);
+        const parts = segs.map((p) => el('polygon', { points: p, fill: LED_OFF }, leds) as SVGElement)
+            .concat([el('circle', { cx: 11.3, cy: 16.9, r: 1.1, fill: LED_OFF }, leds)]);
         update = (value) => {
             const v = value('in');
-            parts.forEach((p, k) => p.setAttribute('fill', v[k === 7 ? 0 : k + 1] === '1' ? '#ff3b30' : '#dddddd'));
+            parts.forEach((p, k) => p.setAttribute('fill', v[k === 7 ? 0 : k + 1] === '1' ? LED_ON : LED_OFF));
         };
     } else if (t === 'LEDMatrix') {
-        rect({ fill: '#333333', stroke: '#222222' });
+        rect({ fill: LED_BODY, stroke: '#000000' });
         const { pitch, r } = ledLayout(d.rows, d.cols);
         const leds: SVGCircleElement[] = [];
         let last = '';
         for (let i = 0; i < d.rows * d.cols; i++)
-            leds.push(el('circle', { cx: 8 + pitch * (i % d.cols + 0.5), cy: 8 + pitch * (Math.floor(i / d.cols) + 0.5), r, fill: '#dddddd' }, body));
+            leds.push(el('circle', { cx: 8 + pitch * (i % d.cols + 0.5), cy: 8 + pitch * (Math.floor(i / d.cols) + 0.5), r, fill: LED_OFF }, body));
         // bit 0 (the last character) is the top-left LED, row-major
         update = (value) => {
             const v = value('in');
             for (let i = 0; i < leds.length; i++) {
                 const on = v[v.length - 1 - i] === '1';
-                if (on !== (last[last.length - 1 - i] === '1') || !last) leds[i].setAttribute('fill', on ? '#ff3b30' : '#dddddd');
+                if (on !== (last[last.length - 1 - i] === '1') || !last) leds[i].setAttribute('fill', on ? LED_ON : LED_OFF);
             }
             last = v;
         };

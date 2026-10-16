@@ -79,66 +79,64 @@ export class SynthProvider {
   <link href="${icon_uri}" rel="stylesheet"/>
   <style>
     body { padding: 8px 10px 12px; }
-    .group { margin-bottom: 12px; }
-    .group > summary {
-      cursor: pointer;
-      margin-bottom: 8px;
-      font-size: 11px;
-      font-weight: 600;
-      letter-spacing: 0.05em;
-      text-transform: uppercase;
-      opacity: 0.6;
-    }
 ${nativeControls}
-    .opt { margin: 5px 0; }
+    #do-synth { padding: 2px 10px; font-size: 12px; }
+    /* tabs like VS Code's panel titles */
+    .tabs { display: flex; gap: 14px; margin: 10px 0 4px; border-bottom: 1px solid var(--vscode-panel-border); }
+    .tabs button {
+      background: none; border: none; padding: 4px 0; cursor: pointer; font: inherit;
+      font-size: 11px; letter-spacing: 0.04em; text-transform: uppercase;
+      color: var(--vscode-panelTitle-inactiveForeground, var(--vscode-descriptionForeground));
+      border-bottom: 1px solid transparent; margin-bottom: -1px;
+    }
+    .tabs button.active {
+      color: var(--vscode-panelTitle-activeForeground, var(--vscode-foreground));
+      border-bottom-color: var(--vscode-panelTitle-activeBorder, var(--vscode-focusBorder));
+    }
+    .tabs button:focus-visible { outline: 1px solid var(--vscode-focusBorder); }
+    .tab[hidden] { display: none; }
+    .opt { margin: 6px 0; }
     .field { margin: 8px 0; }
     .field > label { display: block; font-size: 12px; opacity: 0.9; margin-bottom: 3px; }
     select { width: 100%; }
-    hr { border: none; border-top: 1px solid var(--vscode-panel-border); margin: 12px 0; }
-    #do-synth { width: 100%; margin-top: 2px; }
   </style>
 </head>
 <body>
-  <details class="group" open>
-    <summary>Synthesis</summary>
-    <div class="group-body">
-      <div class="field">
-        <label for="top">Top module</label>
-        <select title="Module to treat as the top of the design. 'Auto' lets Yosys figure it out (or, when the slang frontend is used, lets it auto-detect the same way)." id="top">
-          <option value="">Auto</option>
-        </select>
-      </div>
-      <label class="check opt" title="Enables Yosys optimizations of the synthesized circuit. This might make the circuit differ significantly to its HDL specification. This corresponds to the 'opt -full' Yosys command."><input type="checkbox" id="opt"> Optimize in Yosys</label>
-      <label class="check opt" title="Decomposes complex cells (adders, comparators, muxes, ...) into basic logic gates. This corresponds to the 'techmap' Yosys command."><input type="checkbox" id="techmap"> Decompose to basic gates</label>
-      <div class="field">
-        <label for="fsm">FSM</label>
-        <select title="Enables finite state machine processing in Yosys. This corresponds to the 'fsm' and 'fsm -nomap' Yosys commands." id="fsm">
-          <option value="no">No FSM transform</option>
-          <option value="yes">FSM transform</option>
-          <option value="nomap">FSM as circuit element</option>
-        </select>
-      </div>
-      <label class="check opt" title="This corresponds to the 'fsm_expand' Yosys command."><input type="checkbox" id="fsmexpand"> Merge more logic into FSM</label>
+  <button id="do-synth" class="primary" title="Synthesize the circuit's sources with Yosys"><i class="codicon codicon-run"></i> Synthesize</button>
+  <div class="tabs" role="tablist">
+    <button role="tab" class="active" data-tab="synthesis">Synthesis</button>
+    <button role="tab" data-tab="diagram">Diagram</button>
+  </div>
+  <div class="tab" id="synthesis">
+    <div class="field">
+      <label for="top">Top module</label>
+      <select title="Module to treat as the top of the design. 'Auto' lets Yosys figure it out (or, when the slang frontend is used, lets it auto-detect the same way)." id="top">
+        <option value="">Auto</option>
+      </select>
     </div>
-  </details>
-
-  <details class="group" open>
-    <summary>Diagram</summary>
-    <div class="group-body">
-      <label class="check opt" title="Enables post-processing of Yosys output to reduce the number of components and improve readability."><input type="checkbox" id="transform" checked> Simplify diagram</label>
-      <label class="check opt" title="Makes combinational gates propagate with zero delay, so a combinational path settles within a single tick instead of one tick per gate. Applies when the circuit is (re)built."><input type="checkbox" id="defaultcomb"> Zero combinational propagation delay</label>
-      <div class="field">
-        <label for="layout">Layout</label>
-        <select title="Auto-layout engine for the diagram (the digitaljs view only; the new schematic always uses ELK). Applies to a freshly synthesized circuit (existing layouts keep their saved positions)." id="layout">
-          <option value="elkjs" selected>ELK</option>
-          <option value="dagre">Dagre</option>
-        </select>
-      </div>
+    <label class="check opt" title="Enables Yosys optimizations of the synthesized circuit. This might make the circuit differ significantly to its HDL specification. This corresponds to the 'opt -full' Yosys command."><input type="checkbox" id="opt"> Optimize in Yosys</label>
+    <label class="check opt" title="Decomposes complex cells (adders, comparators, muxes, ...) into basic logic gates. This corresponds to the 'techmap' Yosys command."><input type="checkbox" id="techmap"> Decompose to basic gates</label>
+    <div class="field">
+      <label for="fsm">FSM</label>
+      <select title="Enables finite state machine processing in Yosys. This corresponds to the 'fsm' and 'fsm -nomap' Yosys commands." id="fsm">
+        <option value="no">No FSM transform</option>
+        <option value="yes">FSM transform</option>
+        <option value="nomap">FSM as circuit element</option>
+      </select>
     </div>
-  </details>
-
-  <hr>
-  <button id="do-synth" class="primary"><i class="codicon codicon-run"></i> Synthesize</button>
+    <label class="check opt" title="This corresponds to the 'fsm_expand' Yosys command."><input type="checkbox" id="fsmexpand"> Merge more logic into FSM</label>
+  </div>
+  <div class="tab" id="diagram" hidden>
+    <label class="check opt" title="Enables post-processing of Yosys output to reduce the number of components and improve readability."><input type="checkbox" id="transform" checked> Simplify diagram</label>
+    <label class="check opt" title="Makes combinational gates propagate with zero delay, so a combinational path settles within a single tick instead of one tick per gate. Applies when the circuit is (re)built."><input type="checkbox" id="defaultcomb"> Zero combinational propagation delay</label>
+    <div class="field">
+      <label for="layout">Layout</label>
+      <select title="Auto-layout engine for the diagram (the digitaljs view only; the new schematic always uses ELK). Applies to a freshly synthesized circuit (existing layouts keep their saved positions)." id="layout">
+        <option value="elkjs" selected>ELK</option>
+        <option value="dagre">Dagre</option>
+      </select>
+    </div>
+  </div>
 </body>
 </html>`;
     }
