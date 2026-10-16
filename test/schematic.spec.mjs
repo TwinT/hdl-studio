@@ -17,7 +17,7 @@ import { route } from '../view/schematic/route.ts';
 import { ledLayout } from '../view/schematic/cells.ts';
 import { hdlstudio_bin } from '../src/hdlstudio_bin.mjs';
 import { formatTimeAt } from '../src/time_units.mjs';
-import { designs, synthesize, slangAvailable, convert } from './simdiff/designs.mjs';
+import { designs, synthesize, slangAvailable, convert } from './designs.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -95,8 +95,13 @@ describe('schematic webview on the engine', function () {
             this.skip();
         }
         const { chromium } = await import('playwright');
+        try {
+            browser = await chromium.launch();
+        } catch (e) {
+            console.warn(`  no Chromium for Playwright (npx playwright install chromium) - skipping the webview test\n  ${e.message.split('\n')[0]}`);
+            this.skip();
+        }
         engine = spawn(hdlstudio_bin(), ['serve'], { stdio: ['pipe', 'pipe', 'inherit'] });
-        browser = await chromium.launch();
         page = await browser.newPage({ viewport: { width: 1200, height: 800 } });
         page.on('pageerror', (e) => errors.push(e.stack));
         page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });

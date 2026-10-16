@@ -54,10 +54,9 @@ export class CircuitView {
             this.#disposed = true;
             this.#engine?.kill();
         });
-        this.#init = this.#getViewContent(djs, this.#panel.webview).then(content => {
-            this.#panel.webview.html = content;
-            this.#showCircuit({ run: false, pause: true }); // force pause
-        });
+        this.#panel.webview.html = this.#getViewContent(djs, this.#panel.webview);
+        this.#init = Promise.resolve();
+        this.#showCircuit({ run: false, pause: true }); // force pause
     }
     get panel() {
         return this.#panel;
@@ -135,75 +134,16 @@ export class CircuitView {
         this.post({
             command: 'showcircuit',
             circuit: this.#document.circuit,
-            // defaultcomb and layout are digitaljs display/simulation options
-            // applied when the circuit is (re)built, so they travel with the
-            // circuit, not yosys.
+            // defaultcomb is applied when the circuit is (re)built, so it
+            // travels with the circuit, not yosys
             opts: { ...opts,
                     defaultcomb: this.#document.synth_options.defaultcomb,
-                    layout: this.#document.synth_options.layout,
                     timescale: this.#document.synth_options.timescale,
                     waveColors: waveColors(),
                     speed: this.#djs.simSpeed }
         });
     }
-    async #getViewContent(djs, webview) {
-        if (!vscode.workspace.getConfiguration('hdl-studio').get('useDigitaljsView'))
-            return this.#schematicContent(djs, webview);
-        const js_uri = webview.asWebviewUri(djs.mainJSPath);
-        const ui_uri = webview.asWebviewUri(djs.uiToolkitPath);
-        const icon_uri = webview.asWebviewUri(djs.codIconsPath);
-        const worker_script = await djs.simWorker;
-        return `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <script>
-    window.getImageSupport = ${!djs.image_exts_set};
-    window.simWorkerUri = URL.createObjectURL(new Blob([${JSON.stringify(worker_script)}], {type: 'text/javascript'}));
-  </script>
-  <script type="module" src="${js_uri}"></script>
-  <script type="module" src="${ui_uri}"></script>
-  <link href="${icon_uri}" rel="stylesheet"/>
-  <title>DigitalJS Code</title>
-  <style>
-    html > body, foreignObject > body {
-      padding: 0 0;
-    }
-  </style>
-</head>
-<body>
-<div id="grid">
-  <div id="paper"></div>
-  <div id="gutter_vert" class="gutter gutter-vertical"></div>
-  <div id="monitorbox">
-    <div style="margin-bottom:3px">
-      <vscode-button appearance="icon" name="ppt_up" title="Increase pixels per tick" disabled style="vertical-align: middle;"><i class="codicon codicon-add"></i></vscode-button>
-      <vscode-button appearance="icon" name="ppt_down" title="Decrease pixels per tick" disabled style="vertical-align: middle;"><i class="codicon codicon-dash"></i></vscode-button>
-      <span style="color:var(--foreground);vertical-align:middle;">scale</span>
-      <vscode-text-field name="scale" readonly style="vertical-align: middle;">
-      </vscode-text-field>
-      <vscode-button appearance="icon" name="live" title="Pause plot" disabled style="vertical-align: middle;"><i class="codicon codicon-debug-pause"></i></vscode-button>
-      <vscode-button appearance="icon" name="left" title="Move left" disabled style="vertical-align: middle;"><i class="codicon codicon-arrow-small-left"></i></vscode-button>
-      <vscode-button appearance="icon" name="right" title="Move right" disabled style="vertical-align: middle;"><i class="codicon codicon-arrow-small-right"></i></vscode-button>
-    </div>
-    <div style="margin-bottom:2px">
-      <span style="color:var(--foreground);vertical-align:middle;">range</span>
-      <vscode-text-field name="rangel" readonly style="vertical-align: middle;">
-      </vscode-text-field>
-      <span style="color:var(--foreground);vertical-align:middle;">-</span>
-      <vscode-text-field name="rangeh" readonly style="vertical-align: middle;">
-      </vscode-text-field>
-    </div>
-    <div id="monitor">
-    </div>
-  </div>
-</div>
-</body>
-</html>`;
-    }
-    // The new schematic (view/schematic/).
-    #schematicContent(djs, webview) {
+    #getViewContent(djs, webview) {
         return `<!DOCTYPE html>
 <html lang="en">
 <head>

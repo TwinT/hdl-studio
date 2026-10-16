@@ -134,17 +134,11 @@ class DigitalJS {
         // Paths
         const ext_uri = context.extensionUri;
         this.iconPath = vscode.Uri.joinPath(ext_uri, 'imgs', 'hdl-studio.svg');
-        this.mainJSPath = vscode.Uri.joinPath(ext_uri, 'dist', 'view-bundle.js');
         this.schematicJSPath = vscode.Uri.joinPath(ext_uri, 'dist', 'schematic.js');
         this.synthJSPath = vscode.Uri.joinPath(ext_uri, 'dist', 'synth_view.js');
         this.statusJSPath = vscode.Uri.joinPath(ext_uri, 'dist', 'status_view.js');
-        this.uiToolkitPath = vscode.Uri.joinPath(ext_uri, "node_modules", "@vscode",
-                                                 "webview-ui-toolkit", "dist",
-                                                 "toolkit.min.js");
         this.codIconsPath = vscode.Uri.joinPath(ext_uri, "node_modules", "@vscode",
                                                 "codicons", "dist", "codicon.css");
-        this.simWorker = read_txt_file(vscode.Uri.joinPath(ext_uri, 'dist',
-            'digitaljs-sym-worker.js'));
 
         this.#tickUpdated = new vscode.EventEmitter();
         this.tickUpdated = this.#tickUpdated.event;

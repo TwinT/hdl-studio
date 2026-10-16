@@ -62,7 +62,7 @@ class Synth {
             });
         }
 
-        for (const opt of ['fsm', 'layout']) {
+        for (const opt of ['fsm']) {
             const ele = document.getElementById(opt);
             this.#widgets[opt] = ele;
             if (!ele)
@@ -100,7 +100,7 @@ class Synth {
             for (const opt of ['opt', 'transform', /* 'lint', */ 'fsmexpand', 'techmap', 'defaultcomb'])
                 if (this.#widgets[opt]) this.#widgets[opt].checked = this.#options[opt];
             this.#renderTopModules();
-            for (const opt of ['fsm', 'layout'])
+            for (const opt of ['fsm'])
                 if (this.#widgets[opt]) this.#widgets[opt].value = this.#options[opt];
         }
         finally {

@@ -2,11 +2,13 @@
 'use strict';
 
 // The engine and the schematic against what digitaljs did, frozen in
-// test/golden/ (see test/golden/freeze.mjs): every example's end-of-tick
-// trace under a seeded stimulus, the ports of every cell, and what each
-// example's Lua script prints. Needs only the hdlstudio binary.
+// test/golden/ before digitaljs went away (by test/golden/freeze.mjs, in git
+// history): per example and mode (t: transform, nt: none, dc: zero
+// combinational delay), the converted circuit, a seeded stimulus, the
+// end-of-tick trace and the ports of every cell; per Lua script (`file`, run
+// as it is now), what it printed. Needs only the hdlstudio binary.
 // `BLESS=1 npm run test:golden` rewrites the traces and Lua outputs from the
-// engine, after an intended change (review the diff of what it changed).
+// engine, after an intended change (review what it changed).
 
 import assert from 'assert';
 import fs from 'fs';
@@ -78,7 +80,8 @@ describe('Lua scripts print what they did on digitaljs_lua', function () {
     for (const file of fixtures('lua')) {
         it(path.basename(file, '.json.gz'), function () {
             const f = read(file);
-            const output = inTmp({ 'circuit.json': JSON.stringify(f.circuit), 'script.lua': f.source }, (p) =>
+            const source = fs.readFileSync(path.join(root, f.file), 'utf8');
+            const output = inTmp({ 'circuit.json': JSON.stringify(f.circuit), 'script.lua': source }, (p) =>
                 execFileSync(hdlstudio_bin(), ['lua', '--json', p('circuit.json'), p('script.lua'), '5000000'], { maxBuffer: 1 << 30 })
                     .toString().split('\n').filter(Boolean).map((l) => {
                         const e = JSON.parse(l);

@@ -18,8 +18,7 @@ const default_synth_options = {
     fsmexpand: false,
     techmap: false, // decompose complex cells into basic logic gates (yosys 'techmap')
     top: '', // top module name override; empty = auto-detect
-    defaultcomb: false, // zero combinational propagation delay (digitaljs sim option)
-    layout: 'elkjs', // auto-layout engine: elkjs/dagre (digitaljs display option)
+    defaultcomb: false, // zero combinational propagation delay
     timescale: '1ns' // duration of one simulation tick (control panel display/run-for/clock period)
 };
 

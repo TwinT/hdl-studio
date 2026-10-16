@@ -129,13 +129,6 @@ ${nativeControls}
   <div class="tab" id="diagram" hidden>
     <label class="check opt" title="Enables post-processing of Yosys output to reduce the number of components and improve readability."><input type="checkbox" id="transform" checked> Simplify diagram</label>
     <label class="check opt" title="Makes combinational gates propagate with zero delay, so a combinational path settles within a single tick instead of one tick per gate. Applies when the circuit is (re)built."><input type="checkbox" id="defaultcomb"> Zero combinational propagation delay</label>
-    <div class="field">
-      <label for="layout">Layout</label>
-      <select title="Auto-layout engine for the diagram (the digitaljs view only; the new schematic always uses ELK). Applies to a freshly synthesized circuit (existing layouts keep their saved positions)." id="layout">
-        <option value="elkjs" selected>ELK</option>
-        <option value="dagre">Dagre</option>
-      </select>
-    </div>
   </div>
 </body>
 </html>`;

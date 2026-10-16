@@ -1,19 +1,20 @@
 //
 'use strict';
 
-// The examples the differential tests run, synthesized like the extension
-// does (yosys with read_slang). Temporary, like digitaljs.
+// The examples, synthesized like the extension does (yosys with
+// read_slang), for the tests that need a fresh netlist (test/golden/ holds
+// frozen ones).
 
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { execFileSync } from 'child_process';
-import { build_yosys_script, isHdlFile } from '../../src/yosys_script.mjs';
-import { set_hdlstudio_root, hdlstudio_bin } from '../../src/hdlstudio_bin.mjs';
+import { build_yosys_script, isHdlFile } from '../src/yosys_script.mjs';
+import { set_hdlstudio_root, hdlstudio_bin } from '../src/hdlstudio_bin.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const root = path.resolve(__dirname, '../..');
+const root = path.resolve(__dirname, '..');
 const verilog = path.join(root, 'test/verilog');
 set_hdlstudio_root(root);
 
