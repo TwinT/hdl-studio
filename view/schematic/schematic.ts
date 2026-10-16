@@ -2,7 +2,7 @@
 // live with the engine's values. Pan with a drag on the background or the
 // wheel, zoom with ctrl+wheel or a pinch, drag cells to move them.
 
-import { CellView, Connector, Device, GraphData, Point, Shape, draw, el, shape, text } from './cells.ts';
+import { CellView, Connector, Device, GraphData, Point, Shape, draw, el, shape, text, textWidth } from './cells.ts';
 import { Rect, midpoint, pathD, route } from './route.ts';
 import { Level, level, levelColor, show, xes } from './values.ts';
 
@@ -193,6 +193,9 @@ export class Schematic {
             const m = midpoint(pts);
             w.label.setAttribute('x', String(m.x));
             w.label.setAttribute('y', String(m.y));
+            // a name longer than its wire would cover the ports
+            const len = pts.slice(1).reduce((n, p, i) => n + Math.hypot(p.x - pts[i].x, p.y - pts[i].y), 0);
+            w.label.setAttribute('visibility', len > textWidth(w.c.name!) + 36 ? 'visible' : 'hidden');
         }
     }
 

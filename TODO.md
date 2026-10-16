@@ -61,20 +61,20 @@
       real typo/leak.
 
 ## Pending, noted during the Rust migration 📌
-- [ ] `@twint/4vl` 1.0.2: `isHigh`/`isZ` are false for an all-ones/all-z
+- [X] `@twint/4vl` 1.0.2: `isHigh`/`isZ` are false for an all-ones/all-z
       vector whose width is a multiple of 32 (`_lastmask` is `4294967295`,
       but `word & _lastmask` is `-1` in JS). Fix in 4vl 1.0.3:
       `_lastmask` returns `(~0 >>> -this.bits) | 0`. Visible today: a 32-bit
       all-ones bus isn't drawn green, `transform` skips all-x 32-bit
       constants, Lua's `ishigh` is wrong. `hdlstudio-logic` doesn't copy the
       bug (documented in `crates/hdlstudio-logic/tests/4vl.rs`).
+      Moot since the cutover: 4vl is gone, and hdlstudio-logic never had the bug.
 - [ ] Release 0.7.0: publish to the Marketplace (`vsce login TwinT`, then
       `vsce publish --packagePath hdl-studio-0.7.0.vsix`) and create the
       GitHub Release (`gh auth login`). The `v0.6.1` tag was never pushed.
 - [X] `@vscode/webview-ui-toolkit` is deprecated (npm says so). The Control
       and Synthesis panels use native controls since phase 6
-      (`src/webview_style.mjs`); only the digitaljs view still loads it, and
-      it goes with that view.
+      (`src/webview_style.mjs`); the toolkit is gone.
 - [ ] Converter quirks copied from yosys2digitaljs / digitaljs's transform on
       purpose (phase 2 ports faithfully); fix each in its own commit:
       - gate-level `$_DFF_P_`/`$_DFFE_PP_` are "Invalid cell type" (the kinds
@@ -90,27 +90,31 @@
       - with several top-level modules the top is picked by name order.
 - [ ] The techmap option fails on `soc`'s `board`: yosys leaves `$fa`/`$alu`
       cells the converter has no cell for ("Invalid cell type: $fa").
-- [ ] `test/pipeline.spec.mjs`'s wide-index test runs `digitaljs/lib/transform.js`,
+- [X] `test/pipeline.spec.mjs`'s wide-index test runs `digitaljs/lib/transform.js`,
       which (unlike the patched `src/` the extension uses) still makes
       MuxSparse `inputs` BigInts. Gone with digitaljs in the cutover.
-- [ ] Opening a raw yosys netlist on vscode.dev no longer works (conversion
+      Gone: the test moved to the frozen traces (test/golden/wide_idx).
+- [X] Opening a raw yosys netlist on vscode.dev no longer works (conversion
       needs the native `hdlstudio`). Expected: the web build goes away.
-- [ ] Simulator divergences from digitaljs, on purpose: Memory transparency and
+      The web build is gone (the README says the extension needs Linux x64).
+- [X] Simulator divergences from digitaljs, on purpose: Memory transparency and
       collision compare read/write addresses by value (digitaljs's JS `==`
       compares objects, so it depended on whether a Mux or Dff happened to pass
       the same object along); ticks are u64 (digitaljs's are int32: they wrap
       after 2^31, ~2.1 s at 1 tick = 1 ns); a zero-delay loop that never
       settles is an error ("combinational loop did not settle in tick N")
       where digitaljs hangs.
+      Documented in CLAUDE.md ("The engine"); nothing to do.
 - [ ] Simulator speed: the board runs at ~39k cycles/s, 9x digitaljs (the goal
       was 10x). The cost is spread over evaluating and propagating; the next
       steps are structural: fold the zero-delay bus cells (BusSlice/BusGroup,
       a third of all evaluations) into their readers, and a narrow-value fast
       path for nets of up to 64 bits.
-- [ ] Simulator features still to port for phase 4: monitors and alarms,
+- [X] Simulator features still to port for phase 4: monitors and alarms,
       `memChange`/manual memory edits, parameter changes while running (a
       Clock's period), FSM `current_state`/`next_trans` for the editor.
-- [ ] digitaljs_lua bugs the engine's Lua (crates/hdlstudio/src/lua.rs) fixes:
+      All ported (phase 4), next_trans computed by the view (phase 5).
+- [X] digitaljs_lua bugs the engine's Lua (crates/hdlstudio/src/lua.rs) fixes:
       a string narrower than the input/operand it is converted for crashed
       ("Cannot read properties of null (reading 'v')": now zero-extended);
       `sim.setinput` of an unknown input threw a JS TypeError that `pcall`
@@ -118,6 +122,7 @@
       `prependReturn` options were ignored, so typing an expression printed
       nothing (now it prints its values); `tointeger` refused 32 bits or more
       (now up to 63); error messages now say `file:line`.
+      Listed in the CHANGELOG for 1.0.0.
 - [ ] `sim.registerdisplay` (custom number displays) isn't in the engine's Lua
       yet: the display runs in the UI, so it needs a protocol for it.
 - [X] Example scripts that never worked: `11_pushbutton/pushbutton_sim.lua`
@@ -125,7 +130,7 @@
       `03_full_adder` read their outputs 2 ticks after changing the inputs,
       before the gates settled (x, so `tointeger()` failed). Fixed (found by
       the Lua diff test).
-- [ ] Temporary regressions of the engine adapter (phase 4), until the new UI:
+- [X] Temporary regressions of the engine adapter (phase 4), until the new UI:
       editing the circuit (and undo/redo of an edit) restarts the simulation
       at tick 0 (the worker kept the signals); vscode.dev can't simulate at all
       now (the engine is a native process); the FSM editor gets the current
@@ -133,10 +138,12 @@
       The new schematic (phase 5) fixes the first and the last: moving cells
       (and undo/redo of a move) keeps simulating, and it works out the next
       transition itself. They remain in the digitaljs view only.
-- [ ] Unused since phase 4, remove in the cutover: the digitaljs worker bundle
+      The adapter is gone with the digitaljs view.
+- [X] Unused since phase 4, remove in the cutover: the digitaljs worker bundle
       (`dist/digitaljs-sym-worker.js`, `simWorkerUri` in the circuit view HTML,
       `djs.simWorker`), and `digitaljs_lua`/`fengari-web` (only the Lua diff test
       uses them).
+      Removed (cutover, step 3).
 - [X] `view/monitor.mjs` called `_.extend` without importing lodash: it only
       worked because digitaljs_lua loaded lodash, which left a global `_`.
       Removing digitaljs_lua from the webview broke the whole view at load.
@@ -149,8 +156,7 @@
         wires keep their route, even if the moved cell now sits on it. A
         "tidy up" (re-run ELK) button would fix both;
       - no wire editing (on purpose for v1: an edited netlist no longer
-        matches the SystemVerilog); the digitaljs view (setting
-        `hdl-studio.useDigitaljsView`) still has it;
+        matches the SystemVerilog);
       - the waveform monitor's history is capped at 1M changes per signal
         (the oldest quarter goes), which a clock fills in seconds at
         flat-out speed; watched signals survive a re-synthesis only if the
@@ -158,8 +164,6 @@
         and so stops following the simulation (a click follows again): Marcos
         found that odd, to discuss; a light waveform theme, or one following
         the VS Code theme, is a matter of the colours setting;
-      - the synthesis panel's layout option (elkjs/dagre) does nothing in it:
-        it only lays out with ELK. Remove the option with the digitaljs view;
       - a number base picked on a NumEntry/NumDisplay is kept in the circuit
         but, as in digitaljs, only saved with the next edit;
       - the paper is white in dark themes too, as in digitaljs;
@@ -168,23 +172,31 @@
 - [ ] If the engine process dies, the host starts a new one on the next
       request, but the webview doesn't load the circuit into it again
       ("no circuit loaded" until the circuit is shown again). Since phase 4.
-- [ ] Remove at the cutover, with the digitaljs view: `view/main.mjs`,
+- [X] Remove at the cutover, with the digitaljs view: `view/main.mjs`,
       `view/remote_engine.mjs`, `view/iopanel.mjs`, `view/monitor.mjs` (after
       phase 6), `view/scss/`, `view/touch-punch.mjs`, the `main-view` webpack
       config, `djs.mainJSPath`, the `hdl-studio.useDigitaljsView` setting, and
       the npm deps only they use (jquery-ui, hammerjs, svg-pan-zoom,
       split-grid, resize-observer-polyfill, backbone, @joint/*; jquery goes
       when phase 6 rewrites the control panel).
-- [ ] The README says Lua has `sim.start()` and `sim.stop(synchronize)`;
+      Removed (cutover, step 3).
+- [X] The README says Lua has `sim.start()` and `sim.stop(synchronize)`;
       neither digitaljs_lua 0.0.9 (patched or not) nor the engine's Lua has
       them, so this was already untrue before the migration. Running a script
       or a REPL line starts the simulation and its end pauses it, which covers
       most of it. Implement them (a REPL `sim.start()` would have to outlive
       the line, and the UI would need a "running" event from the engine) or
       fix the README.
+      The README no longer says so (cutover). Implement them if a REPL user asks.
 - [X] The control panel's "Run until next event" (digitaljs's
       updateGatesNext: to the next tick with anything queued) is gone: with
       gate delays there is an event almost every tick, so it looked like a
       single step, and it ignores triggers. "One clock cycle" runs one period
       of the first clock (2 x its propagation) and pauses at the same phase,
       everything settled. The views still answer `nexteventsim`.
+- [ ] Release 1.0.0 (merge `rust-migration` into master, version bump, vsix
+      per platform: `vsce package --target linux-x64`; arm64 needs the binary
+      built there or cross-compiled). Needs Marcos's go-ahead.
+- [ ] `.hdls` as the project file extension (proposed for the cutover; the
+      content would stay the same JSON). To decide with Marcos.
+- [ ] The README's screenshots other than the first show the old UI.

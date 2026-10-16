@@ -1,7 +1,7 @@
 {
     "name": "hdl-studio",
     "displayName": "HDL Studio",
-    "description": "HDL Studio is a vscode extension for digitaljs, a digital circuit simulator.",
+    "description": "Synthesize Verilog/SystemVerilog with Yosys and simulate the circuit on an interactive schematic, with waveforms and Lua scripting.",
     "version": "0.7.0",
     "license": "See LICENSE",
     "publisher": "TwinT",
@@ -22,7 +22,12 @@
     ],
     "keywords": [
         "verilog",
-        "simulation"
+        "systemverilog",
+        "yosys",
+        "simulation",
+        "schematic",
+        "waveform",
+        "digital logic"
     ],
     "main": "./dist/local-extension.js",
     "contributes": {

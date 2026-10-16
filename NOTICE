@@ -1,0 +1,33 @@
+HDL Studio includes code derived from the following projects.
+
+- DigitalJS (https://github.com/tilk/digitaljs): the simulator's cell
+  semantics (crates/hdlstudio-sim), the schematic's cell geometry and gate
+  symbols (view/schematic/cells.ts), the transform passes
+  (crates/hdlstudio-yosys/src/transform.rs).
+- yosys2digitaljs (https://github.com/tilk/yosys2digitaljs): the netlist
+  converter (crates/hdlstudio-yosys).
+- digitaljs_lua (https://github.com/tilk/digitaljs_lua): the Lua API
+  (crates/hdlstudio/src/lua.rs).
+- 3vl/4vl (https://github.com/tilk/3vl): the 4-valued vectors
+  (crates/hdlstudio-logic).
+- wavecanvas (https://github.com/tilk/wavecanvas): the waveform drawing
+  (view/schematic/waves.ts).
+
+They are distributed under this license:
+
+Copyright 2018 Marek Materzok
+
+Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:
+
+1. Redistributions of source code must retain the above copyright notice, this list of conditions and the following disclaimer.
+
+2. Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following disclaimer in the documentation and/or other materials provided with the distribution.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+The waveform monitor's default colours are Surfer's default theme
+(https://surfer-project.org, EUPL-1.2).
+
+The hdlstudio binary includes Lua 5.4 (https://www.lua.org, MIT license,
+Copyright © Lua.org, PUC-Rio) and Rust crates under the MIT and
+Apache-2.0 licenses (see Cargo.lock).

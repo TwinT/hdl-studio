@@ -5,6 +5,48 @@ All notable changes to HDL Studio will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0] - Unreleased
+
+HDL Studio no longer uses DigitalJS: the simulator, the netlist converter and
+the Lua engine are its own, written in Rust (`hdlstudio`, a native process),
+and the circuit view and panels are new. They follow DigitalJS's semantics and
+file format, so projects saved by earlier versions open as they are.
+
+### Added
+- Waveform monitor (like Surfer/VaporView): a button on any wire (or a
+  double-click) adds it; values under the pointer, a ruler in time units,
+  zoom and scroll, number formats, and "pause the simulation when it
+  rises/falls/changes/is x/equals…". Colours are a setting
+  (`hdl-studio.waveform.colors`), Surfer's dark theme by default.
+- "One clock cycle" in the control panel: runs one period of the clock and
+  pauses.
+- Moving cells on the schematic; their wires go around other cells. The
+  layout is saved, also inside subcircuits.
+- The FSM window highlights the transition the next clock edge takes.
+
+### Changed
+- Much faster simulation (about 9x on the `soc` board).
+- Moving cells, and undo/redo of it, no longer restart the simulation.
+- The Synthesis panel has Synthesis/Diagram tabs under the Synthesize button;
+  the panels use VS Code's native-looking controls.
+- LED matrices and 7-segment displays are red on black.
+- "Run until next event" is gone (with gate delays it was a single step);
+  use "One clock cycle" or a pause condition on a waveform.
+- Lua is Lua 5.4. `tointeger` takes up to 63 bits; an expression typed in
+  the Lua terminal prints its value.
+
+### Removed
+- The browser version (vscode.dev): the simulator is a native program. The
+  extension needs Linux x64.
+- Editing wires on the schematic (an edited circuit no longer matches its
+  sources) and the Layout option (ELK only).
+- `sim.registerdisplay` in Lua.
+
+### Fixed
+- A combinational loop that never settles is reported instead of hanging.
+- Lua errors say where they happened (`file:line`); a number narrower than
+  the input it is set to no longer crashes the script.
+
 ## [0.7.0] - 2026-10-15
 
 ### Added
