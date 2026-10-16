@@ -1,0 +1,209 @@
+html, body {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    overflow: hidden;
+}
+
+#paper {
+    position: absolute;
+    inset: 0;
+    background: white;
+}
+
+svg.schematic {
+    display: block;
+    font-family: verdana, sans-serif;
+    user-select: none;
+    touch-action: none;
+}
+
+svg.schematic .cell {
+    cursor: move;
+}
+
+svg.schematic .button,
+svg.schematic .open {
+    cursor: pointer;
+}
+
+svg.schematic .wirehit {
+    pointer-events: stroke;
+}
+
+svg.schematic .numvalue {
+    font-family: monospace;
+    font-size: 10px;
+}
+
+/* inputs and number base pickers inside the drawing */
+svg.schematic foreignObject > div {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    cursor: initial;
+}
+
+svg.schematic foreignObject input,
+svg.schematic foreignObject select {
+    font-size: 8pt;
+    border: 1px solid gray;
+    box-sizing: border-box;
+    width: 100%;
+}
+
+svg.schematic foreignObject.valinput input {
+    font-family: monospace;
+}
+
+svg.schematic foreignObject.tooltip {
+    visibility: hidden;
+    opacity: 0;
+    transition: visibility 0s linear 0.5s, opacity 0.5s linear;
+}
+
+svg.schematic .cell .open {
+    visibility: hidden;
+    opacity: 0;
+    transition: visibility 0s linear 0.5s, opacity 0.5s linear;
+}
+
+svg.schematic .cell:hover > .open,
+svg.schematic .cell:hover > foreignObject.tooltip,
+svg.schematic foreignObject.tooltip:hover {
+    visibility: visible;
+    opacity: 1;
+    transition-delay: 0s;
+}
+
+svg.schematic foreignObject.tooltip > div {
+    border: 1px solid gray;
+    box-sizing: border-box;
+    background: white;
+    padding: 5px;
+}
+
+input.invalid {
+    background: #ffaaaa;
+}
+
+div.wire_hover {
+    position: fixed;
+    pointer-events: none;
+    background: white;
+    color: black;
+    border: 1px solid black;
+    padding: 5px;
+    font-size: 8pt;
+    font-family: verdana, sans-serif;
+    z-index: 200;
+}
+
+.nocircuit {
+    text-align: center;
+    color: black;
+    font-family: var(--vscode-font-family, sans-serif);
+}
+
+.nocircuit button,
+.memeditor button {
+    background: var(--vscode-button-background);
+    color: var(--vscode-button-foreground);
+    border: none;
+    padding: 4px 10px;
+    cursor: pointer;
+}
+
+/* floating windows */
+.dialog {
+    position: fixed;
+    display: flex;
+    flex-direction: column;
+    background: var(--vscode-editorWidget-background, #f3f3f3);
+    color: var(--vscode-editorWidget-foreground, black);
+    border: 1px solid var(--vscode-editorWidget-border, #999);
+    box-shadow: 0 2px 8px var(--vscode-widget-shadow, rgba(0, 0, 0, 0.36));
+    max-width: 95vw;
+    max-height: 95vh;
+}
+
+.dialog .titlebar {
+    display: flex;
+    align-items: center;
+    padding: 2px 4px 2px 8px;
+    cursor: move;
+    font-family: var(--vscode-font-family, sans-serif);
+    font-size: 12px;
+    user-select: none;
+}
+
+.dialog .titlebar span {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.dialog .titlebar button {
+    background: none;
+    border: none;
+    color: inherit;
+    cursor: pointer;
+}
+
+.dialog .content {
+    position: relative;
+    overflow: auto;
+    resize: both;
+    background: white;
+    min-width: 100px;
+    min-height: 60px;
+}
+
+.memeditor {
+    padding: 6px;
+    color: black;
+}
+
+.memeditor .toolbar {
+    display: flex;
+    gap: 2px;
+}
+
+.memeditor table {
+    margin-top: 0.5em;
+}
+
+.memeditor td:first-child {
+    font-family: monospace;
+    padding-right: 1em;
+}
+
+.memeditor input {
+    font-family: monospace;
+    border: 1px solid #aaa;
+    border-radius: 4px;
+    padding: 0.2em 0.5em;
+}
+
+.memeditor input.flash {
+    animation: flash-animation 1s;
+}
+
+.memeditor input.isread {
+    box-shadow: 0px 0px 5px green;
+}
+
+.memeditor input.iswrite {
+    box-shadow: 0px 0px 5px red;
+}
+
+.memeditor input.iswrite.isread {
+    box-shadow: 1px 1px 5px -1px red, -1px -1px 5px -1px green;
+}
+
+@keyframes flash-animation {
+    from { background-color: yellow; }
+    to { background-color: white; }
+}

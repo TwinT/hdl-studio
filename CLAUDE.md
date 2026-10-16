@@ -54,6 +54,39 @@ event-driven simulator, digitaljs's WorkerEngine semantics), `hdlstudio` (the bi
   every `sim.lua` plus `test/simdiff/lua_api.lua` against digitaljs_lua on
   SynchEngine, same printed lines).
 
+## The new schematic (`view/schematic/`, TypeScript, phase 5)
+
+The circuit view without digitaljs/jointjs: SVG drawn by hand, laid out by
+`elkjs`, simulated by the engine directly (no RemoteEngine adapter). It is
+the default; the setting `hdl-studio.useDigitaljsView` brings back the old
+view (`view/main.mjs`, which still has the waveform monitor and wire editing)
+until the cutover. `src/circuit_view.mjs` picks the bundle when the view opens.
+
+- `cells.ts`: each cell's ports, size and drawing. The geometry is
+  digitaljs's (sizes, port positions, 25px leads), so a device's `position`
+  is its body's top-left in both UIs and saved layouts work in either.
+  `schematic.ts`: one graph as SVG, live values (engine `update` changes,
+  applied once per animation frame), pan/zoom, wire tooltips, dragging cells.
+  `layout.ts`: ELK, a node is the body plus its leads (ports on the border).
+  `main.ts`: the host protocol (same messages as `view/main.mjs`), sim
+  controls, control-panel I/O, dialogs (`dialog.ts`, native), memory editor
+  (`memory.ts`), FSM diagram (`fsm.ts`, the next transition is computed in
+  the view), image export (`view/imgutils.mjs`). `view/lua_runner.ts` is
+  shared by both views.
+- The circuit stays in digitaljs's JSON (hdlstudio-netlist's serde form);
+  layout lives in `devices[id].position` and `connectors[i].vertices` (ELK's
+  bend points), in the top level and per subcircuit type. A `showcircuit`
+  whose netlist (the JSON without position/vertices/numbase) didn't change
+  only redraws: the simulation goes on (undo/redo of a move).
+- TypeScript: `tsc` only type-checks (`tsconfig.json`, part of `npm run
+  lint`); webpack transpiles with `esbuild-loader` (TypeScript 7 has no JS
+  API for ts-loader). Node imports the `.ts` directly in tests.
+- `npm run test:schematic` (`test/schematic.spec.mjs`): value formats, then
+  `dist/schematic.js` in Chromium (Playwright, from `@vscode/test-web`) on a
+  real `hdlstudio serve`, with the test as the extension host: the board's
+  matrix lights up, a subcircuit opens, Reset, a move keeps simulating, a
+  Lua script runs. The same harness shape works for poking at the view by hand.
+
 ## Architecture: host vs webview
 
 Two worlds, bundled separately by webpack (`webpack.config.js`):
@@ -61,7 +94,8 @@ Two worlds, bundled separately by webpack (`webpack.config.js`):
 - **Extension host** — `src/*.mjs` → `dist/local-extension.js` (and `web-extension.js`).
   Runs in the VS Code extension host process. Talks to yosys, owns the document/state.
 - **Webviews** — `view/*.mjs` → separate bundles:
-  - `view/main.mjs` → `view-bundle.js` (the circuit editor: digitaljs, jointjs, elkjs)
+  - `view/schematic/main.ts` → `schematic.js` (the circuit view, see above)
+  - `view/main.mjs` → `view-bundle.js` (the old circuit editor: digitaljs, jointjs, elkjs)
   - `view/synth_view.mjs` → `synth_view.js` (the "Synthesis" side panel controls)
   - `view/status_view.mjs` → `status_view.js` (the "control" panel: run/step + I/O widgets)
 
@@ -86,7 +120,8 @@ webview logic is `view/synth_view.mjs`).
 
 ## Testing & lint
 
-- `npm test` → `test:rust` (`cargo test --workspace`), `test:pipeline`, `test:vscode`.
+- `npm test` → `test:rust` (`cargo test --workspace`), `test:pipeline`, `test:simdiff`,
+  `test:schematic`, `test:vscode`.
 - `test:pipeline` (builds the engine, then `mocha test/pipeline.spec.mjs`) — synthesizes
   every single-file example through the real flow (yosys → `hdlstudio`) and asserts it
   converts. No VS Code, no DOM; needs `yosys` on PATH (skips if absent). Named

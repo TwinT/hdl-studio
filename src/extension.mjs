@@ -135,6 +135,7 @@ class DigitalJS {
         const ext_uri = context.extensionUri;
         this.iconPath = vscode.Uri.joinPath(ext_uri, 'imgs', 'hdl-studio.svg');
         this.mainJSPath = vscode.Uri.joinPath(ext_uri, 'dist', 'view-bundle.js');
+        this.schematicJSPath = vscode.Uri.joinPath(ext_uri, 'dist', 'schematic.js');
         this.synthJSPath = vscode.Uri.joinPath(ext_uri, 'dist', 'synth_view.js');
         this.statusJSPath = vscode.Uri.joinPath(ext_uri, 'dist', 'status_view.js');
         this.uiToolkitPath = vscode.Uri.joinPath(ext_uri, "node_modules", "@vscode",

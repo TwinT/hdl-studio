@@ -7,6 +7,9 @@ const webpack = require('webpack');
 
 const outputDirectory = "dist";
 
+// TypeScript is only transpiled here; `tsc` (npm run lint) checks the types.
+const tsRule = { test: /\.ts$/, loader: 'esbuild-loader', options: { target: 'es2022' } };
+
 function main_view_config(env, argv) {
     const devMode = argv.mode !== "production";
     return {
@@ -18,6 +21,7 @@ function main_view_config(env, argv) {
         },
         module: {
             rules: [
+                tsRule,
                 {
                     test: /\.css$/,
                     use: ["style-loader", "css-loader"]
@@ -44,6 +48,28 @@ function main_view_config(env, argv) {
                 [path.resolve(__dirname, './node_modules/digitaljs/src/engines/worker-worker.mjs')]: false,
                 [path.resolve(__dirname, './node_modules/jquery-ui/themes/base/all.css')]: false,
             }
+        },
+    };
+}
+
+// The new schematic (TypeScript), replacing main_view_config's digitaljs view.
+function schematic_view_config() {
+    return {
+        name: 'schematic-view',
+        entry: "./view/schematic/main.ts",
+        output: {
+            path: path.join(__dirname, outputDirectory),
+            filename: "schematic.js"
+        },
+        resolve: { extensions: ['.ts', '.mjs', '.js'] },
+        module: {
+            rules: [
+                tsRule,
+                {
+                    test: /\.css$/,
+                    use: ["style-loader", "css-loader"]
+                },
+            ]
         },
     };
 }
@@ -180,5 +206,5 @@ function local_ext_config(env, argv) {
     };
 }
 
-module.exports = [main_view_config, status_view_config, synth_view_config,
+module.exports = [main_view_config, schematic_view_config, status_view_config, synth_view_config,
                   digitaljs_worker_config, web_ext_config, local_ext_config];

@@ -134,6 +134,8 @@ export class CircuitView {
         });
     }
     async #getViewContent(djs, webview) {
+        if (!vscode.workspace.getConfiguration('hdl-studio').get('useDigitaljsView'))
+            return this.#schematicContent(djs, webview);
         const js_uri = webview.asWebviewUri(djs.mainJSPath);
         const ui_uri = webview.asWebviewUri(djs.uiToolkitPath);
         const icon_uri = webview.asWebviewUri(djs.codIconsPath);
@@ -185,6 +187,21 @@ export class CircuitView {
   </div>
 </div>
 </body>
+</html>`;
+    }
+    // The new schematic (view/schematic/).
+    #schematicContent(djs, webview) {
+        return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script>window.getImageSupport = ${!djs.image_exts_set};</script>
+  <script type="module" src="${webview.asWebviewUri(djs.schematicJSPath)}"></script>
+  <link href="${webview.asWebviewUri(djs.codIconsPath)}" rel="stylesheet"/>
+  <title>HDL Studio</title>
+</head>
+<body><div id="paper"></div></body>
 </html>`;
     }
     reveal() {

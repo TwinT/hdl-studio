@@ -16,7 +16,8 @@ import Split from 'split-grid';
 import * as imgutils from './imgutils.mjs';
 import { Monitor, MonitorView } from './monitor.mjs';
 import { RemoteIOPanel } from './iopanel.mjs';
-import { RemoteEngine, EngineLuaRunner } from './remote_engine.mjs';
+import { RemoteEngine } from './remote_engine.mjs';
+import { LuaRunner } from './lua_runner.ts';
 
 const vscode = acquireVsCodeApi();
 
@@ -232,129 +233,6 @@ function max_dialog_width() {
 }
 function max_dialog_height() {
     return $window.height() * 0.9;
-}
-
-class LuaRunner {
-    #djs
-    #runners
-    #repl_runner
-    #repl_queue = []
-    #switching = false
-    constructor(djs) {
-        this.#djs = djs;
-        this.#runners = {};
-    }
-
-    #error(name, e, isrepl, label) {
-        vscode.postMessage({ command: "luaerror", name, message: e.luaMessage, isrepl, label });
-    }
-    #getRunner(name, isrepl, label) {
-        if (isrepl) {
-            if (this.#repl_runner) {
-                this.#repl_runner.djs_name = name;
-                this.#repl_runner.djs_label = label;
-                return this.#repl_runner;
-            }
-        }
-        const runner = new EngineLuaRunner(engineChannel, isrepl);
-        runner.djs_name = name;
-        runner.djs_label = label;
-        runner.on('thread:stop', (pid) => {
-            vscode.postMessage({ command: "luastop", name: runner.djs_name, isrepl });
-            if (!this.#switching) {
-                const has_queued = isrepl && this.#repl_queue.length > 0;
-                if (!has_queued)
-                    this.#djs.pauseSim();
-                this.#djs.updateRunStates();
-            }
-            if (!isrepl || this.#repl_queue.length <= 0)
-                return;
-            const { name, script, label } = this.#repl_queue[0];
-            this.#repl_queue.splice(0, 1);
-            this.#run(name, script, true, label);
-        });
-        runner.on('thread:error', (pid, e) => {
-            this.#error(runner.djs_name, e, isrepl, runner.djs_label);
-        });
-        runner.on('print', msgs => {
-            vscode.postMessage({ command: "luaprint", name: runner.djs_name,
-                                 messages: msgs, isrepl, label: runner.djs_label });
-        });
-        if (isrepl) {
-            this.#repl_runner = runner;
-        }
-        else {
-            this.#runners[name] = runner;
-        }
-        return runner;
-    }
-    run(name, script, isrepl, label) {
-        if (isrepl) {
-            const runner = this.#repl_runner;
-            if (runner && runner.running_pid !== undefined) {
-                const pid = runner.running_pid;
-                if (runner.isThreadRunning(pid)) {
-                    this.#repl_queue.push({ name, script, label });
-                    return;
-                }
-            }
-        }
-        // Only one Lua execution (script or REPL) may drive the circuit's
-        // inputs at a time. #switching suppresses the natural-completion
-        // pause/broadcast below while we're about to immediately start a
-        // replacement execution.
-        this.#switching = true;
-        try {
-            for (const other_name of Object.keys(this.#runners))
-                this.stop(other_name);
-            if (!isrepl)
-                this.stop(undefined, true, false);
-        } finally {
-            this.#switching = false;
-        }
-        this.#run(name, script, isrepl, label);
-    }
-    get active() {
-        if (this.#repl_queue.length > 0) return true;
-        const isBusy = (r) => r && r.running_pid !== undefined && r.isThreadRunning(r.running_pid);
-        return isBusy(this.#repl_runner) || Object.values(this.#runners).some(isBusy);
-    }
-    #run(name, script, isrepl, label) {
-        label = label || name;
-        const runner = this.#getRunner(name, isrepl, label);
-        // A script's sim.sleep/sim.wait resumption only fires while the
-        // circuit is ticking; ensure it's running (no state reset).
-        if (!this.#djs.circuit.running)
-            this.#djs.startSim();
-        // the engine runs it (errors come back as thread:error)
-        runner.running_pid = runner.runThread(script);
-        vscode.postMessage({ command: "luastarted", name, isrepl });
-    }
-    stop(name, isrepl, quit) {
-        const runner = isrepl ? this.#repl_runner : this.#runners[name];
-        if (!runner)
-            return;
-        if (!isrepl) {
-            delete this.#runners[name];
-        }
-        else {
-            if (quit)
-                this.#repl_runner = undefined;
-            this.#repl_queue.length = 0;
-        }
-        const pid = runner.running_pid;
-        if (pid === undefined)
-            return;
-        if (runner.isThreadRunning(pid)) {
-            runner.stopThread(pid);
-            delete runner.running_pid;
-        }
-    }
-    shutdown() {
-        for (const h of Object.values(this.#runners))
-            h.shutdown();
-        this.#runners = {};
-    }
 }
 
 class ChangeTracker {
@@ -588,7 +466,7 @@ class DigitalJS {
     #initialMem = new Map()
     constructor() {
         this.circuit = undefined;
-        this.#lua = new LuaRunner(this);
+        this.#lua = new LuaRunner(vscode, engineChannel, this);
         this.#paper_in_flight = new Map();
         this.#change_tracker = new ChangeTracker();
         this.#dialog_mgr = new DialogManager();
@@ -1466,6 +1344,9 @@ class DigitalJS {
         this.updateRunStates();
         $('#monitorbox vscode-button').prop('disabled', true).off();
         $('#paper').empty();
+    }
+    get running() {
+        return !!this.circuit?.running;
     }
     pauseSim() {
         this.circuit.stop();

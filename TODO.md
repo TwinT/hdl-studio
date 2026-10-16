@@ -128,6 +128,9 @@
       at tick 0 (the worker kept the signals); vscode.dev can't simulate at all
       now (the engine is a native process); the FSM editor gets the current
       state but not `next_trans` (the highlighted transition).
+      The new schematic (phase 5) fixes the first and the last: moving cells
+      (and undo/redo of a move) keeps simulating, and it works out the next
+      transition itself. They remain in the digitaljs view only.
 - [ ] Unused since phase 4, remove in the cutover: the digitaljs worker bundle
       (`dist/digitaljs-sym-worker.js`, `simWorkerUri` in the circuit view HTML,
       `djs.simWorker`), and `digitaljs_lua`/`fengari-web` (only the Lua diff test
@@ -136,4 +139,28 @@
       worked because digitaljs_lua loaded lodash, which left a global `_`.
       Removing digitaljs_lua from the webview broke the whole view at load.
       Fixed with `Object.assign` (found by the webview test on the engine).
-
+- [ ] The new schematic (phase 5, `view/schematic/`), what it doesn't do yet
+      or does differently:
+      - a moved cell's wires lose their route and go straight (an L/Z shape
+        through other cells); route them around cells, or re-run ELK on
+        demand ("tidy up" button);
+      - no wire editing (on purpose for v1: an edited netlist no longer
+        matches the SystemVerilog), no waveform monitor yet (phase 6); the
+        digitaljs view (setting `hdl-studio.useDigitaljsView`) still has both;
+      - the synthesis panel's layout option (elkjs/dagre) does nothing in it:
+        it only lays out with ELK. Remove the option with the digitaljs view;
+      - a number base picked on a NumEntry/NumDisplay is kept in the circuit
+        but, as in digitaljs, only saved with the next edit;
+      - the paper is white in dark themes too, as in digitaljs;
+      - cells moved inside a subcircuit are saved (per subcircuit type, like
+        its layout); digitaljs never saved those.
+- [ ] If the engine process dies, the host starts a new one on the next
+      request, but the webview doesn't load the circuit into it again
+      ("no circuit loaded" until the circuit is shown again). Since phase 4.
+- [ ] Remove at the cutover, with the digitaljs view: `view/main.mjs`,
+      `view/remote_engine.mjs`, `view/iopanel.mjs`, `view/monitor.mjs` (after
+      phase 6), `view/scss/`, `view/touch-punch.mjs`, the `main-view` webpack
+      config, `djs.mainJSPath`, the `hdl-studio.useDigitaljsView` setting, and
+      the npm deps only they use (jquery-ui, hammerjs, svg-pan-zoom,
+      split-grid, resize-observer-polyfill, backbone, @joint/*; jquery goes
+      when phase 6 rewrites the control panel).

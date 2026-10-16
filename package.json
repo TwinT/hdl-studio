@@ -349,6 +349,11 @@
                     "type": "string",
                     "default": "",
                     "description": "Path to the yosys executable. If empty, yosys from the PATH will be used."
+                },
+                "hdl-studio.useDigitaljsView": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Show circuits with the old digitaljs view (it still has the waveform monitor and wire editing) instead of the new schematic. Takes effect on newly opened circuits. Temporary: goes away when the new view has everything."
                 }
             }
         }
@@ -364,12 +369,13 @@
         "watch:webpack": "webpack --watch --mode development",
         "watch-prod": "npm-run-all watch-prod:*",
         "watch-prod:webpack": "webpack --watch --mode production",
-        "lint": "eslint .",
+        "lint": "eslint . && tsc",
         "pretest": "npm run lint",
-        "test": "npm-run-all test:rust test:pipeline test:simdiff test:vscode",
+        "test": "npm-run-all test:rust test:pipeline test:simdiff test:schematic test:vscode",
         "test:rust": "cargo test --workspace",
         "test:pipeline": "npm run compile:rust && mocha test/pipeline.spec.mjs",
         "test:simdiff": "npm run compile:rust && mocha test/simdiff/simdiff.spec.mjs test/simdiff/luadiff.spec.mjs",
+        "test:schematic": "npm run compile:rust && webpack --mode development --config-name schematic-view && mocha test/schematic.spec.mjs",
         "test:vscode": "node ./test/runTest.js",
         "open-in-browser": "vscode-test-web --extensionDevelopmentPath=. ."
     },
@@ -380,6 +386,7 @@
         "@vscode/test-electron": "^3.0.0",
         "@vscode/test-web": "^0.0.81",
         "css-loader": "^7.1.4",
+        "esbuild-loader": "^4.5.0",
         "eslint": "^10.5.0",
         "expose-loader": "^5.0.1",
         "glob": "^13.0.6",
@@ -391,6 +398,7 @@
         "sass": "^1.101.0",
         "sass-loader": "^17.0.0",
         "style-loader": "^4.0.0",
+        "typescript": "^7.0.2",
         "webpack": "5.107.2",
         "webpack-cli": "^7.0.3"
     },
@@ -406,6 +414,7 @@
         "dequal": "^2.0.3",
         "digitaljs": "^0.14.2",
         "digitaljs_lua": "^0.0.9",
+        "elkjs": "^0.11.1",
         "hammerjs": "^2.0.8",
         "luaparse": "^0.3.1",
         "path-browserify": "^1.0.1",
