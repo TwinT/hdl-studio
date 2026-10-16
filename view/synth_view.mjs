@@ -26,12 +26,12 @@ class Synth {
         if (!ele)
             return;
         ele.innerHTML = '';
-        const auto = document.createElement('vscode-option');
+        const auto = document.createElement('option');
         auto.value = '';
         auto.textContent = 'Auto';
         ele.appendChild(auto);
         for (const name of this.#topModules) {
-            const opt = document.createElement('vscode-option');
+            const opt = document.createElement('option');
             opt.value = name;
             opt.textContent = name;
             ele.appendChild(opt);

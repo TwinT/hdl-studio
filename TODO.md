@@ -71,8 +71,10 @@
 - [ ] Release 0.7.0: publish to the Marketplace (`vsce login TwinT`, then
       `vsce publish --packagePath hdl-studio-0.7.0.vsix`) and create the
       GitHub Release (`gh auth login`). The `v0.6.1` tag was never pushed.
-- [ ] Check whether `@vscode/webview-ui-toolkit` is really deprecated
-      (phase 6 drops it either way).
+- [X] `@vscode/webview-ui-toolkit` is deprecated (npm says so). The Control
+      and Synthesis panels use native controls since phase 6
+      (`src/webview_style.mjs`); only the digitaljs view still loads it, and
+      it goes with that view.
 - [ ] Converter quirks copied from yosys2digitaljs / digitaljs's transform on
       purpose (phase 2 ports faithfully); fix each in its own commit:
       - gate-level `$_DFF_P_`/`$_DFFE_PP_` are "Invalid cell type" (the kinds
@@ -172,3 +174,10 @@
       the npm deps only they use (jquery-ui, hammerjs, svg-pan-zoom,
       split-grid, resize-observer-polyfill, backbone, @joint/*; jquery goes
       when phase 6 rewrites the control panel).
+- [ ] The README says Lua has `sim.start()` and `sim.stop(synchronize)`;
+      neither digitaljs_lua 0.0.9 (patched or not) nor the engine's Lua has
+      them, so this was already untrue before the migration. Running a script
+      or a REPL line starts the simulation and its end pauses it, which covers
+      most of it. Implement them (a REPL `sim.start()` would have to outlive
+      the line, and the UI would need a "running" event from the engine) or
+      fix the README.

@@ -74,28 +74,16 @@ function schematic_view_config() {
     };
 }
 
-function status_view_config(env, argv) {
-    const devMode = argv.mode !== "production";
+function status_view_config() {
     return {
         name: 'status-view',
-        entry: "./view/status_view.mjs",
+        entry: "./view/status_view.ts",
         output: {
             path: path.join(__dirname, outputDirectory),
             filename: "status_view.js"
         },
-        module: {
-            rules: [
-                {
-                    test: require.resolve('jquery'),
-                    loader: 'expose-loader',
-                    options: {
-                        exposes: ['$']
-                    }
-                },
-            ]
-        },
-        plugins: [
-        ],
+        resolve: { extensions: ['.ts', '.mjs', '.js'] },
+        module: { rules: [tsRule] },
     };
 }
 
