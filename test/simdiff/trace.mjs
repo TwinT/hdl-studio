@@ -11,7 +11,32 @@
 // Only end-of-tick values are compared: glitches inside a tick depend on the
 // order zero-delay cells run in, which the engines don't have to share.
 
+import readline from 'readline';
+import { spawn } from 'child_process';
 import { HeadlessCircuit, WorkerEngine, Vector4vl, workerURL } from './digitaljs_src.mjs';
+import { hdlstudio_bin, set_hdlstudio_root } from '../../src/hdlstudio_bin.mjs';
+
+set_hdlstudio_root(new URL('../..', import.meta.url).pathname);
+
+const { RemoteEngine } = await import('../../view/remote_engine.mjs');
+
+// A channel to a fresh `hdlstudio serve` (view/remote_engine.mjs).
+export function engineProcess() {
+    const proc = spawn(hdlstudio_bin(), ['serve'], { stdio: ['pipe', 'pipe', 'inherit'] });
+    const listeners = new Set();
+    readline.createInterface({ input: proc.stdout }).on('line', (line) => {
+        const ev = JSON.parse(line);
+        for (const fn of [...listeners]) fn(ev);
+    });
+    return {
+        send: (req) => proc.stdin.write(JSON.stringify(req) + '\n'),
+        listen: (fn) => {
+            listeners.add(fn);
+            return () => listeners.delete(fn);
+        },
+        close: () => proc.kill(),
+    };
+}
 
 // mulberry32, so a seed always gives the same stimulus
 function rng(seed) {
@@ -49,14 +74,20 @@ export function makeStimulus(circuit, { ticks, seed = 1, every = 300 }) {
     return events.sort((a, b) => a[0] - b[0]);
 }
 
-export async function digitaljsTrace(circuitJson, { ticks, stimulus, defaultcomb = false }) {
+// `remote`: on hdlstudio's engine through the UI's adapter, instead of
+// digitaljs's own worker.
+export async function digitaljsTrace(circuitJson, { ticks, stimulus, defaultcomb = false, remote = false }) {
+    const channel = remote && engineProcess();
     const circuit = new HeadlessCircuit(JSON.parse(JSON.stringify(circuitJson)), {
-        engine: WorkerEngine,
-        engineOptions: { workerURL },
+        engine: remote ? RemoteEngine : WorkerEngine,
+        engineOptions: remote ? { channel } : { workerURL },
         ...(defaultcomb ? { defaultCombinationalPropagation: 0 } : {}),
     });
     let failure;
-    circuit._engine._worker.addEventListener('error', (e) => { failure = e.error ?? e; });
+    if (remote)
+        circuit._engine.on('engine:error', (message) => { failure = new Error(message); });
+    else
+        circuit._engine._worker.addEventListener('error', (e) => { failure = e.error ?? e; });
     const lines = [];
     const last = new Map();
     const touched = new Set();
@@ -102,5 +133,6 @@ export async function digitaljsTrace(circuitJson, { ticks, stimulus, defaultcomb
         touched.clear();
     }
     circuit.shutdown();
+    if (channel) channel.close();
     return lines;
 }

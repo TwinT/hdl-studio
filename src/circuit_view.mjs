@@ -3,7 +3,10 @@
 'use strict';
 
 import * as vscode from 'vscode';
+import * as child_process from 'child_process';
+import * as readline from 'readline';
 import * as base64 from 'base64-arraybuffer';
+import { hdlstudio_bin } from './hdlstudio_bin.mjs';
 import { WebviewMsgQueue } from './webview_msg_queue.mjs';
 import { write_txt_file } from './utils.mjs';
 
@@ -14,6 +17,11 @@ export class CircuitView {
     #init
     #djs
     #subcircuits = {}
+    // the simulation engine of this view (`hdlstudio serve`), started on
+    // the webview's first request
+    #engine
+    #engineSession
+    #disposed = false
     constructor(djs, panel, document) {
         this.#djs = djs;
         this.#panel = panel;
@@ -32,6 +40,8 @@ export class CircuitView {
         });
         this.onDidDispose(() => {
             circuit_listener.dispose();
+            this.#disposed = true;
+            this.#engine?.kill();
         });
         this.#init = this.#getViewContent(djs, this.#panel.webview).then(content => {
             this.#panel.webview.html = content;
@@ -50,8 +60,41 @@ export class CircuitView {
     init() {
         return this.#init;
     }
+    #engineSend(req) {
+        if (req.op === 'load')
+            this.#engineSession = req.session;
+        if (!this.#engine)
+            this.#startEngine();
+        this.#engine.stdin.write(JSON.stringify(req) + '\n');
+    }
+    #startEngine() {
+        const proc = child_process.spawn(hdlstudio_bin(), ['serve'], { stdio: ['pipe', 'pipe', 'pipe'] });
+        this.#engine = proc;
+        const fail = (message) => {
+            if (this.#engine === proc)
+                this.#engine = undefined;
+            if (this.#disposed)
+                return;
+            vscode.window.showErrorMessage(`Simulation: ${message}`);
+            this.post({ command: 'engine', ev: { ev: 'error', session: this.#engineSession, message } });
+        };
+        readline.createInterface({ input: proc.stdout }).on('line', (line) => {
+            const ev = JSON.parse(line);
+            if (ev.ev === 'error')
+                vscode.window.showErrorMessage(`Simulation: ${ev.message}`);
+            this.post({ command: 'engine', ev });
+        });
+        proc.stderr.on('data', (d) => console.error(`hdlstudio: ${d}`));
+        proc.stdin.on('error', () => {}); // a dead engine is reported by 'exit'
+        proc.on('error', (e) => fail(e.code === 'ENOENT' ?
+            `the engine is missing (${hdlstudio_bin()}). Run "npm run compile".` : e.message));
+        proc.on('exit', (code, signal) => fail(`the engine stopped (${signal || code})`));
+    }
     #processCommand(djs, msg) {
         switch (msg.command) {
+            case 'engine':
+                this.#engineSend(msg.req);
+                return;
             case 'subcircuits':
                 this.#subcircuits = msg.subcircuits;
                 return;

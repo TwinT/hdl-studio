@@ -39,6 +39,20 @@ event-driven simulator, digitaljs's WorkerEngine semantics), `hdlstudio` (the bi
   differences: today, Memory transparency compares addresses by value (JS
   compared them by object). Speed: `cargo run --release -p hdlstudio-sim
   --example bench -- circuit.json TICKS`.
+- The extension simulates on the engine: each circuit view (`src/circuit_view.mjs`)
+  starts a `hdlstudio serve` (JSON lines on stdio, protocol at the top of
+  `crates/hdlstudio/src/serve.rs`, gates addressed by digitaljs path
+  "dev3/dev12"). In the webview, `view/remote_engine.mjs`'s `RemoteEngine`
+  replaces digitaljs's WorkerEngine (same API, mirrors its main-thread half; the
+  circuit is sent whole on `load`, an edit reloads it from tick 0) and
+  `EngineLuaRunner` replaces digitaljs_lua's LuaRunner: scripts run *inside*
+  the engine (`crates/hdlstudio/src/lua.rs`, mlua + Lua 5.4) as coroutines, and
+  `sim.sleep`/`sim.wait` wake them after the step their alarm/monitor fires in.
+  `hdlstudio lua circuit.json script.lua` runs a script headless.
+  `test:simdiff` also checks the adapter (digitaljs's model on the engine through
+  `RemoteEngine`, `trace.mjs` `remote: true`) and the Lua (`luadiff.spec.mjs`:
+  every `sim.lua` plus `test/simdiff/lua_api.lua` against digitaljs_lua on
+  SynchEngine, same printed lines).
 
 ## Architecture: host vs webview
 
@@ -277,6 +291,10 @@ bug coming back, e.g. Reset erasing the schematic). `npm run compile` runs
   `lib/cells.js` should differ.
 
 ## Lua script execution lifecycle
+
+(History from the fengari/digitaljs_lua era. Since the Rust migration's phase 4
+scripts run inside the engine, where the async races below can't happen; the
+webview's `LuaRunner` single-active-execution logic still applies.)
 
 Root cause of the earlier "stale/wrong values in the real webview" bug (a Lua
 script driving a shared tri-state bus printed the same value 5 times instead

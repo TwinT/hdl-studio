@@ -21,6 +21,8 @@ registerHooks({
             return next(url, context);
         const spec = url.slice('shim:'.length);
         const keys = Object.keys(require(spec)).filter((k) => /^[A-Za-z_$][\w$]*$/.test(k) && k !== 'default');
+        // digitaljs_lua imports `luaconf`, which fengari-web lacks (webpack lets it be undefined)
+        if (spec === 'fengari-web' && !keys.includes('luaconf')) keys.push('luaconf');
         const source = `import { createRequire } from 'node:module';
 const m = createRequire(${JSON.stringify(pkg)})(${JSON.stringify(spec)});
 export default m;

@@ -9,7 +9,6 @@ import $ from 'jquery';
 import 'jquery-ui/ui/widgets/dialog.js';
 import './touch-punch.mjs';
 import * as digitaljs from 'digitaljs';
-import * as digitaljs_lua from 'digitaljs_lua';
 import svgPanZoom from 'svg-pan-zoom';
 import Hammer from 'hammerjs';
 import ResizeObserver from 'resize-observer-polyfill';
@@ -17,8 +16,24 @@ import Split from 'split-grid';
 import * as imgutils from './imgutils.mjs';
 import { Monitor, MonitorView } from './monitor.mjs';
 import { RemoteIOPanel } from './iopanel.mjs';
+import { RemoteEngine, EngineLuaRunner } from './remote_engine.mjs';
 
 const vscode = acquireVsCodeApi();
+
+// The simulation engine (`hdlstudio serve`), through the extension host.
+const engineChannel = (() => {
+    const listeners = new Set();
+    return {
+        send: (req) => vscode.postMessage({ command: 'engine', req }),
+        listen: (fn) => {
+            listeners.add(fn);
+            return () => listeners.delete(fn);
+        },
+        dispatch: (ev) => {
+            for (const fn of [...listeners]) fn(ev);
+        },
+    };
+})();
 
 digitaljs.paperOptions.gridSize = 0.5;
 digitaljs.paperOptions.moveThreshold = 10;
@@ -241,7 +256,7 @@ class LuaRunner {
                 return this.#repl_runner;
             }
         }
-        const runner = new digitaljs_lua.LuaRunner(this.#djs.circuit);
+        const runner = new EngineLuaRunner(engineChannel, isrepl);
         runner.djs_name = name;
         runner.djs_label = label;
         runner.on('thread:stop', (pid) => {
@@ -311,24 +326,9 @@ class LuaRunner {
         // circuit is ticking; ensure it's running (no state reset).
         if (!this.#djs.circuit.running)
             this.#djs.startSim();
-        let pid;
-        try {
-            // A `@` prefixed chunk name is interpreted as filename by lua
-            pid = runner.runThread(script, { name: `@${label}`, printResult: isrepl,
-                                             prependReturn: isrepl });
-            runner.running_pid = pid;
-        }
-        catch (e) {
-            if (e instanceof digitaljs_lua.LuaError) {
-                this.#error(name, e, isrepl, label);
-            }
-            else {
-                throw e;
-            }
-        }
-        if (pid !== undefined) {
-            vscode.postMessage({ command: "luastarted", name, isrepl });
-        }
+        // the engine runs it (errors come back as thread:error)
+        runner.running_pid = runner.runThread(script);
+        vscode.postMessage({ command: "luastarted", name, isrepl });
     }
     stop(name, isrepl, quit) {
         const runner = isrepl ? this.#repl_runner : this.#runners[name];
@@ -415,23 +415,11 @@ class SubCircuitTracker {
     }
 }
 
-class Engine extends digitaljs.engines.WorkerEngine {
+// ponytail: a circuit rebuilt with keep (undo/redo of an edit) restarts the
+// simulation at tick 0; the worker engine took the previous signals over
+class Engine extends RemoteEngine {
     constructor(graph, opts) {
-        const restore_graph_states = (graph, signals) => {
-            if (!signals)
-                return;
-            for (const gate of graph.getElements()) {
-                const sub_signals = signals[gate.id];
-                if (!sub_signals)
-                    continue;
-                if (gate.get('type') == 'Subcircuit')
-                    restore_graph_states(gate.get('graph'), sub_signals.sub_signals);
-                gate.set('outputSignals', sub_signals.output);
-                gate.set('inputSignals', sub_signals.input);
-            }
-        };
-        restore_graph_states(graph, opts.signals);
-        super(graph, opts);
+        super(graph, { ...opts, channel: engineChannel });
     }
 }
 
@@ -653,6 +641,9 @@ class DigitalJS {
             return;
         }
         switch (message.command) {
+            case 'engine':
+                engineChannel.dispatch(message.ev);
+                return;
             case 'showcircuit':
                 if ('speed' in message.opts)
                     this.#speed = message.opts.speed;
@@ -1163,10 +1154,7 @@ class DigitalJS {
         const circuit_opts = {
             layoutEngine: opts.layout === 'dagre' ? 'dagre' : 'elkjs',
             engine: Engine,
-            // a reset keeps the dialogs (keep) but not the simulation state
-            engineOptions: { workerURL: window.simWorkerUri,
-                             signals: opts.keep && !opts.reset ? old_states.signals : undefined,
-                             initTick: opts.keep && !opts.reset ? old_states.tick : undefined },
+            engineOptions: {},
             windowCallback: (type, div, close_cb, opts) => {
                 // digitaljs 0.14.2 does not pass the model object here, so opts
                 // may be undefined. Derive what we need from the paper attached

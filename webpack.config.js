@@ -126,6 +126,7 @@ function web_ext_config(env, argv) {
                 stream: require.resolve('stream-browserify'),
                 'tmp-promise': false,
                 child_process: false,
+                readline: false,
             },
             fallback: {
                 https: false,

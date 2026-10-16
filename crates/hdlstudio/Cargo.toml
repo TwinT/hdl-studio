@@ -6,7 +6,9 @@ edition.workspace = true
 license.workspace = true
 
 [dependencies]
+hdlstudio-logic = { path = "../hdlstudio-logic" }
 hdlstudio-netlist = { path = "../hdlstudio-netlist" }
 hdlstudio-sim = { path = "../hdlstudio-sim" }
 hdlstudio-yosys = { path = "../hdlstudio-yosys" }
+mlua = { version = "0.11", features = ["lua54", "vendored"] }
 serde_json = "1"

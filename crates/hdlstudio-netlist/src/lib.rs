@@ -74,6 +74,10 @@ fn is_false(b: &bool) -> bool {
     !b
 }
 
+fn one() -> u32 {
+    1
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub enum Cell {
@@ -155,10 +159,14 @@ pub enum Cell {
     Subcircuit { celltype: String },
 }
 
+/// digitaljs doesn't save `net`, `order` or `bits` for a Clock.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Io {
+    #[serde(default)]
     pub net: String,
+    #[serde(default)]
     pub order: u32,
+    #[serde(default = "one")]
     pub bits: u32,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub rows: Option<u32>,
@@ -352,6 +360,8 @@ pub enum PortMask {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Fsm {
     pub polarity: FsmPolarity,
+    /// Not saved by digitaljs.
+    #[serde(default)]
     pub wirename: serde_json::Value,
     pub bits: InOut,
     pub states: u32,

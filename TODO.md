@@ -108,4 +108,28 @@
 - [ ] Simulator features still to port for phase 4: monitors and alarms,
       `memChange`/manual memory edits, parameter changes while running (a
       Clock's period), FSM `current_state`/`next_trans` for the editor.
+- [ ] digitaljs_lua bugs the engine's Lua (crates/hdlstudio/src/lua.rs) fixes:
+      a string narrower than the input/operand it is converted for crashed
+      ("Cannot read properties of null (reading 'v')": now zero-extended);
+      `sim.setinput` of an unknown input threw a JS TypeError that `pcall`
+      couldn't catch (now a Lua error); the REPL's `printResult`/
+      `prependReturn` options were ignored, so typing an expression printed
+      nothing (now it prints its values); `tointeger` refused 32 bits or more
+      (now up to 63); error messages now say `file:line`.
+- [ ] `sim.registerdisplay` (custom number displays) isn't in the engine's Lua
+      yet: the display runs in the UI, so it needs a protocol for it.
+- [X] Example scripts that never worked: `11_pushbutton/pushbutton_sim.lua`
+      set an input `btn` (the port is `pushbutton`); `02_d_latch` and
+      `03_full_adder` read their outputs 2 ticks after changing the inputs,
+      before the gates settled (x, so `tointeger()` failed). Fixed (found by
+      the Lua diff test).
+- [ ] Temporary regressions of the engine adapter (phase 4), until the new UI:
+      editing the circuit (and undo/redo of an edit) restarts the simulation
+      at tick 0 (the worker kept the signals); vscode.dev can't simulate at all
+      now (the engine is a native process); the FSM editor gets the current
+      state but not `next_trans` (the highlighted transition).
+- [ ] Unused since phase 4, remove in the cutover: the digitaljs worker bundle
+      (`dist/digitaljs-sym-worker.js`, `simWorkerUri` in the circuit view HTML,
+      `djs.simWorker`), and `digitaljs_lua`/`fengari-web` (only the Lua diff test
+      uses them).
 

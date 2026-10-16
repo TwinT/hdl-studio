@@ -98,6 +98,8 @@ pub struct Memory {
     rd: Vec<RdPort>,
     wr: Vec<WrPort>,
     pub mem: LogicMem,
+    /// Words the circuit changed in the last run (digitaljs's `memChange`).
+    pub writes: Vec<(usize, LogicVec)>,
 }
 
 #[derive(Clone, Debug)]
@@ -134,6 +136,14 @@ pub struct Fsm {
     /// Per input state: (ctrl_in, next state, ctrl_out).
     transitions: std::collections::HashMap<i64, Vec<(LogicVec, i64, LogicVec)>>,
     last_clk: Bit,
+    /// The state changed in the last run (shown by the FSM editor).
+    pub moved: bool,
+}
+
+impl Fsm {
+    pub fn state(&self) -> i64 {
+        self.state
+    }
 }
 
 /// A port: name and width.
@@ -500,6 +510,7 @@ fn memory(m: &hdlstudio_netlist::Memory) -> Result<Spec, String> {
         rd,
         wr,
         mem,
+        writes: vec![],
     };
     let mut s = Spec::new(Op::Memory(Box::new(op)), inputs, outputs, 1);
     s.initial = initial;
@@ -527,6 +538,7 @@ fn fsm(f: &hdlstudio_netlist::Fsm) -> Result<Spec, String> {
         state: f.init_state as i64,
         transitions,
         last_clk: Bit::X,
+        moved: false,
     };
     let inputs = vec![("in".into(), bin_), ("clk".into(), 1), ("arst".into(), 1)];
     Ok(Spec::new(Op::Fsm(Box::new(op)), inputs, one("out", bout), 1))
@@ -864,7 +876,11 @@ impl Memory {
                 let a = self.calc_addr(&args[w.addr]);
                 if self.valid(a) {
                     let old = self.mem.get(a as usize).clone();
-                    self.mem.set(a as usize, write_value(w, &old, &args[w.data]));
+                    let new = write_value(w, &old, &args[w.data]);
+                    if new != old {
+                        self.writes.push((a as usize, new.clone()));
+                    }
+                    self.mem.set(a as usize, new);
                 }
             }
         }
@@ -908,6 +924,7 @@ impl Fsm {
 
     fn eval(&mut self, args: &Args) -> LogicVec {
         let (input, clk, arst) = (&args[0], bit0(&args[1]), bit0(&args[2]));
+        let before = self.state;
         if arst == self.arst_pol {
             self.state = self.init;
         } else if clk == self.clk_pol && self.last_clk == opposite(self.clk_pol) {
@@ -915,6 +932,7 @@ impl Fsm {
             self.state = next.map_or(self.init, |t| t.1);
         }
         self.last_clk = clk;
+        self.moved |= self.state != before;
         // the output, merging every transition the (possibly x) input may take
         let ixmask = input.xmask();
         let mut results: Vec<LogicVec> = self

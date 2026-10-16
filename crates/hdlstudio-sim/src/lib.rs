@@ -50,6 +50,35 @@ struct Net {
     /// Cells to queue when the value changes, in digitaljs's order.
     fanout: Vec<CellId>,
     changed: bool,
+    monitored: bool,
+}
+
+/// What a step tells the engine's client (digitaljs's worker messages).
+#[derive(Clone, Debug, PartialEq)]
+pub enum Event {
+    /// A monitored output changed (to one of its trigger values, if given).
+    Monitor { id: u64, tick: u64, value: LogicVec, stop: bool, once: bool },
+    Alarm { id: u64, tick: u64, stop: bool },
+    /// The circuit wrote a memory word.
+    Memory { path: String, addr: usize, value: LogicVec },
+    /// An FSM moved to another state.
+    FsmState { path: String, state: i64 },
+}
+
+struct Monitor {
+    net: NetId,
+    triggers: Option<Vec<LogicVec>>,
+    stop: bool,
+    once: bool,
+}
+
+/// Names in one (sub)circuit instance, for scripts: digitaljs's label index.
+#[derive(Default)]
+struct Labels {
+    /// Connector name to the net it carries.
+    wires: HashMap<String, NetId>,
+    /// Subcircuit label to its instance.
+    subcircuits: HashMap<String, usize>,
 }
 
 /// A cell's inputs (or outputs) when it runs: its queued copy, or the
@@ -114,6 +143,21 @@ pub struct Sim {
     /// Sorted by path, then port.
     pub probes: Vec<Probe>,
     top_cells: HashMap<String, CellId>,
+    /// Every cell by path, and each cell's path.
+    cell_ids: HashMap<String, CellId>,
+    cell_paths: Vec<String>,
+    labels: Vec<Labels>,
+    /// Top-level inputs and outputs by `net`: the cell, and the net an
+    /// output shows.
+    inputs: HashMap<String, CellId>,
+    outputs: HashMap<String, NetId>,
+    monitors: HashMap<u64, Monitor>,
+    /// Monitored values that changed this tick, by monitor id.
+    checks: BTreeMap<u64, LogicVec>,
+    alarms: HashMap<u64, u64>,
+    alarm_queue: BTreeMap<u64, Vec<(u64, bool)>>,
+    events: Vec<Event>,
+    stop: bool,
 }
 
 impl Sim {
@@ -131,6 +175,13 @@ impl Sim {
         !self.queue.is_empty()
     }
 
+    /// Moves time forward to `tick` (no earlier than now) when nothing is
+    /// queued before it: a rate-limited run's empty ticks.
+    pub fn skip_to(&mut self, tick: u64) {
+        debug_assert!(self.next_event_tick().is_none_or(|k| k >= tick));
+        self.tick = self.tick.max(tick);
+    }
+
     /// The next tick with events, if any.
     pub fn next_event_tick(&self) -> Option<u64> {
         self.queue.first_key_value().map(|(&k, _)| k)
@@ -138,6 +189,140 @@ impl Sim {
 
     pub fn value(&self, probe: &Probe) -> &LogicVec {
         &self.nets[probe.net as usize].value
+    }
+
+    /// The probe of a cell output, by digitaljs path and port.
+    pub fn find_probe(&self, path: &str, port: &str) -> Option<usize> {
+        self.probes.binary_search_by(|p| (p.path.as_str(), p.port.as_str()).cmp(&(path, port))).ok()
+    }
+
+    /// The probes reading `net`'s value.
+    pub fn net_of(&self, probe: usize) -> NetId {
+        self.probes[probe].net
+    }
+
+    pub fn net_value(&self, net: NetId) -> &LogicVec {
+        &self.nets[net as usize].value
+    }
+
+    /// A named wire (connector name) in the subcircuit reached through the
+    /// subcircuit labels `path`.
+    pub fn find_wire(&self, path: &[&str], name: &str) -> Option<NetId> {
+        let mut inst = 0;
+        for label in path {
+            inst = *self.labels[inst].subcircuits.get(*label)?;
+        }
+        self.labels[inst].wires.get(name).copied()
+    }
+
+    /// A top-level input or output cell by its `net` (the Verilog port name):
+    /// the input's device id, or the net the output shows.
+    pub fn find_input(&self, net: &str) -> Option<&str> {
+        self.inputs.get(net).map(|&c| self.cell_paths[c as usize].as_str())
+    }
+
+    pub fn find_output(&self, net: &str) -> Option<NetId> {
+        self.outputs.get(net).copied()
+    }
+
+    /// The net a top-level output cell (by device id) shows.
+    pub fn find_output_id(&self, device: &str) -> Option<NetId> {
+        let c = &self.cells[*self.top_cells.get(device)? as usize];
+        if c.outputs.is_empty() { c.inputs.first().copied() } else { None }
+    }
+
+    /// The width of a top-level input.
+    pub fn input_bits(&self, device: &str) -> Option<usize> {
+        let &c = self.top_cells.get(device)?;
+        let &net = self.cells[c as usize].outputs.first()?;
+        Some(self.nets[net as usize].value.bits())
+    }
+
+    /// Events since the last call, and whether one of them asked to stop.
+    pub fn take_events(&mut self) -> (Vec<Event>, bool) {
+        (std::mem::take(&mut self.events), std::mem::take(&mut self.stop))
+    }
+
+    /// Reports `net` changes as `id`: after each tick it changed in, if its
+    /// value is one of `triggers` (any, if `None`); `once` drops the monitor
+    /// when it fires, `stop` asks the client to stop running. Without
+    /// triggers the current value is reported right away (digitaljs's
+    /// worker `monitor`).
+    pub fn monitor(&mut self, id: u64, net: NetId, triggers: Option<Vec<LogicVec>>, stop: bool, once: bool) {
+        if triggers.is_none() {
+            let value = self.nets[net as usize].value.clone();
+            self.events.push(Event::Monitor { id, tick: self.tick, value, stop: false, once: false });
+        }
+        self.nets[net as usize].monitored = true;
+        self.monitors.insert(id, Monitor { net, triggers, stop, once });
+    }
+
+    pub fn unmonitor(&mut self, id: u64) {
+        self.monitors.remove(&id);
+        self.checks.remove(&id);
+    }
+
+    /// Reports `id` once ticks reach `tick` (the next tick if that already
+    /// happened: the client's view of the tick can be stale).
+    pub fn alarm(&mut self, id: u64, tick: u64, stop: bool) {
+        let tick = tick.max(self.tick + 1);
+        self.alarms.insert(id, tick);
+        self.alarm_queue.entry(tick).or_default().push((id, stop));
+        // runs stop at the tick before, as they do at a tick with events
+        let spare = &mut self.spare;
+        self.queue.entry(tick - 1).or_insert_with(|| spare.pop().unwrap_or_default());
+    }
+
+    pub fn unalarm(&mut self, id: u64) {
+        if let Some(tick) = self.alarms.remove(&id)
+            && let Some(ids) = self.alarm_queue.get_mut(&tick)
+        {
+            ids.retain(|&(i, _)| i != id);
+        }
+    }
+
+    /// Changes a cell parameter while running; only a cell's propagation
+    /// delay (a Clock's half period) affects the simulation.
+    pub fn set_propagation(&mut self, path: &str, propagation: u64) -> Result<(), String> {
+        let &c = self.cell_ids.get(path).ok_or_else(|| format!("no cell {path}"))?;
+        self.sched[c as usize].propagation = propagation;
+        Ok(())
+    }
+
+    /// A memory word written by hand (the memory editor); the memory then
+    /// runs again.
+    pub fn write_memory(&mut self, path: &str, addr: usize, value: LogicVec) -> Result<(), String> {
+        let &c = self.cell_ids.get(path).ok_or_else(|| format!("no cell {path}"))?;
+        let Op::Memory(m) = &mut self.cells[c as usize].op else { return Err(format!("{path} isn't a memory")) };
+        if addr >= m.mem.len() || value.bits() != m.mem.bits() {
+            return Err(format!("bad memory write to {path}"));
+        }
+        m.mem.set(addr, value);
+        self.enqueue(c);
+        Ok(())
+    }
+
+    /// After a step: monitored values and alarms (digitaljs's
+    /// `_postMonitors`).
+    fn post_monitors(&mut self) {
+        for (id, value) in std::mem::take(&mut self.checks) {
+            let Some(m) = self.monitors.get(&id) else { continue };
+            if m.triggers.as_ref().is_none_or(|t| t.contains(&value)) {
+                let (stop, once) = (m.stop, m.once);
+                if once {
+                    self.unmonitor(id);
+                }
+                self.events.push(Event::Monitor { id, tick: self.tick, value, stop, once });
+                self.stop |= stop;
+            }
+        }
+        if let Some(ids) = self.alarm_queue.remove(&self.tick) {
+            for (id, stop) in ids {
+                self.alarms.remove(&id);
+                self.events.push(Event::Alarm { id, tick: self.tick, stop });
+                self.stop |= stop;
+            }
+        }
     }
 
     /// Sets a top-level input cell (by device id) to `v`.
@@ -157,6 +342,7 @@ impl Sim {
             self.update_gates_next()
         } else {
             self.tick += 1;
+            self.post_monitors();
             Ok(0)
         }
     }
@@ -165,7 +351,10 @@ impl Sim {
     /// cells ran. A zero-delay loop that never settles (each cell running
     /// over and over in the same tick) is an error, where digitaljs hangs.
     pub fn update_gates_next(&mut self) -> Result<usize, String> {
-        let Some((k, entries)) = self.queue.pop_first() else { return Ok(0) };
+        let Some((k, entries)) = self.queue.pop_first() else {
+            self.post_monitors();
+            return Ok(0);
+        };
         // ponytail: a fixed budget per cell; no real circuit gets near it
         let limit = 100 * self.cells.len() + 10_000;
         self.tick = k;
@@ -203,6 +392,20 @@ impl Sim {
                 let net = self.cells[e.cell as usize].outputs[port];
                 self.set_net(net, v);
             }
+            match &mut self.cells[e.cell as usize].op {
+                Op::Memory(m) if !m.writes.is_empty() => {
+                    for (addr, value) in m.writes.drain(..) {
+                        let path = self.cell_paths[e.cell as usize].clone();
+                        self.events.push(Event::Memory { path, addr, value });
+                    }
+                }
+                Op::Fsm(f) if f.moved => {
+                    f.moved = false;
+                    let path = self.cell_paths[e.cell as usize].clone();
+                    self.events.push(Event::FsmState { path, state: f.state() });
+                }
+                _ => {}
+            }
             count += 1;
             if count > limit {
                 self.running = false;
@@ -217,6 +420,7 @@ impl Sim {
         done.copies.clear();
         self.spare.push(done);
         self.tick = k + 1;
+        self.post_monitors();
         Ok(count)
     }
 
@@ -238,6 +442,14 @@ impl Sim {
         if !n.changed {
             n.changed = true;
             self.changed.push(net);
+        }
+        if n.monitored {
+            let value = &self.nets[net as usize].value;
+            for (&id, m) in &self.monitors {
+                if m.net == net {
+                    self.checks.insert(id, value.clone());
+                }
+            }
         }
         for &c in &fanout {
             // a reader queued in an earlier tick keeps the inputs it was
@@ -308,6 +520,7 @@ mod build {
         sched: Vec<Sched>,
         specs: Vec<Spec>,
         nets: Vec<Net>,
+        cell_paths: Vec<String>,
         passthrough: bool,
         defaultcomb: bool,
     }
@@ -356,7 +569,7 @@ mod build {
                             .initial
                             .iter()
                             .map(|v| {
-                                self.nets.push(Net { value: v.clone(), fanout: vec![], changed: false });
+                                self.nets.push(Net { value: v.clone(), fanout: vec![], changed: false, monitored: false });
                                 (self.nets.len() - 1) as NetId
                             })
                             .collect();
@@ -369,6 +582,7 @@ mod build {
                             lazy_since: NONE,
                         });
                         self.specs.push(spec);
+                        self.cell_paths.push(prefix);
                         self.insts[idx].cells.insert(id.clone(), id_);
                     }
                 }
@@ -432,7 +646,7 @@ mod build {
         }
 
         fn undriven(&mut self, bits: usize) -> NetId {
-            self.nets.push(Net { value: LogicVec::xes(bits), fanout: vec![], changed: false });
+            self.nets.push(Net { value: LogicVec::xes(bits), fanout: vec![], changed: false, monitored: false });
             (self.nets.len() - 1) as NetId
         }
     }
@@ -446,6 +660,7 @@ mod build {
             sched: vec![],
             specs: vec![],
             nets: vec![],
+            cell_paths: vec![],
             passthrough: false,
             defaultcomb,
         };
@@ -498,7 +713,40 @@ mod build {
             }
         }
         probes.sort_by(|a, b| (&a.path, &a.port).cmp(&(&b.path, &b.port)));
+        // names for scripts (digitaljs's makeLabelIndex)
+        let mut labels = vec![];
+        for inst in 0..b.insts.len() {
+            let mut l = Labels::default();
+            for c in &b.insts[inst].circuit.connectors {
+                if let (Some(name), Some(net)) = (&c.name, b.net_from(inst, &c.from.id, &c.from.port)) {
+                    l.wires.insert(name.clone(), net);
+                }
+            }
+            for (id, dev) in &b.insts[inst].circuit.devices {
+                if let (Some(label), Some(&child)) = (&dev.label, b.insts[inst].subs.get(id)) {
+                    l.subcircuits.insert(label.clone(), child);
+                }
+            }
+            labels.push(l);
+        }
+        let (mut inputs, mut outputs) = (HashMap::new(), HashMap::new());
+        for (id, dev) in &circuit.devices {
+            match &dev.cell {
+                Cell::Input(io) | Cell::Button(io) | Cell::NumEntry(io) | Cell::PushButton(io) => {
+                    inputs.insert(io.net.clone(), b.insts[0].cells[id]);
+                }
+                Cell::Output(io) | Cell::Lamp(io) | Cell::NumDisplay(io) | Cell::Display7(io) | Cell::LedMatrix(io) => {
+                    let net = match b.net_into(0, id, "in") {
+                        Some(n) => n,
+                        None => b.undriven(io.bits as usize),
+                    };
+                    outputs.insert(io.net.clone(), net);
+                }
+                _ => {}
+            }
+        }
         let top_cells = b.insts[0].cells.clone();
+        let cell_ids = b.cell_paths.iter().enumerate().map(|(i, p)| (p.clone(), i as CellId)).collect();
         let mut sim = Sim {
             cells: b.cells,
             sched: b.sched,
@@ -511,6 +759,17 @@ mod build {
             changed: vec![],
             probes,
             top_cells,
+            cell_ids,
+            cell_paths: b.cell_paths,
+            labels,
+            inputs,
+            outputs,
+            monitors: HashMap::new(),
+            checks: BTreeMap::new(),
+            alarms: HashMap::new(),
+            alarm_queue: BTreeMap::new(),
+            events: vec![],
+            stop: false,
         };
         // the worker queues every cell as it gets it
         for c in 0..sim.cells.len() {
