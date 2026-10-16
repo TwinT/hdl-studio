@@ -3,78 +3,48 @@
 'use strict';
 
 const path = require("path");
-const webpack = require('webpack');
 
 const outputDirectory = "dist";
 
-function main_view_config(env, argv) {
-    const devMode = argv.mode !== "production";
+// TypeScript is only transpiled here; `tsc` (npm run lint) checks the types.
+const tsRule = { test: /\.ts$/, loader: 'esbuild-loader', options: { target: 'es2022' } };
+
+// The circuit view (TypeScript).
+function schematic_view_config() {
     return {
-        name: 'main-view',
-        entry: "./view/main.mjs",
+        name: 'schematic-view',
+        entry: "./view/schematic/main.ts",
         output: {
             path: path.join(__dirname, outputDirectory),
-            filename: "view-bundle.js"
+            filename: "schematic.js"
         },
+        resolve: { extensions: ['.ts', '.mjs', '.js'] },
         module: {
             rules: [
+                tsRule,
                 {
                     test: /\.css$/,
                     use: ["style-loader", "css-loader"]
                 },
-                {
-                    test: /\.scss$/,
-                    use: ["style-loader", "css-loader", "sass-loader"]
-                },
-                {
-                    test: /\.(png|woff|woff2|eot|ttf|svg)$/,
-                    type: 'asset/inline'
-                },
-                {
-                    test: require.resolve('jquery'),
-                    loader: 'expose-loader',
-                    options: {
-                        exposes: ['$']
-                    }
-                },
             ]
-        },
-        resolve: {
-            alias: {
-                [path.resolve(__dirname, './node_modules/digitaljs/src/engines/worker-worker.mjs')]: false,
-                [path.resolve(__dirname, './node_modules/jquery-ui/themes/base/all.css')]: false,
-            }
         },
     };
 }
 
-function status_view_config(env, argv) {
-    const devMode = argv.mode !== "production";
+function status_view_config() {
     return {
         name: 'status-view',
-        entry: "./view/status_view.mjs",
+        entry: "./view/status_view.ts",
         output: {
             path: path.join(__dirname, outputDirectory),
             filename: "status_view.js"
         },
-        module: {
-            rules: [
-                {
-                    test: require.resolve('jquery'),
-                    loader: 'expose-loader',
-                    options: {
-                        exposes: ['$']
-                    }
-                },
-            ]
-        },
-        plugins: [
-        ],
+        resolve: { extensions: ['.ts', '.mjs', '.js'] },
+        module: { rules: [tsRule] },
     };
 }
 
-function synth_view_config(env, argv) {
-    const devMode = argv.mode !== "production";
+function synth_view_config() {
     return {
         name: 'synth-view',
         entry: "./view/synth_view.mjs",
@@ -87,74 +57,7 @@ function synth_view_config(env, argv) {
     };
 }
 
-function digitaljs_worker_config(env, argv) {
-    const devMode = argv.mode !== "production";
-    return {
-        name: 'web_worker',
-        target: 'webworker',
-        entry: "./node_modules/digitaljs/src/engines/worker-worker.mjs",
-        output: {
-            path: path.join(__dirname, outputDirectory),
-            filename: "digitaljs-sym-worker.js"
-        },
-        plugins: [
-            new webpack.optimize.LimitChunkCountPlugin({
-                maxChunks: 1
-            })
-        ]
-    };
-}
-
-function web_ext_config(env, argv) {
-    const devMode = argv.mode !== "production";
-    return {
-        name: 'web-ext',
-        target: 'webworker',
-        entry: {
-            extension: "./src/extension.mjs",
-        },
-        output: {
-            path: path.join(__dirname, outputDirectory),
-            filename: "web-extension.js",
-            libraryTarget: 'commonjs',
-            devtoolModuleFilenameTemplate: '../../[resource-path]'
-        },
-        resolve: {
-            alias: {
-                path: require.resolve('path-browserify'),
-                crypto: require.resolve('crypto-browserify'),
-                stream: require.resolve('stream-browserify'),
-                'tmp-promise': false,
-                child_process: false,
-            },
-            fallback: {
-                https: false,
-                fs: false,
-                assert: require.resolve("assert"),
-                util: require.resolve("util"),
-                vm: false,
-                os: false,
-                buffer: require.resolve("buffer/")
-            }
-        },
-        module: {
-            rules: [
-            ]
-        },
-        plugins: [
-            new webpack.ProvidePlugin({
-                process: 'process/browser.js', // provide a shim for the global `process` variable
-                Buffer: ['buffer', 'Buffer']
-            })
-        ],
-        externals: {
-            vscode: 'commonjs vscode' // ignored because it doesn't exist
-        },
-    };
-}
-
-function local_ext_config(env, argv) {
-    const devMode = argv.mode !== "production";
+function local_ext_config() {
     return {
         name: 'local-ext',
         target: 'node',
@@ -179,5 +82,4 @@ function local_ext_config(env, argv) {
     };
 }
 
-module.exports = [main_view_config, status_view_config, synth_view_config,
-                  digitaljs_worker_config, web_ext_config, local_ext_config];
+module.exports = [schematic_view_config, status_view_config, synth_view_config, local_ext_config];

@@ -1,0 +1,395 @@
+html, body {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    overflow: hidden;
+}
+
+body {
+    display: flex;
+    flex-direction: column;
+}
+
+#paper {
+    position: relative;
+    flex: 1;
+    min-height: 0;
+    background: white;
+}
+
+/* the waveform monitor, under the schematic (colours from the
+   hdl-studio.waveform.colors setting, Surfer's dark theme by default) */
+#monitor {
+    --wave-bg: #0b151d;
+    --wave-alt: #1b252d;
+    --wave-fg: #d4d4d4;
+    position: relative;
+    height: 30%;
+    display: flex;
+    flex-direction: column;
+    background: var(--wave-bg);
+    color: var(--wave-fg);
+    font-family: var(--vscode-font-family, sans-serif);
+    font-size: 12px;
+}
+
+#monitor .gutter {
+    height: 4px;
+    cursor: ns-resize;
+    background: var(--vscode-panel-border, #333);
+}
+
+#monitor .toolbar {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    padding: 2px 4px;
+}
+
+#monitor .toolbar .range {
+    margin-left: 8px;
+    opacity: 0.8;
+    font-variant-numeric: tabular-nums;
+}
+
+#monitor .toolbar .status {
+    margin-left: auto;
+    padding-right: 6px;
+}
+
+#monitor .grid {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    display: grid;
+    grid-template-columns: minmax(80px, 180px) 90px minmax(0, 1fr);
+    align-content: start;
+}
+
+#monitor .grid .head,
+#monitor .grid .ruler {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: var(--wave-bg);
+    height: 20px;
+}
+
+#monitor .grid .head {
+    padding-left: 6px;
+    font-size: 11px;
+    line-height: 20px;
+    opacity: 0.7;
+}
+
+#monitor .grid canvas {
+    display: block;
+    width: 100%;
+    height: 24px;
+}
+
+#monitor .grid .name,
+#monitor .grid .value {
+    height: 24px;
+    line-height: 24px;
+    padding-left: 6px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+#monitor .grid .name {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+#monitor .grid .name > span:not(.pause) {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+#monitor .grid .name .pause {
+    color: #f44747;
+    font-size: 10px;
+}
+
+#monitor .grid .name button {
+    visibility: hidden;
+}
+
+#monitor .grid .name:hover button {
+    visibility: visible;
+}
+
+#monitor .grid .value {
+    font-family: var(--vscode-editor-font-family, monospace);
+}
+
+#monitor .grid .alt {
+    background: var(--wave-alt);
+}
+
+#monitor button {
+    background: none;
+    border: none;
+    color: inherit;
+    cursor: pointer;
+    padding: 2px;
+    border-radius: 4px;
+}
+
+#monitor button:hover,
+#monitor button.on {
+    background: rgba(255, 255, 255, 0.12);
+}
+
+/* a waveform row's menu: format, pause on..., remove */
+.wavemenu {
+    position: fixed;
+    z-index: 300;
+    min-width: 200px;
+    display: flex;
+    flex-direction: column;
+    padding: 4px 0;
+    background: var(--vscode-menu-background, #252526);
+    color: var(--vscode-menu-foreground, #ccc);
+    border: 1px solid var(--vscode-menu-border, #454545);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+    font-family: var(--vscode-font-family, sans-serif);
+    font-size: 12px;
+}
+
+.wavemenu .head {
+    padding: 4px 10px 2px;
+    opacity: 0.6;
+    font-size: 11px;
+}
+
+.wavemenu button {
+    text-align: left;
+    background: none;
+    border: none;
+    color: inherit;
+    padding: 3px 10px;
+    cursor: pointer;
+    font: inherit;
+}
+
+.wavemenu button:hover {
+    background: var(--vscode-menu-selectionBackground, #04395e);
+    color: var(--vscode-menu-selectionForeground, #fff);
+}
+
+.wavemenu input {
+    margin: 2px 10px;
+    font: inherit;
+    background: var(--vscode-input-background, #3c3c3c);
+    color: var(--vscode-input-foreground, #ccc);
+    border: 1px solid var(--vscode-input-border, #555);
+}
+
+.wavemenu hr {
+    width: 100%;
+    border: none;
+    border-top: 1px solid var(--vscode-menu-separatorBackground, #454545);
+}
+
+svg.schematic {
+    display: block;
+    font-family: verdana, sans-serif;
+    user-select: none;
+    touch-action: none;
+}
+
+svg.schematic .cell {
+    cursor: move;
+}
+
+svg.schematic .button,
+svg.schematic .open,
+svg.schematic .wiretool {
+    cursor: pointer;
+}
+
+svg.schematic .wirehit {
+    pointer-events: stroke;
+}
+
+svg.schematic .numvalue {
+    font-family: monospace;
+    font-size: 10px;
+}
+
+/* inputs and number base pickers inside the drawing */
+svg.schematic foreignObject > div {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    cursor: initial;
+}
+
+svg.schematic foreignObject input,
+svg.schematic foreignObject select {
+    font-size: 8pt;
+    border: 1px solid gray;
+    box-sizing: border-box;
+    width: 100%;
+}
+
+svg.schematic foreignObject.valinput input {
+    font-family: monospace;
+}
+
+svg.schematic foreignObject.tooltip {
+    visibility: hidden;
+    opacity: 0;
+    transition: visibility 0s linear 0.5s, opacity 0.5s linear;
+}
+
+svg.schematic .cell .open {
+    visibility: hidden;
+    opacity: 0;
+    transition: visibility 0s linear 0.5s, opacity 0.5s linear;
+}
+
+svg.schematic .cell:hover > .open,
+svg.schematic .cell:hover > foreignObject.tooltip,
+svg.schematic foreignObject.tooltip:hover {
+    visibility: visible;
+    opacity: 1;
+    transition-delay: 0s;
+}
+
+svg.schematic foreignObject.tooltip > div {
+    border: 1px solid gray;
+    box-sizing: border-box;
+    background: white;
+    padding: 5px;
+}
+
+input.invalid {
+    background: #ffaaaa;
+}
+
+div.wire_hover {
+    position: fixed;
+    pointer-events: none;
+    background: white;
+    color: black;
+    border: 1px solid black;
+    padding: 5px;
+    font-size: 8pt;
+    font-family: verdana, sans-serif;
+    z-index: 200;
+}
+
+.nocircuit {
+    text-align: center;
+    color: black;
+    font-family: var(--vscode-font-family, sans-serif);
+}
+
+.nocircuit button,
+.memeditor button {
+    background: var(--vscode-button-background);
+    color: var(--vscode-button-foreground);
+    border: none;
+    padding: 4px 10px;
+    cursor: pointer;
+}
+
+/* floating windows */
+.dialog {
+    position: fixed;
+    display: flex;
+    flex-direction: column;
+    background: var(--vscode-editorWidget-background, #f3f3f3);
+    color: var(--vscode-editorWidget-foreground, black);
+    border: 1px solid var(--vscode-editorWidget-border, #999);
+    box-shadow: 0 2px 8px var(--vscode-widget-shadow, rgba(0, 0, 0, 0.36));
+    max-width: 95vw;
+    max-height: 95vh;
+}
+
+.dialog .titlebar {
+    display: flex;
+    align-items: center;
+    padding: 2px 4px 2px 8px;
+    cursor: move;
+    font-family: var(--vscode-font-family, sans-serif);
+    font-size: 12px;
+    user-select: none;
+}
+
+.dialog .titlebar span {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.dialog .titlebar button {
+    background: none;
+    border: none;
+    color: inherit;
+    cursor: pointer;
+}
+
+.dialog .content {
+    position: relative;
+    overflow: auto;
+    resize: both;
+    background: white;
+    min-width: 100px;
+    min-height: 60px;
+}
+
+.memeditor {
+    padding: 6px;
+    color: black;
+}
+
+.memeditor .toolbar {
+    display: flex;
+    gap: 2px;
+}
+
+.memeditor table {
+    margin-top: 0.5em;
+}
+
+.memeditor td:first-child {
+    font-family: monospace;
+    padding-right: 1em;
+}
+
+.memeditor input {
+    font-family: monospace;
+    border: 1px solid #aaa;
+    border-radius: 4px;
+    padding: 0.2em 0.5em;
+}
+
+.memeditor input.flash {
+    animation: flash-animation 1s;
+}
+
+.memeditor input.isread {
+    box-shadow: 0px 0px 5px green;
+}
+
+.memeditor input.iswrite {
+    box-shadow: 0px 0px 5px red;
+}
+
+.memeditor input.iswrite.isread {
+    box-shadow: 1px 1px 5px -1px red, -1px -1px 5px -1px green;
+}
+
+@keyframes flash-animation {
+    from { background-color: yellow; }
+    to { background-color: white; }
+}

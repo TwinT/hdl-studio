@@ -6,7 +6,7 @@ print("=== Simulacion: D Latch ===\n");
 local function step(d, en, label)
     sim.setinput("d", d);
     sim.setinput("en", en);
-    sim.sleep(2);
+    sim.sleep(10); -- let the gates settle (each takes a tick)
     print(string.format("%s: d=%d en=%d -> q=%d\n",
         label, d and 1 or 0, en and 1 or 0, sim.getoutput("q"):tointeger()));
 end

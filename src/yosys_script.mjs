@@ -56,7 +56,7 @@ export function build_yosys_script(files, opts = {}) {
         // A module with no output ports (e.g. a CPU datapath whose only effect
         // is internal register/memory state) has nothing to anchor opt_clean's
         // reachable-from-outputs sweep below, so it silently loses all its
-        // instantiated cells - and yosys2digitaljs's top-module detection (a
+        // instantiated cells - and the converter's top-module detection (a
         // topsort over instantiation edges, not yosys's own `top` attribute)
         // then renders an arbitrary other now-orphaned module instead. Keep
         // the requested top's own contents alive across the opt passes.
@@ -68,12 +68,12 @@ export function build_yosys_script(files, opts = {}) {
     cmds.push('proc');
     // Lowers $bwmux (per-bit select, e.g. a part-select write into a wide
     // register like `matrix[i*COLS+:COLS] <= d`) to $and/$or/$not:
-    // yosys2digitaljs has no cell for it ("Invalid cell type: $bwmux").
+    // the converter has no cell for it ("Invalid cell type: $bwmux").
     cmds.push('bwmuxmap');
     // Converts tri-state muxes (`assign x = en ? val : 'z;`) into $tribuf
     // cells with a genuine enable + high-Z output, instead of leaving them
-    // as an inferred mux. yosys2digitaljs converts $tribuf directly (native
-    // Z/4vl support), and a net with more than one driver - the norm for a
+    // as an inferred mux. The converter turns $tribuf into a Tribuf (z is a
+    // value like 0, 1 and x), and a net with more than one driver - the norm for a
     // shared bus - gets merged via a synthesized TriMerge device.
     cmds.push('tribuf');
     cmds.push(opts.optimize ? 'opt' : 'opt_clean');
@@ -91,7 +91,7 @@ export function build_yosys_script(files, opts = {}) {
         // Decompose complex cells into basic logic gates, then clean up.
         // Exclude flip-flops, latches, memories and tri-state buffers: techmap
         // would lower them to gate-level primitives ($_DFF_P_, $_DLATCH_P_,
-        // $_TBUF_, ...) that yosys2digitaljs cannot render. Keeping them coarse
+        // $_TBUF_, ...) that the converter cannot render. Keeping them coarse
         // leaves them as Dff/Dlatch/Memory/Tribuf.
         cmds.push('select *');
         cmds.push('select -del t:$dff t:$dffe t:$adff t:$adffe t:$aldff t:$aldffe ' +

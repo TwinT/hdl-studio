@@ -10,11 +10,11 @@ import { read_txt_file } from './utils.mjs';
 export class EditorProvider {
     static viewType = 'hdl-studio.circuitView'
     static viewType_json = 'hdl-studio.circuitView_json'
-    #djs
+    #studio
     onDidChangeCustomDocument
     #onDidChangeCustomDocument
-    constructor(djs) {
-        this.#djs = djs;
+    constructor(studio) {
+        this.#studio = studio;
         this.#onDidChangeCustomDocument = new vscode.EventEmitter();
         this.onDidChangeCustomDocument = this.#onDidChangeCustomDocument.event;
     }
@@ -44,9 +44,9 @@ export class EditorProvider {
         panel.webview.options = {
             enableScripts: true,
         };
-        const circuit_view = new CircuitView(this.#djs, panel, document);
+        const circuit_view = new CircuitView(this.#studio, panel, document);
         await circuit_view.init();
-        this.#djs.registerDocument(document, circuit_view);
+        this.#studio.registerDocument(document, circuit_view);
         return;
     }
 

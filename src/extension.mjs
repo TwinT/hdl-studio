@@ -11,6 +11,7 @@ import { SynthProvider } from './synth_provider.mjs';
 import { StatusProvider } from './status_provider.mjs';
 import { read_txt_file, write_txt_file, file_exist } from './utils.mjs';
 import { extension_formats } from '../lib/image_formats.mjs';
+import { set_hdlstudio_root } from './hdlstudio_bin.mjs';
 
 const SOURCE_EXTS = ['.sv', '.v', '.vh', '.lua', '.hex', '.mem'];
 
@@ -54,7 +55,8 @@ async function expandSources(uris, recursive) {
 }
 
 export function activate(context) {
-    new DigitalJS(context);
+    set_hdlstudio_root(context.extensionPath);
+    new HdlStudio(context);
 }
 
 export function deactivate() {
@@ -110,7 +112,7 @@ class UntitledTracker {
     }
 }
 
-class DigitalJS {
+class HdlStudio {
     #document
     #tickUpdated
     #sourcesUpdated
@@ -132,16 +134,11 @@ class DigitalJS {
         // Paths
         const ext_uri = context.extensionUri;
         this.iconPath = vscode.Uri.joinPath(ext_uri, 'imgs', 'hdl-studio.svg');
-        this.mainJSPath = vscode.Uri.joinPath(ext_uri, 'dist', 'view-bundle.js');
+        this.schematicJSPath = vscode.Uri.joinPath(ext_uri, 'dist', 'schematic.js');
         this.synthJSPath = vscode.Uri.joinPath(ext_uri, 'dist', 'synth_view.js');
         this.statusJSPath = vscode.Uri.joinPath(ext_uri, 'dist', 'status_view.js');
-        this.uiToolkitPath = vscode.Uri.joinPath(ext_uri, "node_modules", "@vscode",
-                                                 "webview-ui-toolkit", "dist",
-                                                 "toolkit.min.js");
         this.codIconsPath = vscode.Uri.joinPath(ext_uri, "node_modules", "@vscode",
                                                 "codicons", "dist", "codicon.css");
-        this.simWorker = read_txt_file(vscode.Uri.joinPath(ext_uri, 'dist',
-            'digitaljs-sym-worker.js'));
 
         this.#tickUpdated = new vscode.EventEmitter();
         this.tickUpdated = this.#tickUpdated.event;
@@ -525,7 +522,7 @@ class DigitalJS {
             const active = panel.active;
             if (active) {
                 switch_document(document, circuit_view);
-                // Only switch to the digitaljs side panel
+                // Only switch to the HDL Studio side panel
                 // if this is the first time we show this circuit
                 // or in general if the editor is shown as a result of a direct
                 // interaction between the user and our extension.
@@ -558,7 +555,7 @@ class DigitalJS {
             }
             const uri = document.uri;
             if (uri.scheme === 'untitled') {
-                const m = uri.path.match(/\/circuit-(\d*)\.digitaljs$/);
+                const m = uri.path.match(/\/circuit-(\d*)\.hdls$/);
                 if (m) {
                     this.#untitled_tracker.free(parseInt(m[1]));
                 }
@@ -623,7 +620,7 @@ class DigitalJS {
         // Stripping them for now should hopefully be the least risky.
         const new_name = () => {
             const id = this.#untitled_tracker.alloc();
-            return `circuit-${id}.digitaljs`;
+            return `circuit-${id}.hdls`;
         };
         const workspaceFolders = vscode.workspace.workspaceFolders;
         if (!workspaceFolders || workspaceFolders.length == 0)
@@ -632,7 +629,7 @@ class DigitalJS {
         const gen_uri = async () => {
             if (!use_workspace && hint) {
                 if (use_name_hint) {
-                    const doc_path = hint.path.replace(/\.[^/.]+$/, '') + '.digitaljs';
+                    const doc_path = hint.path.replace(/\.[^/.]+$/, '') + '.hdls';
                     const doc_fs_uri = hint.with({ path: doc_path });
                     if (!(await file_exist(doc_fs_uri))) {
                         return doc_fs_uri.with({ scheme: 'untitled' });
@@ -829,7 +826,8 @@ class DigitalJS {
             return exist_view.reveal();
         }
         const ext = path.extname(uri.path);
-        if (ext == '.digitaljs') {
+        // .digitaljs: projects of HDL Studio before 1.0 (same content)
+        if (ext == '.hdls' || ext == '.digitaljs') {
             return this.#openViewJSON(uri);
         }
         if (ext == '.json') {

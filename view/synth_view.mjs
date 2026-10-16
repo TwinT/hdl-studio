@@ -26,12 +26,12 @@ class Synth {
         if (!ele)
             return;
         ele.innerHTML = '';
-        const auto = document.createElement('vscode-option');
+        const auto = document.createElement('option');
         auto.value = '';
         auto.textContent = 'Auto';
         ele.appendChild(auto);
         for (const name of this.#topModules) {
-            const opt = document.createElement('vscode-option');
+            const opt = document.createElement('option');
             opt.value = name;
             opt.textContent = name;
             ele.appendChild(opt);
@@ -62,7 +62,7 @@ class Synth {
             });
         }
 
-        for (const opt of ['fsm', 'layout']) {
+        for (const opt of ['fsm']) {
             const ele = document.getElementById(opt);
             this.#widgets[opt] = ele;
             if (!ele)
@@ -71,6 +71,15 @@ class Synth {
             ele.addEventListener('change', () => {
                 this.#options[opt] = ele.value;
                 this.#notifyOption();
+            });
+        }
+
+        for (const tab of document.querySelectorAll('.tabs button')) {
+            tab.addEventListener('click', () => {
+                for (const t of document.querySelectorAll('.tabs button'))
+                    t.classList.toggle('active', t === tab);
+                for (const panel of document.querySelectorAll('.tab'))
+                    panel.hidden = panel.id !== tab.dataset.tab;
             });
         }
 
@@ -91,7 +100,7 @@ class Synth {
             for (const opt of ['opt', 'transform', /* 'lint', */ 'fsmexpand', 'techmap', 'defaultcomb'])
                 if (this.#widgets[opt]) this.#widgets[opt].checked = this.#options[opt];
             this.#renderTopModules();
-            for (const opt of ['fsm', 'layout'])
+            for (const opt of ['fsm'])
                 if (this.#widgets[opt]) this.#widgets[opt].value = this.#options[opt];
         }
         finally {

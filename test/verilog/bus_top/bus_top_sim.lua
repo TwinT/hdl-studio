@@ -4,7 +4,7 @@
 --
 -- Los valores esperados en los comentarios de cada linea salen de probar la
 -- logica de Tribuf/TriMerge por separado (operation() a mano + conversion
--- real yosys -> yosys2digitaljs), no de correr este script: la simulacion
+-- real yosys -> netlist), no de correr este script: la simulacion
 -- interactiva real (F5, extension host) todavia no se corrio.
 
 print("=== Simulacion: bus_top (bus compartido tri-state) ===\n");

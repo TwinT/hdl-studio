@@ -2,12 +2,11 @@
 
 'use strict';
 
-import $ from 'jquery';
 import { extension_formats } from '../lib/image_formats.mjs';
 
 function get_content_rect(svg, svgrect) {
-    // jointjs's paper size is larger than the content size,
-    // first figure out the content size and offset.
+    // the svg is larger than its content: first figure out the content's
+    // size and offset
     let realrect;
     for (const child of svg.children) {
         const rect = child.getBoundingClientRect();
@@ -34,17 +33,18 @@ function get_content_rect(svg, svgrect) {
 function replace_input(node, parent, opts) {
     const text = document.createElementNS("http://www.w3.org/2000/svg", 'text');
     parent.appendChild(text);
-    const input = $(node).find('input');
-    text.innerHTML = input.val();
+    const input = node.querySelector('input');
+    text.textContent = input.value;
 
-    const node_rect = node.getBoundingClientRect();
+    // the centre of the foreignObject, in its own (unzoomed) coordinates
+    const [x, y, w, h] = ['x', 'y', 'width', 'height'].map((a) => node[a].baseVal.value);
     let transform = node.getAttribute('transform');
-    transform = `${transform || ''} translate(${node_rect.width / 2} ${node_rect.height / 2})`;
+    transform = `${transform || ''} translate(${x + w / 2} ${y + h / 2})`;
     text.setAttribute('transform', transform);
     text.setAttribute('dominant-baseline', 'middle');
     text.setAttribute('text-anchor', 'middle');
     text.setAttribute('font-family', 'monospace');
-    const input_style = window.getComputedStyle(input[0]);
+    const input_style = window.getComputedStyle(input);
     if (input_style.fontSize)
         text.setAttribute('font-size', input_style.fontSize);
     if (input_style.fontWeight)
@@ -78,13 +78,6 @@ function clone_node(node, parent, in_foreign, opts = {}) {
         for (let i = 0; i < nattrs; i++) {
             const name = cloned.attributes[i].name;
             if (name === 'class') { // we'll replace it with explicit styles
-                to_remove.push(name);
-            }
-            else if (name.startsWith('joint-')) {
-                to_remove.push(name);
-            }
-            else if (name === 'model-id' || name === 'data-type') {
-                // These are joint specific afaict
                 to_remove.push(name);
             }
         }

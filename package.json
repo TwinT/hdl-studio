@@ -1,8 +1,8 @@
 {
     "name": "hdl-studio",
     "displayName": "HDL Studio",
-    "description": "HDL Studio is a vscode extension for digitaljs, a digital circuit simulator.",
-    "version": "0.7.0",
+    "description": "Synthesize Verilog/SystemVerilog with Yosys and simulate the circuit on an interactive schematic, with waveforms and Lua scripting.",
+    "version": "1.0.0",
     "license": "See LICENSE",
     "publisher": "TwinT",
     "repository": {
@@ -22,10 +22,14 @@
     ],
     "keywords": [
         "verilog",
-        "simulation"
+        "systemverilog",
+        "yosys",
+        "simulation",
+        "schematic",
+        "waveform",
+        "digital logic"
     ],
     "main": "./dist/local-extension.js",
-    "browser": "./dist/web-extension.js",
     "contributes": {
         "commands": [
             {
@@ -136,6 +140,9 @@
                 "viewType": "hdl-studio.circuitView",
                 "displayName": "HDL Studio",
                 "selector": [
+                    {
+                        "filenamePattern": "*.hdls"
+                    },
                     {
                         "filenamePattern": "*.digitaljs"
                     }
@@ -267,7 +274,7 @@
             "explorer/context": [
                 {
                     "command": "hdl-studio.openViewJSON",
-                    "when": "resourceExtname == .json || resourceExtname == .digitaljs",
+                    "when": "resourceExtname == .json || resourceExtname == .hdls || resourceExtname == .digitaljs",
                     "group": "navigation@99999"
                 },
                 {
@@ -349,69 +356,108 @@
                     "type": "string",
                     "default": "",
                     "description": "Path to the yosys executable. If empty, yosys from the PATH will be used."
+                },
+                "hdl-studio.waveform.colors": {
+                    "type": "object",
+                    "markdownDescription": "Colours of the waveform monitor, as CSS colours (any key can be left out). The default is [Surfer](https://surfer-project.org)'s dark theme.",
+                    "default": {
+                        "background": "#0b151d",
+                        "altBackground": "#1b252d",
+                        "foreground": "#d4d4d4",
+                        "grid": "#222222",
+                        "signal": "#56c126",
+                        "undefined": "#f44747",
+                        "highImpedance": "#c9e124",
+                        "cursor": "#b63935",
+                        "fillOpacity": 0.2
+                    },
+                    "properties": {
+                        "background": {
+                            "type": "string",
+                            "description": "Background."
+                        },
+                        "altBackground": {
+                            "type": "string",
+                            "description": "Background of every other group of three rows."
+                        },
+                        "foreground": {
+                            "type": "string",
+                            "description": "Text and the ruler."
+                        },
+                        "grid": {
+                            "type": "string",
+                            "description": "Vertical grid lines."
+                        },
+                        "signal": {
+                            "type": "string",
+                            "description": "A defined signal (one colour for 0 and 1)."
+                        },
+                        "undefined": {
+                            "type": "string",
+                            "description": "An x value."
+                        },
+                        "highImpedance": {
+                            "type": "string",
+                            "description": "A z value."
+                        },
+                        "cursor": {
+                            "type": "string",
+                            "description": "Where a trigger paused the simulation."
+                        },
+                        "fillOpacity": {
+                            "type": "number",
+                            "minimum": 0,
+                            "maximum": 1,
+                            "description": "Opacity of the fill under a high (1) bit."
+                        }
+                    }
                 }
             }
         }
     },
     "scripts": {
-        "postinstall": "patch-package",
         "vscode:prepublish": "npm run compile",
+        "precompile": "node -e \"require('fs').rmSync('dist', { recursive: true, force: true })\"",
         "compile": "npm-run-all compile:*",
+        "compile:rust": "cargo build --release",
         "compile:views": "webpack --mode production",
         "watch": "npm-run-all watch:*",
         "watch:webpack": "webpack --watch --mode development",
         "watch-prod": "npm-run-all watch-prod:*",
         "watch-prod:webpack": "webpack --watch --mode production",
-        "lint": "eslint .",
+        "lint": "eslint . && tsc",
         "pretest": "npm run lint",
-        "test": "npm-run-all test:pipeline test:vscode",
-        "test:pipeline": "mocha test/pipeline.spec.mjs",
-        "test:vscode": "node ./test/runTest.js",
-        "open-in-browser": "vscode-test-web --extensionDevelopmentPath=. ."
+        "test": "npm-run-all test:rust test:pipeline test:golden test:schematic test:vscode",
+        "test:rust": "cargo test --workspace",
+        "test:pipeline": "npm run compile:rust && mocha test/pipeline.spec.mjs",
+        "test:golden": "npm run compile:rust && mocha test/golden.spec.mjs",
+        "test:schematic": "npm run compile:rust && webpack --mode development --config-name schematic-view && mocha test/schematic.spec.mjs",
+        "test:vscode": "node ./test/runTest.js"
     },
     "devDependencies": {
+        "@playwright/browser-chromium": "^1.62.1",
         "@types/mocha": "^10.0.10",
         "@types/node": "26.x",
         "@types/vscode": "^1.125.0",
         "@vscode/test-electron": "^3.0.0",
-        "@vscode/test-web": "^0.0.81",
         "css-loader": "^7.1.4",
+        "esbuild-loader": "^4.5.0",
         "eslint": "^10.5.0",
-        "expose-loader": "^5.0.1",
         "glob": "^13.0.6",
-        "jquery": "^4.0.0",
         "mocha": "^11.7.6",
         "npm-run-all": "^4.1.5",
-        "patch-package": "^8.0.1",
-        "process": "^0.11.10",
-        "sass": "^1.101.0",
-        "sass-loader": "^17.0.0",
+        "playwright": "^1.62.1",
         "style-loader": "^4.0.0",
+        "typescript": "^7.0.2",
         "webpack": "5.107.2",
         "webpack-cli": "^7.0.3"
     },
     "dependencies": {
-        "@twint/4vl": "^1.0.2",
         "@vscode/codicons": "^0.0.45",
-        "@vscode/webview-ui-toolkit": "^1.4.0",
-        "assert": "^2.1.0",
-        "backbone": "^1.6.1",
         "base64-arraybuffer": "^1.0.2",
-        "buffer": "^6.0.3",
-        "crypto-browserify": "^3.12.1",
         "dequal": "^2.0.3",
-        "digitaljs": "^0.14.2",
-        "digitaljs_lua": "^0.0.9",
-        "hammerjs": "^2.0.8",
-        "luaparse": "^0.3.1",
-        "path-browserify": "^1.0.1",
-        "resize-observer-polyfill": "^1.5.1",
-        "split-grid": "^1.0.11",
-        "stream-browserify": "^3.0.0",
-        "svg-pan-zoom": "^3.6.2",
-        "util": "^0.12.5",
-        "wavecanvas": "^1.1.1",
-        "yosys2digitaljs": "^0.10.3"
+        "elkjs": "^0.11.1",
+        "luaparse": "^0.3.1"
     },
     "allowScripts": {
         "@parcel/watcher@2.5.6": true,

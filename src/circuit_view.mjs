@@ -3,40 +3,60 @@
 'use strict';
 
 import * as vscode from 'vscode';
+import * as child_process from 'child_process';
+import * as readline from 'readline';
 import * as base64 from 'base64-arraybuffer';
+import { hdlstudio_bin } from './hdlstudio_bin.mjs';
 import { WebviewMsgQueue } from './webview_msg_queue.mjs';
 import { write_txt_file } from './utils.mjs';
+
+const waveColors = () => vscode.workspace.getConfiguration('hdl-studio').get('waveform.colors');
 
 export class CircuitView {
     #panel
     #document
     #queue
     #init
-    #djs
+    #studio
     #subcircuits = {}
-    constructor(djs, panel, document) {
-        this.#djs = djs;
+    // the simulation engine of this view (`hdlstudio serve`), started on
+    // the webview's first request
+    #engine
+    #engineSession
+    #disposed = false
+    constructor(studio, panel, document) {
+        this.#studio = studio;
         this.#panel = panel;
         this.#document = document;
         this.#queue = new WebviewMsgQueue(this.#panel.webview);
-        this.#panel.iconPath = djs.iconPath; // currently no effect for custom editor
+        this.#panel.iconPath = studio.iconPath; // currently no effect for custom editor
         this.onDidDispose = this.#panel.onDidDispose;
         this.onDidChangeViewState = this.#panel.onDidChangeViewState;
         this.#panel.webview.onDidReceiveMessage((msg) => {
             this.#queue.release();
-            this.#processCommand(djs, msg);
+            this.#processCommand(studio, msg);
         });
         let circuit_listener = this.#document.circuitUpdated(opts => {
             this.#showCircuit({ ...opts, pause: false });
             this.reveal();
         });
+        // the waveform monitor shows time in the project's units, in the user's colours
+        const timescale_listener = this.#document.synthOptionUpdated(() =>
+            this.post({ command: 'timescale', value: this.#document.synth_options.timescale }));
+        const colors_listener = vscode.workspace.onDidChangeConfiguration((e) => {
+            if (e.affectsConfiguration('hdl-studio.waveform'))
+                this.post({ command: 'wavecolors', colors: waveColors() });
+        });
         this.onDidDispose(() => {
             circuit_listener.dispose();
+            timescale_listener.dispose();
+            colors_listener.dispose();
+            this.#disposed = true;
+            this.#engine?.kill();
         });
-        this.#init = this.#getViewContent(djs, this.#panel.webview).then(content => {
-            this.#panel.webview.html = content;
-            this.#showCircuit({ run: false, pause: true }); // force pause
-        });
+        this.#panel.webview.html = this.#getViewContent(studio, this.#panel.webview);
+        this.#init = Promise.resolve();
+        this.#showCircuit({ run: false, pause: true }); // force pause
     }
     get panel() {
         return this.#panel;
@@ -50,8 +70,41 @@ export class CircuitView {
     init() {
         return this.#init;
     }
-    #processCommand(djs, msg) {
+    #engineSend(req) {
+        if (req.op === 'load')
+            this.#engineSession = req.session;
+        if (!this.#engine)
+            this.#startEngine();
+        this.#engine.stdin.write(JSON.stringify(req) + '\n');
+    }
+    #startEngine() {
+        const proc = child_process.spawn(hdlstudio_bin(), ['serve'], { stdio: ['pipe', 'pipe', 'pipe'] });
+        this.#engine = proc;
+        const fail = (message) => {
+            if (this.#engine === proc)
+                this.#engine = undefined;
+            if (this.#disposed)
+                return;
+            vscode.window.showErrorMessage(`Simulation: ${message}`);
+            this.post({ command: 'engine', ev: { ev: 'error', session: this.#engineSession, message } });
+        };
+        readline.createInterface({ input: proc.stdout }).on('line', (line) => {
+            const ev = JSON.parse(line);
+            if (ev.ev === 'error')
+                vscode.window.showErrorMessage(`Simulation: ${ev.message}`);
+            this.post({ command: 'engine', ev });
+        });
+        proc.stderr.on('data', (d) => console.error(`hdlstudio: ${d}`));
+        proc.stdin.on('error', () => {}); // a dead engine is reported by 'exit'
+        proc.on('error', (e) => fail(e.code === 'ENOENT' ?
+            `the engine is missing (${hdlstudio_bin()}). Run "npm run compile".` : e.message));
+        proc.on('exit', (code, signal) => fail(`the engine stopped (${signal || code})`));
+    }
+    #processCommand(studio, msg) {
         switch (msg.command) {
+            case 'engine':
+                this.#engineSend(msg.req);
+                return;
             case 'subcircuits':
                 this.#subcircuits = msg.subcircuits;
                 return;
@@ -69,7 +122,7 @@ export class CircuitView {
                 }
             }
             case 'img-exts':
-                djs.image_exts = msg.exts;
+                studio.image_exts = msg.exts;
                 return;
             case 'focus':
                 this.reveal();
@@ -81,67 +134,27 @@ export class CircuitView {
         this.post({
             command: 'showcircuit',
             circuit: this.#document.circuit,
-            // defaultcomb and layout are digitaljs display/simulation options
-            // applied when the circuit is (re)built, so they travel with the
-            // circuit, not yosys.
+            // defaultcomb is applied when the circuit is (re)built, so it
+            // travels with the circuit, not yosys
             opts: { ...opts,
                     defaultcomb: this.#document.synth_options.defaultcomb,
-                    layout: this.#document.synth_options.layout,
-                    speed: this.#djs.simSpeed }
+                    timescale: this.#document.synth_options.timescale,
+                    waveColors: waveColors(),
+                    speed: this.#studio.simSpeed }
         });
     }
-    async #getViewContent(djs, webview) {
-        const js_uri = webview.asWebviewUri(djs.mainJSPath);
-        const ui_uri = webview.asWebviewUri(djs.uiToolkitPath);
-        const icon_uri = webview.asWebviewUri(djs.codIconsPath);
-        const worker_script = await djs.simWorker;
+    #getViewContent(studio, webview) {
         return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <script>
-    window.getImageSupport = ${!djs.image_exts_set};
-    window.simWorkerUri = URL.createObjectURL(new Blob([${JSON.stringify(worker_script)}], {type: 'text/javascript'}));
-  </script>
-  <script type="module" src="${js_uri}"></script>
-  <script type="module" src="${ui_uri}"></script>
-  <link href="${icon_uri}" rel="stylesheet"/>
-  <title>DigitalJS Code</title>
-  <style>
-    html > body, foreignObject > body {
-      padding: 0 0;
-    }
-  </style>
+  <script>window.getImageSupport = ${!studio.image_exts_set};</script>
+  <script type="module" src="${webview.asWebviewUri(studio.schematicJSPath)}"></script>
+  <link href="${webview.asWebviewUri(studio.codIconsPath)}" rel="stylesheet"/>
+  <title>HDL Studio</title>
 </head>
-<body>
-<div id="grid">
-  <div id="paper"></div>
-  <div id="gutter_vert" class="gutter gutter-vertical"></div>
-  <div id="monitorbox">
-    <div style="margin-bottom:3px">
-      <vscode-button appearance="icon" name="ppt_up" title="Increase pixels per tick" disabled style="vertical-align: middle;"><i class="codicon codicon-add"></i></vscode-button>
-      <vscode-button appearance="icon" name="ppt_down" title="Decrease pixels per tick" disabled style="vertical-align: middle;"><i class="codicon codicon-dash"></i></vscode-button>
-      <span style="color:var(--foreground);vertical-align:middle;">scale</span>
-      <vscode-text-field name="scale" readonly style="vertical-align: middle;">
-      </vscode-text-field>
-      <vscode-button appearance="icon" name="live" title="Pause plot" disabled style="vertical-align: middle;"><i class="codicon codicon-debug-pause"></i></vscode-button>
-      <vscode-button appearance="icon" name="left" title="Move left" disabled style="vertical-align: middle;"><i class="codicon codicon-arrow-small-left"></i></vscode-button>
-      <vscode-button appearance="icon" name="right" title="Move right" disabled style="vertical-align: middle;"><i class="codicon codicon-arrow-small-right"></i></vscode-button>
-    </div>
-    <div style="margin-bottom:2px">
-      <span style="color:var(--foreground);vertical-align:middle;">range</span>
-      <vscode-text-field name="rangel" readonly style="vertical-align: middle;">
-      </vscode-text-field>
-      <span style="color:var(--foreground);vertical-align:middle;">-</span>
-      <vscode-text-field name="rangeh" readonly style="vertical-align: middle;">
-      </vscode-text-field>
-    </div>
-    <div id="monitor">
-    </div>
-  </div>
-</div>
-</body>
+<body><div id="paper"></div></body>
 </html>`;
     }
     reveal() {

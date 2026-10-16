@@ -2,59 +2,34 @@
 
 [![vscode marketplace](https://img.shields.io/badge/VS%20Code-HDL%20Studio-blue)](https://marketplace.visualstudio.com/items?itemName=TwinT.hdl-studio)
 
-HDL Studio is a VS Code extension for simulating and synthesizing digital circuits written in Verilog/SystemVerilog. It brings the [DigitalJS](https://github.com/tilk/digitaljs) digital logic simulator and the [yosys2digitaljs](https://github.com/tilk/yosys2digitaljs) netlist format converter directly into your editor, with synthesis delegated to a native [Yosys](https://yosyshq.net/yosys/) binary running in the associated dev-container.
+HDL Studio is a VS Code extension for synthesizing and simulating digital circuits written in Verilog/SystemVerilog. A native [Yosys](https://yosyshq.net/yosys/) synthesizes your sources, and HDL Studio shows the resulting circuit as an interactive schematic and simulates that same circuit, gate by gate, with 4-valued logic (0, 1, x, z), tri-state buses and per-cell delays. Its simulator, `hdlstudio`, is written in Rust and runs as a native process next to the editor.
 
-It provides similar functionalities as the [online version](https://digitaljs.tilk.eu/) while allowing you to work directly with local source files and saving your progress, including source information and the synthesized circuit, for future use. It also includes other additional features like undo-redo, exporting the circuit to images and more.
+You work on your own source files and save your progress, sources and synthesized circuit included, in a project file. The extension adds undo/redo, a waveform monitor with triggers, Lua scripting, image export and more.
 
-> **Fork notice:** HDL Studio is a fork of [digitaljs_code](https://github.com/yuyichao/digitaljs_code) by [Yichao Yu](https://github.com/yuyichao), maintained here with a focus on classroom use and native Yosys integration. The original work was made possible by [DigitalJS](https://github.com/tilk/digitaljs), [yosys2digitaljs](https://github.com/tilk/yosys2digitaljs) and many other related projects by [Marek Materzok](http://www.tilk.eu/) at the [University of Wrocław](http://www.ii.uni.wroc.pl/), as well as the [Yosys](https://yosyshq.net/yosys/) open-source hardware synthesis framework. Ideas and code are also borrowed from [DigitalJS Online](https://github.com/tilk/digitaljs_online).
+> **Origins:** HDL Studio is a fork of [digitaljs_code](https://github.com/yuyichao/digitaljs_code) by [Yichao Yu](https://github.com/yuyichao), maintained here with a focus on classroom use. It was built on [DigitalJS](https://github.com/tilk/digitaljs), [yosys2digitaljs](https://github.com/tilk/yosys2digitaljs) and [digitaljs_lua](https://github.com/tilk/digitaljs_lua) by [Marek Materzok](http://www.tilk.eu/) at the [University of Wrocław](http://www.ii.uni.wroc.pl/). Version 1.0 replaces them with its own simulator, converter and Lua engine, which follow their semantics and file format: projects saved by earlier versions, and circuits saved by [DigitalJS Online](https://digitaljs.tilk.eu/), open as they are.
 
 Contributions are welcome!
 
-![screenshot](./imgs/screenshots/code-highlight.png)
-
-## Features
-
-* Simulation of circuit (using [DigitalJS](https://github.com/tilk/digitaljs)) including support for
-
-    * Continuous simulation
-    * Single step
-    * Trigger
-    * Signal monitor and plotting.
-
-* __Saving/backing up__ the circuit including the source file information in a portable format
-
-  (The relative paths of the source files are saved and so that the project can be fully
-   restored on another machine as long as the source files are also packaged/copied with
-   the project/circuit file)
-
-  The saved file can be loaded again using this extension,
-  or in the [online version](https://digitaljs.tilk.eu/) for simulation.
-
-* Open the JSON circuit saved by the [online version](https://digitaljs.tilk.eu/)
-  for simulation. Accepted extensions are either `.json` or `.digitaljs`.
-  `.digitaljs` will be opened by default using this extension.
-
-* __Exporting the synthesized circuit as vector (SVG) or raster images (PNG or JPEG)__.
-
-* __Undo and redo__ all the changes on the circuit including but not limited to
-  resynthesize of the circuit and edits done from the graphic view of the circuit.
-
-* __Highlighting the source code__ that matches certain circuit element in the graphic view.
-
-    This can be seen in the screenshot above.
-
-* Using `Lua` scripts to customize/seed the simulation
-  (using [`digitaljs_lua`](https://github.com/tilk/digitaljs_lua))
-
-* Lua command line
-
-* Viewing and simulation of multiple circuits simultaneously
-
-* Zoom and pan support with both mouse and touch screen.
+![screenshot](./imgs/screenshots/schematic-waveform.png)
 
 ## Requirements
 
-This extension is designed to run inside the provided dev-container [sd](https://hub.docker.com/r/twint/sd), which includes a native [Yosys](https://yosyshq.net/yosys/) binary. Synthesis will not work without it. Check the [hdl_studio_test](https://github.com/TwinT/hdl_studio_test) repo for a working example of the dev-container setup.
+- A native [Yosys](https://yosyshq.net/yosys/) for synthesis, ideally with the [slang](https://github.com/povik/yosys-slang) frontend for SystemVerilog. The extension is designed to run inside the dev-container [sd](https://hub.docker.com/r/twint/sd), which includes both; check the [hdl_studio_test](https://github.com/TwinT/hdl_studio_test) repo for a working setup. Set `hdl-studio.yosysPath` if `yosys` is not on the PATH.
+- Linux x64 (the simulator is a native binary shipped with the extension). The extension doesn't run in the browser (vscode.dev).
+
+## Features
+
+* Simulation of the synthesized circuit: continuous (at an adjustable speed, up to as fast as possible), one tick, one clock cycle, or a given time (`Run for 2 us`), and Reset back to tick 0.
+* Waveform monitor: watch any wire, read values under the pointer, pause the simulation when a signal rises, falls, changes or takes a value.
+* Inputs and outputs of the top module as switches, push buttons, number fields, lamps, number displays, 7-segment displays and LED matrices, on the schematic and in the control panel.
+* Subcircuits, memories (with an editor) and FSMs (as a state diagram) open in their own windows.
+* __Saving/backing up__ the circuit, including the source files' relative paths, so the project can be restored on another machine together with its sources.
+* __Undo and redo__ of every change, from re-synthesis to moving cells around.
+* __Highlighting the source code__ that matches the element under the pointer.
+* __Exporting the circuit as SVG, PNG or JPEG__, with its signal levels.
+* `Lua` scripts and a Lua command line to drive and check the simulation.
+* Several circuits open and simulating at once.
+* Zoom and pan with mouse, trackpad or touch screen.
 
 ## Basic workflow
 
@@ -77,110 +52,143 @@ This extension is designed to run inside the provided dev-container [sd](https:/
     and the explorer context menu, or using the `Add Files` button from the `Files` view
     in the HDL Studio side panel.
 
-    ![files sidepanel](./imgs/screenshots/digitaljs-files-sidepanel.png)
+    ![files sidepanel](./imgs/screenshots/files-sidepanel.png)
 
-    Files with extension `.digitaljs` will automatically be opened by HDL Studio.
-    Opening files with `.json` is also supported using either the explorer context menu
-    or the `Open With` VS Code command. One can also open JSON files saved from
-    [DigitalJS Online](https://digitaljs.tilk.eu/). However, since DigitalJS Online
-    does not save any source info, only simulation and the graphic editor are supported
-    on such files. Synthesis is only supported once new source files have been added.
+    Circuits are saved as `.hdls` files, which HDL Studio opens automatically.
+    Projects saved by versions before 1.0 (`.digitaljs`) open too; use `Save As`
+    to give one the new extension. Opening `.json` files is also supported using
+    either the explorer context menu or the `Open With` VS Code command, including
+    circuits saved by [DigitalJS Online](https://digitaljs.tilk.eu/) or a raw Yosys
+    JSON netlist. Without source files only simulation is available; synthesis
+    needs sources.
 
     Note that the circuit file contains relative paths to the source files.
     If the circuit is to be copied to a different machine, the source files
     also need to be copied with the same relative paths.
 
-* The main UI for HDL Studio includes the main circuit view/editor and three side panels.
+* The main UI for HDL Studio includes the circuit view and three side panels:
+  the files in the circuit, the synthesis options and the simulation control.
 
-    The main circuit view shows the synthesized circuit (if one exists).
-    It includes interactive tools to view the circuit, edit connections,
-    view and plot signals, and set up triggers.
-    The circuit view supports zooming and panning using touch/drag, two-finger drag/pinch
-    as well as Ctrl + scroll wheel.
-    For complex circuits, the submodules can be opened in a popup window.
-
-    The three side panels show the files in the circuit, the synthesis options
-    and the simulation control respectively.
+    The circuit view shows the synthesized circuit. Drag the background (or use the
+    mouse wheel) to pan, Ctrl + wheel or a pinch to zoom, double-click the background
+    to zoom in. Cells can be dragged around; the layout is saved with the circuit.
+    Subcircuits, memories and FSMs show a magnifying glass when the pointer is over
+    them: click it (or double-click the cell) to open them in a window.
 
 * Synthesis
 
-    Once the source files are added, the circuit can be synthesized
-    using the synthesis side panel. The synthesis options can be set on the same panel
-    and will be saved along with the circuit.
+    Once the source files are added, the circuit is synthesized from the Synthesis
+    side panel. Its options (top module, Yosys optimization, decomposition into basic
+    gates, FSM extraction, diagram simplification, zero combinational delay) are saved
+    with the circuit.
 
     If the source file for the circuit is visible in a text editor,
-    hovering the wires and devices on the main circuit view will highlight
+    hovering the wires and devices on the circuit view highlights
     the corresponding lines of code in the source editor.
+
+    ![screenshot](./imgs/screenshots/code-highlight.png)
 
 * Simulation
 
-    The wires in the main circuit view are highlighted according to the simulation status
-    and one can also hover on the wires to see the signal values.
-    The input values for the top-level module can be changed interactively in the circuit.
-    The input and output ports can also be seen/controlled in the control side panel.
+    Wires are coloured by their value: green all ones, salmon all zeros, blue a
+    defined mix, orange high impedance (z), grey undefined (x). Hover a wire to see
+    its value. The top module's inputs can be changed on the schematic (click a
+    switch, hold a push button, type a number or use the wheel on it) or in the
+    control panel, which also shows the outputs.
 
-    To start/pause the simulation, use the play/pause icon next to the editor title.
-    For more complex simulation control including single-step, wait for event
-    and reset (back to tick 0 with registers and memories at their initial values),
-    a more complete set of buttons is available in the control panel.
-    Its speed slider sets how fast Start runs (and Lua scripts with it); the
-    rightmost position, "max", runs as fast as possible. While running, the
-    panel also shows the speed actually reached, since a large circuit can't
-    keep up with a high setting. LED matrix outputs are drawn as a small LED
-    grid in the panel.
+    Start and pause the simulation with the play/pause icon next to the editor title
+    or in the control panel. The control panel also has single step (one tick), one
+    clock cycle, Reset (back to tick 0 with registers and memories at their initial
+    values) and a speed slider, which sets how fast Start runs (and Lua scripts with
+    it); its rightmost position, "max", runs as fast as possible. While running, the
+    panel shows the speed actually reached, since a large circuit can't keep up with
+    a high setting.
 
-    The control panel also shows the simulation time, in ticks and in time units.
-    How long one tick is (`1 tick = 1 ns` by default) is set per project in the
-    same panel; "Run for" advances a given time (e.g. `2 us`) and pauses,
-    and the clock widgets show and edit the clock period in time units.
+    The control panel shows the simulation time in ticks and in time units. How long
+    one tick is (`1 tick = 1 ns` by default) is set per project in the same panel;
+    "Run for" advances a given time (e.g. `2 us`) and pauses, and the clock widgets
+    show and edit the clock period in time units.
 
-    The magnifying glass icon on the wires allows you to monitor a signal
-    and create a plot for it. Clicking the icon brings up the monitor view
-    as part of the main circuit view. Triggering conditions can also be set up
-    in the monitor view.
+* Waveforms
+
+    Hover a wire and click the waveform button next to it (or double-click the wire)
+    to add it to the waveform monitor under the schematic. The monitor shows each
+    signal's value under the pointer and a ruler in time units. A click on the
+    waveforms stops following the simulation, so you can look around; another click
+    follows it again. Drag to scroll back, Ctrl + wheel to zoom.
+
+    Right-click a signal (or use its `…` button) to choose its number format, to
+    remove it, or to pause the simulation when it rises, falls, changes, becomes x or
+    equals a value. Then press Start: the simulation runs until that happens, and the
+    monitor marks the moment and says why it paused.
+
+    The colours are the `hdl-studio.waveform.colors` setting; the default is
+    [Surfer](https://surfer-project.org)'s dark theme.
 
 * Saving progress
 
-    The main circuit view is implemented as a custom editor and all the normal saving/restoring
+    The circuit view is a custom editor and all the normal saving/restoring
     operations on an editor are supported using the corresponding hotkey or menu from VS Code.
     This includes saving, saving as, reverting, undo and redo.
-    Note that changes to the circuit layout from the graphic interface are saved
-    and will be part of the undo/redo history.
-    However, the signals in the circuit are not saved.
+    Changes to the layout from the circuit view are saved and are part of the
+    undo/redo history. The signals in the circuit are not saved.
     Note that due to VS Code limitations, saving the circuit under a different name
     will close the circuit and open it under the new name, and the simulation status will be lost.
 
 * Exporting image
 
     The circuit, including the signal levels, can be exported as either vector or raster images.
-    SVG, PNG and JPEG formats are supported and additional formats may also be available
-    depending on the host browser.
+    SVG, PNG and JPEG formats are supported and additional formats may also be available.
 
     The exported image is for a single circuit view.
-    Images for subcircuits need to be exported individually.
-    Note that export of a subcircuit image requires the corresponding subcircuit to be open.
+    Images for subcircuits need to be exported individually, while they are open.
 
 * Lua scripting
 
-    For more complex control of the simulation, you can use `Lua` scripts.
+    For more complex control of the simulation, you can use `Lua` (5.4) scripts.
 
     To run a script, add it as a source file to the circuit and use the
     run button in the HDL Studio files view to start it. The run button will change
-    into a stop button to abort the script while it is running.
-    In addition to the API at https://github.com/tilk/digitaljs_lua/blob/master/docs/USAGE.md,
-    two additional functions `sim.start()` and `sim.stop(synchronize=false)` are also supported
-    to start and stop the simulation.
+    into a stop button to abort the script while it is running. Running a script
+    starts the simulation, and the simulation pauses when the script ends.
+
+    The `sim` library talks to the circuit. Inputs, outputs and wires are named
+    as in the sources (a wire inside a subcircuit by the subcircuit labels first:
+    `sim.getvalue("core_i", "pc")`).
+    * `sim.setinput(name, value)`, `sim.getoutput(name)`: the top module's ports.
+    * `sim.getvalue(..., wire)`: any named wire.
+    * `sim.tick()`: the current tick.
+    * `sim.sleep(n)`: wait `n` ticks.
+    * `sim.wait(event[, n])`: wait for an event, at most `n` ticks. Events are
+      `sim.posedge(..., wire)`, `sim.negedge(..., wire)` and
+      `sim.value(v, ..., wire)` (the wire takes value `v`), and `e1 | e2`
+      waits for either.
+
+    The `vec` library is 4-valued vectors:
+    * Making one: `vec(5)`, `vec(-3, 8)`, `vec(true)`, `vec("8ha5")`,
+      `vec("4b1x0z")`, `vec.frombin("1x0z")`, `vec.fromhex("f0", 12)`,
+      `vec.fromoct(s[, bits])`, `vec.frombool(b[, bits])`,
+      `vec.frominteger(n[, bits])`.
+    * Reading one: `v:tobin()`, `v:tohex()`, `v:tooct()`, `v:tointeger()`,
+      `v:tointegersigned()`, `#v` (its width), `v(i)` (bit `i`, negative from the
+      top) and `v(i, n)` (`n` bits from `i`).
+    * Operators: `& | ~` (xor), `~v` (not), `..` (concatenation, `a .. b` puts `a`
+      on top as in `{a, b}`) and `==`.
+    * Bitwise methods: `band bor bxor bnand bnor bxnor bnot`. Reductions:
+      `rand ror rxor rnand rnor rxnor`.
+    * Tests: `ishigh islow isdefined isfullydefined`, and `xmask`.
+
+    Values given to `sim` can be vecs, booleans, integers or strings like
+    `"8hff"`. `print` shows its arguments.
 
     By default, the output of the script will be shown as notification messages in VS Code.
     Alternatively, you can open a Lua terminal for the circuit using the `Lua Terminal` button
     in the HDL Studio files panel. When the terminal is visible, the output of the script
     will be printed to the terminal instead. You can also use the terminal to interactively
-    run Lua scripts, similar to the normal Lua command-line interface. Command-line editing
-    and command history are supported. Pressing `Ctrl-C` aborts the execution of commands
-    from the command line (it does not stop the execution of other Lua scripts).
-
-    Starting and stopping the simulation from the Lua terminal, setting inputs and getting outputs
-    from the circuit:
+    run Lua code, similar to the normal Lua command-line interface; it prints the value
+    of an expression. Command-line editing and command history are supported. Pressing
+    `Ctrl-C` aborts the execution of commands from the command line (it does not stop
+    the execution of other Lua scripts).
 
     ![Lua REPL](./imgs/screenshots/lua-repl.png)
 

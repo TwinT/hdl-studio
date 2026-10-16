@@ -1,0 +1,13 @@
+[package]
+name = "hdlstudio-netlist"
+description = "Circuit model of the HDL Studio engine (devices, connectors, subcircuits)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+hdlstudio-logic = { path = "../hdlstudio-logic" }
+indexmap = { version = "2", features = ["serde"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["preserve_order"] }

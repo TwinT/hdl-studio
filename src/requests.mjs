@@ -6,10 +6,8 @@ import * as child_process from 'child_process';
 import * as fs from 'fs';
 import * as os from 'os';
 import { promisify } from 'util';
-import { yosys2digitaljs, io_ui } from 'yosys2digitaljs/core';
-import { split_inout_ports } from './inout_split.mjs';
-import * as digitaljs_transform from '../node_modules/digitaljs/src/transform.mjs';
 import { build_yosys_script, isHdlFile, data_file_paths } from './yosys_script.mjs';
+import { convert_yosys_json } from './hdlstudio_bin.mjs';
 
 const execFile = promisify(child_process.execFile);
 
@@ -18,17 +16,6 @@ function yosysLog() {
     if (!_outputChannel)
         _outputChannel = vscode.window.createOutputChannel('HDL Studio (Yosys)');
     return _outputChannel;
-}
-
-export function convert_yosys_json(raw, options = {}) {
-    // inout ports -> input + output halves (yosys2digitaljs only knows in/out)
-    let output = yosys2digitaljs(split_inout_ports(raw), options);
-    io_ui(output);
-
-    if (options.transform)
-        output = digitaljs_transform.transformCircuit(output);
-
-    return output;
 }
 
 async function slang_available(yosysBin) {
@@ -40,7 +27,7 @@ async function slang_available(yosysBin) {
     }
 }
 
-const rand_prefix = 'djs-IxU5De4QZDxUgn43Zwj1-_';
+const rand_prefix = 'hdls-IxU5De4QZDxUgn43Zwj1-_';
 const rand_suffix = '_-hbtdHFLoSvFPbPLnGSp8';
 const match_regex = new RegExp(`${rand_prefix}(\\d+)${rand_suffix}`, 'g');
 
@@ -124,15 +111,12 @@ export async function run_yosys(files, options) {
         }
 
         try {
-            const raw = JSON.parse(
-                file_map.unmap_string(fs.readFileSync(outputJson, 'utf8'))
-            );
-
+            const raw = file_map.unmap_string(fs.readFileSync(outputJson, 'utf8'));
             return { output: convert_yosys_json(raw, options) };
         } catch (e) {
             // Yosys ran fine but the netlist couldn't be converted (e.g. a testbench
             // with no synthesizable top, $display, delays, etc.). Surface the real error.
-            log.appendLine('\n--- yosys2digitaljs error ---');
+            log.appendLine('\n--- netlist conversion error ---');
             log.appendLine(e.stack || String(e));
             log.show(true);
             throw { error: `${e.message || e}. See the "HDL Studio (Yosys)" output panel for the full log.` };

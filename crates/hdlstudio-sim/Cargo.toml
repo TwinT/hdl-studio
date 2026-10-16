@@ -1,0 +1,16 @@
+[package]
+name = "hdlstudio-sim"
+description = "Event-driven four-valued simulator of HDL Studio circuits"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+hdlstudio-logic = { path = "../hdlstudio-logic" }
+hdlstudio-netlist = { path = "../hdlstudio-netlist" }
+num-bigint = "0.4"
+indexmap = "2"
+
+[dev-dependencies]
+serde_json = "1"

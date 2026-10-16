@@ -1,0 +1,14 @@
+[package]
+name = "hdlstudio-logic"
+description = "Four-valued logic vectors (0, 1, x, z) for the HDL Studio engine"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+smallvec = "1"
+
+[dev-dependencies]
+serde_json = "1"

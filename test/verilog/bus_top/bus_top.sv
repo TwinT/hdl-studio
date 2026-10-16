@@ -1,6 +1,6 @@
 // Two drivers sharing one bus through their own tri-state output, each in
 // its own module scope (drv_a/drv_b), wired together only at bus_top. This
-// is the minimal repro for native Z/multi-driver-net support: yosys2digitaljs
+// is the minimal repro for native Z/multi-driver-net support: the converter
 // converts each `assign bus = oe ? val : 'z;` to a $tribuf device, and
 // merges the two drivers of the shared `bus` net into a TriMerge device.
 module drv_a(input oe, input [3:0] val, output [3:0] bus);

@@ -1,0 +1,18 @@
+[workspace]
+resolver = "3"
+members = ["crates/*"]
+
+[workspace.package]
+version = "1.0.0"
+edition = "2024"
+license = "BSD-2-Clause"
+
+# the binary the vsix ships
+[profile.release]
+strip = true
+
+# for perf: cargo build --profile profiling
+[profile.profiling]
+inherits = "release"
+strip = false
+debug = "line-tables-only"

@@ -5,7 +5,7 @@ Matriz de LEDs NxM (por defecto 4x4) - punto que recorre
 Cuenta de 0 a ROWS*COLS-1 y prende, en cada ciclo, un unico LED de la
 matriz en la posicion correspondiente (codificacion one-hot de "pos").
 
-Demuestra el widget LEDMatrix: yosys2digitaljs infiere ese widget para una
+Demuestra el widget LEDMatrix: HDL Studio infiere ese widget para una
 salida cuyo ancho es EXACTAMENTE filas*columnas y que lleva los atributos
 led_matrix_rows/led_matrix_cols en el puerto (un ancho de bus solo no
 alcanza para sacar dos dimensiones independientes: 16 bits podria ser
