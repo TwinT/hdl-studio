@@ -351,8 +351,11 @@ export function draw(d: Device, s: Shape, top: boolean, hooks: CellHooks): CellV
         const [kind, arc, neg] = gates[t];
         // only the multi-input gates are scaled (digitaljs's GateX1)
         const x1 = /^(N?And|N?Or|Xn?or)$/.test(t);
-        const gg = el('g', x1 ? { transform: `translate(-4,0) scale(${s.w / 60})` } : {}, body);
-        const attrs = { stroke: 'black', 'stroke-width': 2, 'vector-effect': 'non-scaling-stroke' };
+        const sc = x1 ? s.w / 60 : 1;
+        const gg = el('g', x1 ? { transform: `translate(-4,0) scale(${sc})` } : {}, body);
+        // 2px however the shape is scaled (digitaljs's non-scaling-stroke
+        // also kept it at 2 screen pixels when zoomed out)
+        const attrs = { stroke: 'black', 'stroke-width': 2 / sc };
         el('path', { d: gatePaths[kind], fill: 'white', ...attrs }, gg);
         if (arc) el('path', { d: xorArc, fill: 'black' }, gg);
         if (neg) el('circle', { cx: 56, cy: 16, r: 4, fill: 'white', ...attrs }, gg);

@@ -13,6 +13,7 @@ import readline from 'readline';
 import { spawn } from 'child_process';
 import { fileURLToPath } from 'url';
 import { level, read, show } from '../view/schematic/values.ts';
+import { route } from '../view/schematic/route.ts';
 import { hdlstudio_bin } from '../src/hdlstudio_bin.mjs';
 import { designs, synthesize, slangAvailable, convert } from './simdiff/designs.mjs';
 
@@ -38,6 +39,31 @@ describe('schematic values', function () {
     });
     it('classifies levels like digitaljs', function () {
         assert.deepStrictEqual(['111', '000', '010', 'zzz', 'z1z', 'x00'].map(level), ['high', 'low', 'def', 'highz', 'undef', 'undef']);
+    });
+});
+
+describe('schematic wire routes', function () {
+    const crosses = (pts, r) => pts.slice(1).some((p, i) => {
+        const q = pts[i];
+        return q.x === p.x ? q.x > r.x0 && q.x < r.x1 && Math.max(q.y, p.y) > r.y0 && Math.min(q.y, p.y) < r.y1
+                           : q.y > r.y0 && q.y < r.y1 && Math.max(q.x, p.x) > r.x0 && Math.min(q.x, p.x) < r.x1;
+    });
+    const orthogonal = (pts) => pts.slice(1).every((p, i) => p.x === pts[i].x || p.y === pts[i].y);
+    it('goes around a cell in the way, orthogonally', function () {
+        const cell = { x0: 80, y0: -30, x1: 120, y1: 30 };
+        const pts = route({ x: 0, y: 0 }, 'right', { x: 200, y: 10 }, 'left', undefined, [cell]);
+        assert.deepStrictEqual([pts[0], pts.at(-1)], [{ x: 0, y: 0 }, { x: 200, y: 10 }]);
+        assert.ok(orthogonal(pts) && !crosses(pts, cell), JSON.stringify(pts));
+        // into a port from its own side, even when the target is behind
+        const back = route({ x: 0, y: 100 }, 'right', { x: 0, y: 0 }, 'left', undefined, []);
+        assert.ok(back.at(-2).x < 0 && back.at(-2).y === 0, JSON.stringify(back));
+        // a straight line when nothing is in the way
+        assert.deepStrictEqual(route({ x: 0, y: 0 }, 'right', { x: 200, y: 0 }, 'left', undefined, []), [{ x: 0, y: 0 }, { x: 200, y: 0 }]);
+    });
+    it('reaches a port on top (a mux select) from above', function () {
+        const pts = route({ x: 0, y: 100 }, 'right', { x: 300, y: 0 }, 'top', undefined, [{ x0: 250, y0: 10, x1: 350, y1: 100 }]);
+        assert.ok(orthogonal(pts), JSON.stringify(pts));
+        assert.ok(pts.at(-2).y < 0 && pts.at(-2).x === 300, JSON.stringify(pts));
     });
 });
 

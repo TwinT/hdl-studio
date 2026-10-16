@@ -68,6 +68,8 @@ until the cutover. `src/circuit_view.mjs` picks the bundle when the view opens.
   `schematic.ts`: one graph as SVG, live values (engine `update` changes,
   applied once per animation frame), pan/zoom, wire tooltips, dragging cells.
   `layout.ts`: ELK, a node is the body plus its leads (ports on the border).
+  `route.ts` (no DOM, tested from Node): wires through their saved vertices,
+  or around cells (A*) once a moved cell dropped them.
   `main.ts`: the host protocol (same messages as `view/main.mjs`), sim
   controls, control-panel I/O, dialogs (`dialog.ts`, native), memory editor
   (`memory.ts`), FSM diagram (`fsm.ts`, the next transition is computed in

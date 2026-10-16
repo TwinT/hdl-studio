@@ -141,9 +141,11 @@
       Fixed with `Object.assign` (found by the webview test on the engine).
 - [ ] The new schematic (phase 5, `view/schematic/`), what it doesn't do yet
       or does differently:
-      - a moved cell's wires lose their route and go straight (an L/Z shape
-        through other cells); route them around cells, or re-run ELK on
-        demand ("tidy up" button);
+      - a moved cell's wires lose their ELK route and are routed around the
+        cells nearby (`route.ts`, A* on the cells' edges, within 200px of
+        both ends; farther detours fall back to an L/Z through cells). Other
+        wires keep their route, even if the moved cell now sits on it. A
+        "tidy up" (re-run ELK) button would fix both;
       - no wire editing (on purpose for v1: an edited netlist no longer
         matches the SystemVerilog), no waveform monitor yet (phase 6); the
         digitaljs view (setting `hdl-studio.useDigitaljsView`) still has both;

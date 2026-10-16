@@ -2,7 +2,8 @@
 // live with the engine's values. Pan with a drag on the background or the
 // wheel, zoom with ctrl+wheel or a pinch, drag cells to move them.
 
-import { CellView, Connector, Device, GraphData, Point, Shape, Side, draw, el, shape, text } from './cells';
+import { CellView, Connector, Device, GraphData, Shape, draw, el, shape, text } from './cells';
+import { Rect, midpoint, pathD, route } from './route';
 import { Level, level, levelColor, show, xes } from './values';
 
 export interface SchematicHooks {
@@ -16,77 +17,6 @@ export interface SchematicHooks {
 interface Wire {
     c: Connector; i: number; src: string; bits: number;
     path: SVGPathElement; hit: SVGPathElement; label?: SVGTextElement;
-}
-
-const dirs: Record<Side, [number, number]> = { left: [-1, 0], right: [1, 0], top: [0, -1], bottom: [0, 1] };
-
-function simplify(pts: Point[]): Point[] {
-    const out: Point[] = [];
-    for (const p of pts) {
-        const a = out[out.length - 1], b = out[out.length - 2];
-        if (a && a.x === p.x && a.y === p.y) continue;
-        if (a && b && ((b.x === a.x && a.x === p.x) || (b.y === a.y && a.y === p.y))) out.pop();
-        out.push(p);
-    }
-    return out;
-}
-
-// A wire's points: through its vertices if it has them, else out of the
-// source port and into the target's, orthogonally.
-export function route(a: Point, as: Side, b: Point, bs: Side, vertices?: Point[]): Point[] {
-    const hz = (s: Side) => s === 'left' || s === 'right';
-    if (vertices?.length) {
-        const pts = [a, ...vertices, b];
-        // keep the first and last legs straight
-        const v0 = vertices[0], vn = vertices[vertices.length - 1];
-        if (v0.x !== a.x && v0.y !== a.y) pts.splice(1, 0, hz(as) ? { x: v0.x, y: a.y } : { x: a.x, y: v0.y });
-        if (vn.x !== b.x && vn.y !== b.y) pts.splice(pts.length - 1, 0, hz(bs) ? { x: vn.x, y: b.y } : { x: b.x, y: vn.y });
-        return simplify(pts);
-    }
-    const s = 15;
-    const a1 = { x: a.x + dirs[as][0] * s, y: a.y + dirs[as][1] * s };
-    const b1 = { x: b.x + dirs[bs][0] * s, y: b.y + dirs[bs][1] * s };
-    let mid: Point[];
-    if (hz(as) && hz(bs)) {
-        const mx = (a1.x + b1.x) / 2;
-        mid = (b1.x - a1.x) * dirs[as][0] >= 0 ? [{ x: mx, y: a.y }, { x: mx, y: b.y }]
-            : [a1, { x: a1.x, y: (a.y + b.y) / 2 }, { x: b1.x, y: (a.y + b.y) / 2 }, b1];
-    } else if (!hz(as) && !hz(bs)) {
-        const my = (a1.y + b1.y) / 2;
-        mid = [a1, { x: a.x, y: my }, { x: b.x, y: my }, b1];
-    } else if (hz(as)) {
-        mid = [a1, { x: b1.x, y: a1.y }, b1];
-    } else {
-        mid = [a1, { x: a1.x, y: b1.y }, b1];
-    }
-    return simplify([a, ...mid, b]);
-}
-
-function pathD(pts: Point[], r = 10) {
-    let d = `M${pts[0].x} ${pts[0].y}`;
-    for (let i = 1; i < pts.length - 1; i++) {
-        const [a, p, b] = [pts[i - 1], pts[i], pts[i + 1]];
-        const la = Math.hypot(a.x - p.x, a.y - p.y), lb = Math.hypot(b.x - p.x, b.y - p.y);
-        const rr = Math.min(r, la / 2, lb / 2);
-        const p1 = { x: p.x + (a.x - p.x) * rr / la, y: p.y + (a.y - p.y) * rr / la };
-        const p2 = { x: p.x + (b.x - p.x) * rr / lb, y: p.y + (b.y - p.y) * rr / lb };
-        d += ` L${p1.x} ${p1.y} Q${p.x} ${p.y} ${p2.x} ${p2.y}`;
-    }
-    const z = pts[pts.length - 1];
-    return d + ` L${z.x} ${z.y}`;
-}
-
-function midpoint(pts: Point[]): Point {
-    const lens = pts.slice(1).map((p, i) => Math.hypot(p.x - pts[i].x, p.y - pts[i].y));
-    let half = lens.reduce((a, b) => a + b, 0) / 2;
-    for (let i = 0; i < lens.length; i++) {
-        if (half <= lens[i] && lens[i] > 0) {
-            const t = half / lens[i];
-            return { x: pts[i].x + (pts[i + 1].x - pts[i].x) * t, y: pts[i].y + (pts[i + 1].y - pts[i].y) * t };
-        }
-        half -= lens[i];
-    }
-    return pts[0];
 }
 
 const tooltip = (() => {
@@ -219,10 +149,12 @@ export class Schematic {
         return this.#shapes.get(id)?.ports.find((p) => p.id === port);
     }
 
-    #routeWire(w: Wire) {
+    // `fast`: an L/Z shape, without looking for cells in the way (while dragging)
+    #routeWire(w: Wire, fast = false) {
         const a = this.graph.devices[w.c.from.id].position!, b = this.graph.devices[w.c.to.id].position!;
         const pa = this.#port(w.c.from.id, w.c.from.port)!, pb = this.#port(w.c.to.id, w.c.to.port)!;
-        const pts = route({ x: a.x + pa.x, y: a.y + pa.y }, pa.side, { x: b.x + pb.x, y: b.y + pb.y }, pb.side, w.c.vertices);
+        const pts = route({ x: a.x + pa.x, y: a.y + pa.y }, pa.side, { x: b.x + pb.x, y: b.y + pb.y }, pb.side, w.c.vertices,
+                          w.c.vertices || fast ? undefined : this.#obstacles());
         const d = pathD(pts);
         w.path.setAttribute('d', d);
         w.hit.setAttribute('d', d);
@@ -231,6 +163,14 @@ export class Schematic {
             w.label.setAttribute('x', String(m.x));
             w.label.setAttribute('y', String(m.y));
         }
+    }
+
+    // The cells' bodies, with a margin, for routing wires around them.
+    #obstacles(): Rect[] {
+        return [...this.#shapes].map(([id, s]) => {
+            const p = this.graph.devices[id].position!;
+            return { x0: p.x - 10, y0: p.y - 10, x1: p.x + s.w + 10, y1: p.y + s.h + 10 };
+        });
     }
 
     // The value at a cell's port: its own output, or what drives an input.
@@ -300,14 +240,16 @@ export class Schematic {
                 g.setAttribute('transform', `translate(${d.position.x},${d.position.y})`);
                 for (const w of wires) {
                     delete w.c.vertices;
-                    this.#routeWire(w);
+                    this.#routeWire(w, true);
                 }
             };
             const up = () => {
                 window.removeEventListener('pointermove', move);
                 window.removeEventListener('pointerup', up);
                 window.removeEventListener('pointercancel', up);
-                if (moved) this.#hooks.moved();
+                if (!moved) return;
+                for (const w of wires) this.#routeWire(w);
+                this.#hooks.moved();
             };
             window.addEventListener('pointermove', move);
             window.addEventListener('pointerup', up);
