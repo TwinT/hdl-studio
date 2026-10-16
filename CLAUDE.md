@@ -101,7 +101,13 @@ view (`view/main.mjs`, which still has wire editing) until the cutover. `src/cir
   only redraws: the simulation goes on (undo/redo of a move).
 - TypeScript: `tsc` only type-checks (`tsconfig.json`, part of `npm run
   lint`); webpack transpiles with `esbuild-loader` (TypeScript 7 has no JS
-  API for ts-loader). Node imports the `.ts` directly in tests.
+  API for ts-loader). Node imports the `.ts` directly in tests, so relative
+  imports name the `.ts` file, and the modules tests import (`values.ts`,
+  `route.ts`, `cells.ts`) use `import type` for types and touch the DOM only
+  when called. `test:schematic` checks every cell's ports (id, direction,
+  width) against digitaljs's for every example: "Negation" once matched the
+  comparisons' `^Ne` and got a 1-bit output, which drew a 34-bit signal as a
+  bit in the waveform.
 - `npm run test:schematic` (`test/schematic.spec.mjs`): value formats, then
   `dist/schematic.js` in Chromium (Playwright, from `@vscode/test-web`) on a
   real `hdlstudio serve`, with the test as the extension host: the board's

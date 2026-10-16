@@ -3,7 +3,7 @@
 // port positions and leads), so a layout saved by either UI works in the
 // other: a device's `position` is its body's top-left corner.
 
-import { level, levelColor, show, xes, read as readValue } from './values';
+import { level, levelColor, show, xes, read as readValue } from './values.ts';
 
 export interface Point { x: number; y: number }
 export interface End { id: string; port: string }
@@ -40,8 +40,11 @@ export function text(parent: Element, x: number, y: number, s: string, attrs: Re
     return t;
 }
 
-const canvas = document.createElement('canvas').getContext('2d')!;
+let canvas: CanvasRenderingContext2D | undefined;
 export function textWidth(s: string, font = `8pt ${FONT}`) {
+    // ponytail: outside a browser (the port tests) a rough estimate does
+    if (typeof document === 'undefined') return s.length * 6;
+    canvas ??= document.createElement('canvas').getContext('2d')!;
     canvas.font = font;
     return canvas.measureText(s).width;
 }
@@ -156,7 +159,8 @@ export function shape(d: Device, top: boolean, subcircuits: Record<string, Graph
         let w = 40;
         if (t.endsWith('Const')) w = 30 + String(d.constant).length * 10;
         const b = d.bits;
-        const cmp = /^(Lt|Le|Gt|Ge|Eq|Ne)/.test(t);
+        // the whole name: "Negation" starts with "Ne" too
+        const cmp = /^(Lt|Le|Gt|Ge|Eq|Ne)(Const)?$/.test(t);
         const ins: Spec[] = t.endsWith('Const') || t === 'Negation' || t === 'UnaryPlus'
             ? [{ id: 'in', bits: b.in }] : [{ id: 'in1', bits: b.in1 }, { id: 'in2', bits: b.in2 }];
         return box(w, w, side(ins, 'left', 'in', w, w, { inset: 10, lead: 35 })

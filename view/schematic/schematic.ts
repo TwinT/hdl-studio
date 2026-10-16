@@ -2,9 +2,9 @@
 // live with the engine's values. Pan with a drag on the background or the
 // wheel, zoom with ctrl+wheel or a pinch, drag cells to move them.
 
-import { CellView, Connector, Device, GraphData, Point, Shape, draw, el, shape, text } from './cells';
-import { Rect, midpoint, pathD, route } from './route';
-import { Level, level, levelColor, show, xes } from './values';
+import { CellView, Connector, Device, GraphData, Point, Shape, draw, el, shape, text } from './cells.ts';
+import { Rect, midpoint, pathD, route } from './route.ts';
+import { Level, level, levelColor, show, xes } from './values.ts';
 
 export interface SchematicHooks {
     setInput(id: string, value: string): void;

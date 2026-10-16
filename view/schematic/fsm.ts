@@ -3,7 +3,7 @@
 
 import ELK from 'elkjs/lib/elk.bundled.js';
 import type { ElkExtendedEdge, ElkNode } from 'elkjs/lib/elk-api';
-import { Device, el, text, textWidth } from './cells';
+import { Device, el, text, textWidth } from './cells.ts';
 
 interface Trans { id: string; from: number; to: number; ctrlIn: string; ctrlOut: string }
 

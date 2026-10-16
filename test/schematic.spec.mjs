@@ -14,7 +14,9 @@ import { spawn } from 'child_process';
 import { fileURLToPath } from 'url';
 import { level, read, show } from '../view/schematic/values.ts';
 import { route } from '../view/schematic/route.ts';
+import { shape } from '../view/schematic/cells.ts';
 import { hdlstudio_bin } from '../src/hdlstudio_bin.mjs';
+import { formatTimeAt } from '../src/time_units.mjs';
 import { designs, synthesize, slangAvailable, convert } from './simdiff/designs.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -37,9 +39,52 @@ describe('schematic values', function () {
         assert.strictEqual(read('dec2c', '-1', 4), '1111');
         assert.strictEqual(read('bin', '12', 4), undefined);
     });
+    it('labels times precisely enough for their spacing', function () {
+        assert.strictEqual(formatTimeAt(0.1920004, 200e-9), '192.0004 ms');
+        assert.strictEqual(formatTimeAt(4.62e-6, 20e-9), '4.62 µs');
+        assert.strictEqual(formatTimeAt(4e-6, 1e-6), '4 µs');
+        assert.strictEqual(formatTimeAt(0, 1e-9), '0');
+    });
     it('classifies levels like digitaljs', function () {
         assert.deepStrictEqual(['111', '000', '010', 'zzz', 'z1z', 'x00'].map(level), ['high', 'low', 'def', 'highz', 'undef', 'undef']);
     });
+});
+
+// Every cell of every example has the ports digitaljs gives it (id,
+// direction, width): the schematic draws them and names the waveforms'
+// widths from them. ("Negation" once got a comparison's 1-bit output.)
+describe('schematic cell ports match digitaljs', function () {
+    this.timeout(300000);
+    let HeadlessCircuit;
+    before(async function () {
+        if (!slangAvailable()) this.skip();
+        ({ HeadlessCircuit } = await import('./simdiff/digitaljs_src.mjs'));
+    });
+    const ports = (list) => list.map((p) => `${p.id}:${p.dir}:${p.bits}`).sort();
+    for (const d of designs) {
+        it(d.name, function () {
+            const yosys = synthesize(d);
+            for (const transform of [true, false]) {
+                const data = JSON.parse(convert(yosys, transform));
+                const circuit = new HeadlessCircuit(JSON.parse(JSON.stringify(data)));
+                const subs = data.subcircuits ?? {};
+                const seen = new Set();
+                const check = (graph, devices, top) => {
+                    for (const cell of graph.getElements()) {
+                        const dev = devices[cell.id];
+                        assert.deepStrictEqual(ports(shape(dev, top, subs).ports), ports(cell.getPorts()),
+                                               `${d.name}${transform ? '' : ' (no transform)'}: ${cell.id} ${dev.type}`);
+                        if (dev.type === 'Subcircuit' && !seen.has(dev.celltype)) {
+                            seen.add(dev.celltype);
+                            check(cell.get('graph'), subs[dev.celltype].devices, false);
+                        }
+                    }
+                };
+                check(circuit._graph, data.devices, true);
+                circuit.shutdown();
+            }
+        });
+    }
 });
 
 describe('schematic wire routes', function () {

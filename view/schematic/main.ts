@@ -4,14 +4,14 @@
 
 import './style.css';
 import * as imgutils from '../imgutils.mjs';
-import { LuaRunner } from '../lua_runner';
-import { CircuitData, Connector, Device, GraphData, isInput, isOutput, shape } from './cells';
-import { Dialog } from './dialog';
-import { fsmView } from './fsm';
-import { layout } from './layout';
-import { MemContents, memoryEditor } from './memory';
-import { Schematic } from './schematic';
-import { Monitor, WatchSpec } from './waves';
+import { LuaRunner } from '../lua_runner.ts';
+import { CircuitData, Connector, Device, GraphData, isInput, isOutput, shape } from './cells.ts';
+import { Dialog } from './dialog.ts';
+import { fsmView } from './fsm.ts';
+import { layout } from './layout.ts';
+import { MemContents, memoryEditor } from './memory.ts';
+import { Schematic } from './schematic.ts';
+import { Monitor, WatchSpec } from './waves.ts';
 import { parseTime } from '../../src/time_units.mjs';
 
 declare function acquireVsCodeApi(): { postMessage(msg: any): void };

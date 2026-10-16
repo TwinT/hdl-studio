@@ -1,8 +1,8 @@
 // A memory's contents, and the editor that shows them: pages of 8 rows,
 // cells being read or written marked, edits written to the engine.
 
-import { Device } from './cells';
-import { bases, read, show, size } from './values';
+import { Device } from './cells.ts';
+import { bases, read, show, size } from './values.ts';
 
 // The words of a memory: its initial contents (memdata) plus what the
 // engine wrote since.

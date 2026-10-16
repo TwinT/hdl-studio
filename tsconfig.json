@@ -8,6 +8,7 @@
         "lib": ["ES2022", "DOM", "DOM.Iterable"],
         "strict": true,
         "noEmit": true,
+        "allowImportingTsExtensions": true,
         "allowJs": true,
         "checkJs": false,
         "skipLibCheck": true,

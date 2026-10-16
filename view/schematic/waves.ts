@@ -4,8 +4,8 @@
 // update this asks for the window it shows (`wave`, one entry per pixel
 // column) and draws it.
 
-import { formatTime } from '../../src/time_units.mjs';
-import { read, show } from './values';
+import { formatTimeAt } from '../../src/time_units.mjs';
+import { read, show } from './values.ts';
 
 export interface WatchSpec {
     path: string; port: string; // the output driving the wire
@@ -200,7 +200,7 @@ export class Monitor {
         this.#marker = tick;
         this.#setFollow(false);
         this.#start = Math.max(0, tick - this.#span() * 0.7);
-        this.#status.textContent = `Paused: ${w.name} ${w.pause!.label} at ${formatTime(tick * this.#tickSec)}`;
+        this.#status.textContent = `Paused: ${w.name} ${w.pause!.label} at ${formatTimeAt(tick * this.#tickSec, this.#tickSec)}`;
         this.#ask();
         return true;
     }
@@ -413,7 +413,7 @@ export class Monitor {
     }
 
     #drawAll() {
-        const t = this.#time();
+        const t = this.#time(this.#span() / 10);
         const end = Math.min(this.#tick, this.#start + this.#span());
         this.#range.textContent = `${t(this.#start)} – ${t(this.#start + this.#span())}`;
         this.#drawRuler();
@@ -425,8 +425,9 @@ export class Monitor {
         }
     }
 
-    #time() {
-        return (tick: number) => (tick <= 0 ? '0' : formatTime(tick * this.#tickSec));
+    // Labels for times `res` ticks apart.
+    #time(res: number) {
+        return (tick: number) => formatTimeAt(Math.max(0, tick) * this.#tickSec, res * this.#tickSec);
     }
 
     #drawRuler() {
@@ -434,7 +435,7 @@ export class Monitor {
         c.setTransform(dpr, 0, 0, dpr, 0, 0);
         c.fillStyle = this.#colors.background;
         c.fillRect(0, 0, W, 20);
-        const st = step(this.#ppt, 90), t = this.#time();
+        const st = step(this.#ppt, 90), t = this.#time(st);
         c.font = '10px sans-serif';
         c.textBaseline = 'middle';
         c.fillStyle = this.#colors.foreground;
@@ -533,8 +534,15 @@ export class Monitor {
                         c.globalAlpha = 1;
                     }
                     c.stroke();
-                    const txt = undef ? 'x' : show(w.base, v);
-                    if (c.measureText(txt).width < b - a - 2 * g - 4) {
+                    // as much of the value as fits, like Surfer
+                    let txt = undef ? 'x' : show(w.base, v);
+                    const room = b - a - 2 * g - 4;
+                    if (c.measureText(txt).width > room) {
+                        let n = txt.length;
+                        while (n > 0 && c.measureText(txt.slice(0, n) + '…').width > room) n--;
+                        txt = n > 0 ? txt.slice(0, n) + '…' : '';
+                    }
+                    if (txt) {
                         c.fillStyle = col.foreground;
                         c.fillText(txt, (a + b) / 2, my + 1);
                     }

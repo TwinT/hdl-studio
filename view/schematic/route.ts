@@ -1,7 +1,7 @@
 // Wire geometry: orthogonal routes, around cells when a wire has no saved
 // route, and their rounded SVG paths. No DOM, so tests import it directly.
 
-import type { Point, Side } from './cells';
+import type { Point, Side } from './cells.ts';
 
 export interface Rect { x0: number; y0: number; x1: number; y1: number }
 

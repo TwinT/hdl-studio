@@ -33,3 +33,18 @@ export function formatFreq(hz) {
     const [unit, scale] = [['GHz', 1e9], ['MHz', 1e6], ['kHz', 1e3]].find(([, s]) => hz >= s * (1 - 1e-9)) || ['Hz', 1];
     return `${Number((hz / scale).toPrecision(4))} ${unit}`;
 }
+
+// `sec` in the unit formatTime would pick, with the decimals needed to tell
+// apart times `resolution` seconds apart: 0.192000400 with 200e-9 ->
+// "192.0004 ms" (formatTime's 4 digits would say "192 ms" for all of them).
+export function formatTimeAt(sec, resolution) {
+    if (sec === 0)
+        return '0';
+    let [unit, scale] = units[0];
+    for (const [u, s] of units) {
+        if (Math.abs(sec) >= s * (1 - 1e-9))
+            [unit, scale] = [u, s];
+    }
+    const decimals = Math.max(0, Math.min(9, Math.ceil(-Math.log10(resolution / scale) - 1e-9)));
+    return `${(sec / scale).toFixed(decimals)} ${unit}`;
+}

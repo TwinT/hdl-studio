@@ -4,7 +4,7 @@
 
 import ELK from 'elkjs/lib/elk.bundled.js';
 import type { ElkNode, ElkExtendedEdge } from 'elkjs/lib/elk-api';
-import { GraphData, Point, Shape, layer, textWidth } from './cells';
+import { GraphData, Point, Shape, layer, textWidth } from './cells.ts';
 
 const sides = { left: 'WEST', right: 'EAST', top: 'NORTH', bottom: 'SOUTH' };
 

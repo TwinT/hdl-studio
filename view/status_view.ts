@@ -3,7 +3,7 @@
 // (src/time_units.mjs); the circuit view and the engine only see ticks.
 
 import { parseTime, formatTime, formatFreq } from '../src/time_units.mjs';
-import { read, show, size } from './schematic/values';
+import { read, show, size } from './schematic/values.ts';
 
 declare function acquireVsCodeApi(): { postMessage(msg: any): void };
 declare global {
