@@ -164,6 +164,38 @@ describe('schematic webview on the engine', function () {
         assert.strictEqual(png.base64, true);
     });
 
+    it('records waveforms, and a trigger stops the simulation', async function () {
+        const view = await show('04_counter');
+        await page.evaluate(() => { for (const h of document.querySelectorAll('.wirehit')) h.dispatchEvent(new MouseEvent('dblclick', { bubbles: true })); });
+        const rows = await page.evaluate(() => [...document.querySelectorAll('#monitor .row .name')].map((n) => n.textContent));
+        assert.ok(rows.includes('count') && rows.includes('clk'), rows.join());
+        const rst = view.find((r) => r.label === 'rst').id, count = view.find((r) => r.label === 'count').id;
+        await post({ command: 'iopanel:update', id: rst, value: '1' });
+        await post({ command: 'setspeed', speed: 5000 });
+        await post({ command: 'startsim' });
+        await page.waitForTimeout(100);
+        await post({ command: 'iopanel:update', id: rst, value: '0' });
+        // the count row gets a trigger: stop when it is 5
+        await page.evaluate(() => {
+            const row = [...document.querySelectorAll('#monitor .row')].find((r) => r.querySelector('.name').textContent === 'count');
+            const input = row.querySelector('input');
+            input.value = '5';
+            input.dispatchEvent(new Event('change'));
+        });
+        await until(() => window.__posted.filter((m) => m.command === 'runstate').at(-1)?.running === false);
+        const shown = (await posted('iopanel:update')).filter((m) => m.id === count).at(-1).value;
+        assert.strictEqual(shown, '0101');
+        // something was drawn: the clock's green and salmon
+        const colours = await page.evaluate(() => {
+            const c = document.querySelector('#monitor .row canvas');
+            const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
+            const seen = new Set();
+            for (let i = 0; i < d.length; i += 4) if (d[i + 3]) seen.add(`${d[i]},${d[i + 1]},${d[i + 2]}`);
+            return [...seen];
+        });
+        assert.ok(colours.includes('3,192,60') && colours.includes('252,124,104'), colours.slice(0, 20).join(' '));
+    });
+
     it('runs a Lua script in the engine', async function () {
         await show('04_counter');
         const script = fs.readFileSync(path.join(root, 'test/verilog/04_counter/counter_sim.lua'), 'utf8');

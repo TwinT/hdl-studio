@@ -59,8 +59,7 @@ event-driven simulator, digitaljs's WorkerEngine semantics), `hdlstudio` (the bi
 The circuit view without digitaljs/jointjs: SVG drawn by hand, laid out by
 `elkjs`, simulated by the engine directly (no RemoteEngine adapter). It is
 the default; the setting `hdl-studio.useDigitaljsView` brings back the old
-view (`view/main.mjs`, which still has the waveform monitor and wire editing)
-until the cutover. `src/circuit_view.mjs` picks the bundle when the view opens.
+view (`view/main.mjs`, which still has wire editing) until the cutover. `src/circuit_view.mjs` picks the bundle when the view opens.
 
 - `cells.ts`: each cell's ports, size and drawing. The geometry is
   digitaljs's (sizes, port positions, 25px leads), so a device's `position`
@@ -75,6 +74,14 @@ until the cutover. `src/circuit_view.mjs` picks the bundle when the view opens.
   (`memory.ts`), FSM diagram (`fsm.ts`, the next transition is computed in
   the view), image export (`view/imgutils.mjs`). `view/lua_runner.ts` is
   shared by both views.
+- The waveform monitor (`waves.ts`, phase 6): double-click a wire to watch
+  its driver. The engine records every end-of-tick change of a watched
+  output (`watch`/`unwatch`, `crates/hdlstudio/src/wave.rs`, up to 1M changes
+  per signal); after each update the view asks for the window it shows
+  (`wave {from, to, bins}`, one entry per pixel column, several changes in
+  one column come back as a dense block) and draws it. So a flat-out run
+  never streams its changes through JSON. Triggers are plain engine
+  `monitor`s with `stop`.
 - The circuit stays in digitaljs's JSON (hdlstudio-netlist's serde form);
   layout lives in `devices[id].position` and `connectors[i].vertices` (ELK's
   bend points), in the top level and per subcircuit type. A `showcircuit`

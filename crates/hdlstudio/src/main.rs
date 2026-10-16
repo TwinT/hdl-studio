@@ -1,5 +1,6 @@
 mod lua;
 mod serve;
+mod wave;
 
 use std::io::{Read, Write};
 use std::process::ExitCode;

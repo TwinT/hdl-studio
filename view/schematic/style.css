@@ -5,10 +5,79 @@ html, body {
     overflow: hidden;
 }
 
+body {
+    display: flex;
+    flex-direction: column;
+}
+
 #paper {
-    position: absolute;
-    inset: 0;
+    position: relative;
+    flex: 1;
+    min-height: 0;
     background: white;
+}
+
+/* the waveform monitor, under the schematic */
+#monitor {
+    position: relative;
+    height: 30%;
+    display: flex;
+    flex-direction: column;
+    background: var(--vscode-editor-background, white);
+    color: var(--vscode-foreground, black);
+    font-family: var(--vscode-font-family, sans-serif);
+    font-size: 12px;
+}
+
+#monitor .gutter {
+    height: 5px;
+    cursor: ns-resize;
+    background: var(--vscode-panel-border, #ccc);
+}
+
+#monitor .toolbar {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    padding: 2px 4px;
+}
+
+#monitor .rows {
+    flex: 1;
+    overflow-y: auto;
+}
+
+#monitor .row {
+    display: grid;
+    grid-template-columns: 1fr 64px 64px 22px auto;
+    align-items: center;
+    gap: 2px;
+    padding-left: 4px;
+}
+
+#monitor .row .name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+#monitor .row canvas {
+    background: white;
+    display: block;
+}
+
+#monitor button {
+    background: none;
+    border: none;
+    color: inherit;
+    cursor: pointer;
+    padding: 2px;
+}
+
+#monitor select,
+#monitor input {
+    min-width: 0;
+    font-size: 11px;
 }
 
 svg.schematic {

@@ -13,6 +13,9 @@
 //!   monitor {id, path, port, triggers, stop, once}   unmonitor {id}
 //!   alarm {id, tick, stop}   unalarm {id}
 //!   lua_run {name, script, repl, label}   lua_stop {name, repl, quit}
+//!   watch {id, path, port}   unwatch {id}   (record an output's changes)
+//!   wave {id, watches: [id], from, to, bins}   (acked with their windows,
+//!   see wave.rs, by watch id, and the tick)
 //! Events (`ev`), each with the `session` of the last load:
 //!   update {tick, pending, changes: [[path, port, value]],
 //!           mems: [[path, addr, value]], states: [[path, state]]}
@@ -23,6 +26,7 @@
 //! Values are binary strings, most significant bit first.
 
 use crate::lua::{LuaEngine, LuaEvent, SharedSim};
+use crate::wave::Wave;
 use hdlstudio_logic::LogicVec;
 use hdlstudio_netlist::Circuit;
 use hdlstudio_sim::{Event, Sim};
@@ -35,6 +39,8 @@ use std::sync::mpsc::{self, RecvTimeoutError};
 use std::time::{Duration, Instant};
 
 const SLICE: Duration = Duration::from_millis(10);
+/// Monitor ids of the watches (the client's are below, Lua's above).
+const WATCH: u64 = 1 << 61;
 const UPDATE: Duration = Duration::from_millis(25);
 
 enum Mode {
@@ -59,6 +65,7 @@ struct Server {
     resend: Vec<usize>,
     mems: Vec<Value>,
     states: Vec<Value>,
+    watches: HashMap<u64, Wave>,
     last_update: Instant,
     dirty: bool,
     out: std::io::BufWriter<std::io::Stdout>,
@@ -115,8 +122,17 @@ impl Server {
             self.mode = Mode::Stopped;
         }
         // the scripts' wake-ups: they run now, stopped at this tick
-        let events = self.lua.on_events(events);
+        let mut events = self.lua.on_events(events);
         self.lua_events();
+        events.retain(|e| match e {
+            Event::Monitor { id, tick, value, .. } if *id >= WATCH => {
+                if let Some(w) = self.watches.get_mut(&(id - WATCH)) {
+                    w.push(*tick, value.clone());
+                }
+                false
+            }
+            _ => true,
+        });
         if events.iter().any(|e| matches!(e, Event::Monitor { .. } | Event::Alarm { .. })) {
             self.update();
         }
@@ -227,6 +243,7 @@ impl Server {
                 self.resend.clear();
                 self.mems.clear();
                 self.states.clear();
+                self.watches.clear();
                 ack(self, Value::Null);
             }
             "step" => {
@@ -315,6 +332,36 @@ impl Server {
                     Ok(())
                 })?
             }
+            "watch" => {
+                let (id, path, port) = (u64_("id")?, str_("path")?, str_("port")?);
+                self.with(|s| {
+                    let probe = s.find_probe(path, port).ok_or_else(|| format!("no output {path}.{port}"))?;
+                    // reports the value now, then each change
+                    s.monitor(WATCH + id, s.net_of(probe), None, false, false);
+                    Ok(())
+                })?;
+                self.watches.insert(id, Wave::default());
+                self.events();
+            }
+            "unwatch" => {
+                let id = u64_("id")?;
+                self.watches.remove(&id);
+                self.with(|s| {
+                    s.unmonitor(WATCH + id);
+                    Ok(())
+                })?
+            }
+            "wave" => {
+                let (from, to, bins) = (u64_("from")?, u64_("to")?, u64_("bins")?);
+                let mut waves = serde_json::Map::new();
+                for id in req["watches"].as_array().ok_or("watches missing")?.iter().filter_map(Value::as_u64) {
+                    if let Some(w) = self.watches.get(&id) {
+                        waves.insert(id.to_string(), w.window(from, to.max(from), bins));
+                    }
+                }
+                let tick = self.with(|s| Ok(s.tick()))?;
+                ack(self, json!({"tick": tick, "waves": waves}));
+            }
             "lua_run" => {
                 let (name, script) = (str_("name")?, str_("script")?);
                 let label = req["label"].as_str().unwrap_or(name);
@@ -355,6 +402,7 @@ pub fn serve() -> Result<(), String> {
         resend: vec![],
         mems: vec![],
         states: vec![],
+        watches: HashMap::new(),
         last_update: Instant::now(),
         dirty: false,
         out: std::io::BufWriter::new(std::io::stdout()),

@@ -5,12 +5,13 @@
 import './style.css';
 import * as imgutils from '../imgutils.mjs';
 import { LuaRunner } from '../lua_runner';
-import { CircuitData, Connector, Device, GraphData, isInput, isOutput } from './cells';
+import { CircuitData, Connector, Device, GraphData, isInput, isOutput, shape } from './cells';
 import { Dialog } from './dialog';
 import { fsmView } from './fsm';
 import { layout } from './layout';
 import { MemContents, memoryEditor } from './memory';
 import { Schematic } from './schematic';
+import { Monitor, WatchSpec } from './waves';
 
 declare function acquireVsCodeApi(): { postMessage(msg: any): void };
 const vscode = acquireVsCodeApi();
@@ -69,10 +70,26 @@ class App {
     #reqId = 0;
     #acks = new Map<number, (result: any) => void>();
     #alarms = new Map<number, () => void>();
+    #triggers = new Set<number>(); // the monitor's (they stop the simulation)
     #exportIds = 0;
+    #monitor: Monitor;
 
     constructor() {
         this.#lua = new LuaRunner(vscode, engineChannel, this);
+        this.#monitor = new Monitor(document.body, {
+            send: (req) => this.#send(req),
+            request: (req) => this.#request(req),
+            trigger: (path, port, values) => {
+                const id = ++this.#reqId;
+                this.#triggers.add(id);
+                this.#send({ op: 'monitor', id, path, port, triggers: values, stop: true });
+                return id;
+            },
+            untrigger: (id) => {
+                this.#triggers.delete(id);
+                this.#send({ op: 'unmonitor', id });
+            },
+        });
         engineChannel.listen((ev) => { if (ev.session === this.#session) this.#engineEvent(ev); });
         window.addEventListener('message', (e) => this.#message(e.data));
         for (const t of ['touchstart', 'mousedown', 'click'])
@@ -121,7 +138,7 @@ class App {
     }
     #request(req: any) {
         const id = ++this.#reqId;
-        return new Promise((resolve) => {
+        return new Promise<any>((resolve) => {
             this.#acks.set(id, resolve);
             this.#send({ ...req, id });
         });
@@ -134,6 +151,8 @@ class App {
         this.#fsmStates.clear();
         this.#send({ op: 'load', session: this.#session, circuit: this.circuit, defaultcomb: !!this.#opts.defaultcomb });
         for (const g of this.#views.keys()) this.#send({ op: 'observe', graph: g });
+        this.#triggers.clear();
+        this.#monitor.reloaded();
     }
     #engineEvent(ev: any) {
         switch (ev.ev) {
@@ -153,9 +172,17 @@ class App {
                 if (byGraph.has('')) this.#ioToPanel();
                 for (const x of this.#extras.values()) x.update();
                 vscode.postMessage({ command: 'tick', tick: ev.tick });
+                this.#monitor.tick(ev.tick);
                 if (changedPending) this.updateRunStates();
                 return;
             }
+            case 'monitor':
+                // a waveform trigger fired: the engine stopped
+                if (ev.stop && this.#triggers.has(ev.id) && this.#running) {
+                    this.#running = false;
+                    this.updateRunStates();
+                }
+                return;
             case 'ack':
                 this.#acks.get(ev.id)?.(ev.result);
                 this.#acks.delete(ev.id);
@@ -246,6 +273,10 @@ class App {
         }
         this.#closeAll();
         this.#mems.clear();
+        // the waveforms of a new circuit start afresh, with the same signals
+        // where they still exist
+        const watched = this.#monitor.specs;
+        this.#monitor.clear();
         this.circuit = empty(data) ? undefined : data;
         this.#opts = opts;
         const paper = document.getElementById('paper')!;
@@ -262,6 +293,7 @@ class App {
         const top = this.#schematic(this.circuit, '', paper);
         this.#views.set('', { schematic: top });
         this.#load();
+        for (const w of watched) if (this.#watchSpec(w.path, w.port)?.name === w.name) this.#monitor.add(w);
         await this.#layout(top);
         top.render();
         if (opts.keep && transforms.has('')) top.transform = transforms.get('')!;
@@ -285,6 +317,10 @@ class App {
                 open: (id) => this.#open(prefix, id),
                 marker: (item) => this.#marker(item),
                 moved: () => vscode.postMessage({ command: 'updatecircuit', circuit: this.circuit, type: 'pos', ele_type: 'Device' }),
+                watch: (c) => {
+                    const spec = this.#watchSpec(prefix + c.from.id, c.from.port);
+                    if (spec) this.#monitor.add(spec);
+                },
             },
         });
     }
@@ -376,6 +412,25 @@ class App {
             this.#extras.set(path, { dialog, update, close: () => {}, svg: fsm.svg, exportId: ++this.#exportIds });
             this.#subcircuitList();
         }
+    }
+
+    // The waveform of the output at `path`.`port`, named like digitaljs did:
+    // the subcircuit labels, then the net's name (or the cell label and port).
+    #watchSpec(path: string, port: string): WatchSpec | undefined {
+        const prefix = graphOf(path), id = path.slice(prefix.length);
+        const graph = prefix === '' ? this.circuit : this.#graphAt(prefix);
+        const d = graph?.devices[id];
+        const p = d && shape(d, prefix === '', this.circuit!.subcircuits!).ports.find((q) => q.id === port && q.dir === 'out');
+        if (!graph || !p) return;
+        const names: string[] = [];
+        let g: GraphData = this.circuit!;
+        for (const sub of prefix.split('/').slice(0, -1)) {
+            names.push(g.devices[sub].label ?? sub);
+            g = this.circuit!.subcircuits![g.devices[sub].celltype!];
+        }
+        const net = graph.connectors.find((c) => c.from.id === id && c.from.port === port)?.name;
+        names.push(...(net ? [net] : [graph.devices[id].label ?? id, port]));
+        return { path, port, name: names.join('.'), bits: p.bits };
     }
 
     #mem(path: string) {

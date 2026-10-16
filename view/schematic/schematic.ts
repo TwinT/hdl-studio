@@ -12,6 +12,7 @@ export interface SchematicHooks {
     open(id: string): void;
     marker(item: Device | Connector | null): void;
     moved(): void;
+    watch(c: Connector): void;
 }
 
 interface Wire {
@@ -133,6 +134,7 @@ export class Schematic {
             w.hit.addEventListener('pointerenter', (e) => { this.#hooks.marker(c); this.#hoverWire(w, e); });
             w.hit.addEventListener('pointermove', (e) => this.#hoverWire(w, e));
             w.hit.addEventListener('pointerleave', () => { this.#hooks.marker(null); this.#hover = undefined; tooltip.hide(); });
+            w.hit.addEventListener('dblclick', (e) => { e.stopPropagation(); this.#hooks.watch(c); });
             this.#wires.push(w);
             const r = readers(src);
             r.wires.push(w);
@@ -216,11 +218,11 @@ export class Schematic {
     }
 
     #hoverWire(w: Wire, e?: PointerEvent) {
-        if (w.bits === 1) return;
         if (e) this.#hover = { wire: w, x: e.clientX + 5, y: e.clientY + 5 };
         const v = this.#values.get(w.src) ?? xes(w.bits);
-        tooltip.show(this.#hover!.x, this.#hover!.y,
-            ['hex', 'dec', 'oct', 'bin'].map((b) => `${b[0].toUpperCase() + b.slice(1)}: ${show(b, v)}`).join('<br>'));
+        const lines = w.bits === 1 ? [`Value: ${v}`]
+            : ['hex', 'dec', 'oct', 'bin'].map((b) => `${b[0].toUpperCase() + b.slice(1)}: ${show(b, v)}`);
+        tooltip.show(this.#hover!.x, this.#hover!.y, [...lines, '<i>Double-click: add to the waveform</i>'].join('<br>'));
     }
 
     // Moving a cell drops the routes of its wires (they go straight then).
