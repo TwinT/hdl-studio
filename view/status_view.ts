@@ -296,6 +296,9 @@ class Status {
             }
             case 'timescale':
                 return this.#setTimescale(m.value);
+            case 'speed': // the project's, on switching circuits
+                $<HTMLInputElement>('speed').value = String(speedToPos(m.speed));
+                return this.#showSpeed();
             case 'runstate': {
                 this.#state = m.state;
                 this.#running = m.state.running;

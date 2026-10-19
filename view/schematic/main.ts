@@ -5,7 +5,7 @@ import './style.css';
 import * as imgutils from '../imgutils.mjs';
 import { LuaRunner } from '../lua_runner.ts';
 import { CircuitData, Connector, Device, GraphData, isInput, isOutput, shape } from './cells.ts';
-import { Dialog } from './dialog.ts';
+import { Dialog, popupMenu } from './dialog.ts';
 import { fsmView } from './fsm.ts';
 import { layout } from './layout.ts';
 import { MemContents, memoryEditor } from './memory.ts';
@@ -31,9 +31,10 @@ const engineChannel = (() => {
 const empty = (c?: CircuitData) =>
     !c || (!Object.keys(c.devices ?? {}).length && !(c.connectors ?? []).length && !Object.keys(c.subcircuits ?? {}).length);
 
-// The circuit without its layout, to tell a moved cell from a new circuit.
+// The circuit without its layout and the parameters edited while it runs (a
+// clock's period), to tell an edit from a new circuit.
 const netlist = (c: CircuitData) =>
-    JSON.stringify(c, (k, v) => (k === 'position' || k === 'vertices' || k === 'numbase' ? undefined : v));
+    JSON.stringify(c, (k, v) => (k === 'position' || k === 'vertices' || k === 'numbase' || k === 'propagation' ? undefined : v));
 
 const graphOf = (path: string) => path.slice(0, path.lastIndexOf('/') + 1);
 
@@ -90,6 +91,7 @@ class App {
                 this.#triggers.delete(id);
                 this.#send({ op: 'unmonitor', id });
             },
+            changed: () => this.#wavesChanged(),
         });
         engineChannel.listen((ev) => { if (ev.session === this.#session) this.#engineEvent(ev); });
         window.addEventListener('message', (e) => this.#message(e.data));
@@ -148,7 +150,12 @@ class App {
             this.#send({ ...req, id });
         });
     }
+    // Answers to requests come in the session they were asked in, so after a
+    // load the ones still pending never arrive (their events are dropped):
+    // they end now, with no result.
     #load() {
+        for (const resolve of this.#acks.values()) resolve(undefined);
+        this.#acks.clear();
         this.#session = Math.floor(Math.random() * 2 ** 31);
         this.#running = false;
         this.#tick = 0;
@@ -260,6 +267,7 @@ class App {
         vscode.postMessage({ command: 'tick', tick: 0 });
     }
     updateRunStates() {
+        this.#monitor.setRunning(this.running);
         vscode.postMessage({
             command: 'runstate', hascircuit: !!this.circuit, running: this.running,
             pendingEvents: this.#pending, luaActive: this.#lua.active,
@@ -273,17 +281,21 @@ class App {
         const old = this.circuit;
         const transforms = new Map([...this.#views].map(([g, v]) => [g, v.schematic.transform]));
         if (opts.keep && old && data && !empty(data) && netlist(old) === netlist(data)) {
-            // only the layout changed (undo/redo of a move): redraw, the
-            // simulation goes on
+            // only the layout or a parameter changed (undo/redo of an edit):
+            // redraw, the simulation goes on with the parameters
             this.circuit = data;
+            for (const [id, d] of Object.entries(data.devices))
+                if (d.type === 'Clock' && d.propagation !== old.devices[id]?.propagation)
+                    this.#send({ op: 'set_param', path: id, name: 'propagation', value: d.propagation ?? 100 });
             for (const [g, v] of this.#views) this.#rebuild(g, v);
+            this.#ioView();
             return;
         }
         this.#closeAll();
         this.#mems.clear();
         // the waveforms of a new circuit start afresh, with the same signals
-        // where they still exist
-        const watched = this.#monitor.specs;
+        // where they still exist; on opening a project, the ones it saved
+        const watched = old ? this.#monitor.specs : (opts.view?.waves ?? []);
         this.#monitor.clear();
         this.circuit = empty(data) ? undefined : data;
         this.#opts = opts;
@@ -302,9 +314,10 @@ class App {
         this.#views.set('', { schematic: top });
         this.#load();
         for (const w of watched) if (this.#watchSpec(w.path, w.port)?.name === w.name) this.#monitor.add(w);
-        await this.#layout(top);
+        if (await this.#layout(top)) this.#autolayout();
         top.render();
         if (opts.keep && transforms.has('')) top.transform = transforms.get('')!;
+        else if (!old && opts.view?.zoom) top.transform = opts.view.zoom;
         else top.home();
         this.#ioView();
         if (run) this.startSim();
@@ -313,7 +326,7 @@ class App {
 
     #schematic(graph: GraphData, prefix: string, container: HTMLElement) {
         const subcircuits = this.circuit!.subcircuits!;
-        return new Schematic(container, graph, {
+        const s = new Schematic(container, graph, {
             top: prefix === '', subcircuits,
             hooks: {
                 setInput: (id, v) => this.#setInput(prefix + id, v),
@@ -324,25 +337,84 @@ class App {
                 },
                 open: (id) => this.#open(prefix, id),
                 marker: (item) => this.#marker(item),
-                moved: () => vscode.postMessage({ command: 'updatecircuit', circuit: this.circuit, type: 'pos', ele_type: 'Device' }),
+                edited: (type) => this.#edited(type),
                 watch: (c) => {
                     const spec = this.#watchSpec(prefix + c.from.id, c.from.port);
-                    if (spec) this.#monitor.add(spec);
+                    if (spec) {
+                        this.#monitor.add(spec);
+                        this.#wavesChanged();
+                    }
                 },
+                panned: (t) => { if (prefix === '') this.#panned(t); },
             },
         });
+        s.svg.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+            popupMenu(e.clientX, e.clientY, ({ item }) => item('Reset layout', false, () => this.#resetLayout(prefix)));
+        });
+        return s;
     }
 
-    // Lays out a graph that has no layout yet, and saves the layout with the
-    // document as part of the last edit.
+    // Back to the automatic layout, as after the first synthesis: an edit
+    // (Undo brings the hand-placed one back). A subcircuit's layout is its
+    // type's, so every window showing that type changes too.
+    async #resetLayout(g: string) {
+        const v = this.#views.get(g);
+        if (!v) return;
+        for (const d of Object.values(v.schematic.graph.devices)) delete d.position;
+        for (const c of v.schematic.graph.connectors) delete c.vertices;
+        await this.#layout(v.schematic);
+        for (const [g2, v2] of this.#views) this.#rebuild(g2, v2);
+        const fit = v.dialog && { w: v.dialog.body.clientWidth, h: v.dialog.body.clientHeight };
+        this.#views.get(g)!.schematic.home(fit);
+        this.#edited('pos');
+    }
+
+    // Saved with the project (the document's `view`): the waveforms the user
+    // changed mark it modified, the zoom goes along with the next save.
+    #wavesChanged() {
+        vscode.postMessage({ command: 'viewstate', state: { waves: this.#monitor.specs }, dirty: true });
+    }
+    #panTimer?: ReturnType<typeof setTimeout>;
+    #panned(zoom: { x: number, y: number, k: number }) {
+        clearTimeout(this.#panTimer);
+        this.#panTimer = setTimeout(() => vscode.postMessage({ command: 'viewstate', state: { zoom }, dirty: false }), 500);
+    }
+
+    // The circuit changed in the view: an edit of the document (saved, undoable).
+    #edited(type: 'pos' | 'param') {
+        vscode.postMessage({ command: 'updatecircuit', circuit: this.circuit, type, ele_type: 'Device' });
+    }
+
+    // Lays out a graph that has no layout yet; true if it did.
     async #layout(s: Schematic) {
-        if (!s.needsLayout) return;
+        if (!s.needsLayout) return false;
         const res = await layout(s.graph, s.shapes);
-        for (const [id, p] of Object.entries(res.positions)) s.graph.devices[id].position = p;
-        s.graph.connectors.forEach((c: Connector, i: number) => {
-            if (res.vertices[i]?.length) c.vertices = res.vertices[i];
-            else delete c.vertices;
-        });
+        const kept = Object.entries(s.graph.devices).filter(([, d]) => d.position);
+        if (!kept.length) {
+            for (const [id, p] of Object.entries(res.positions)) s.graph.devices[id].position = p;
+            s.graph.connectors.forEach((c: Connector, i: number) => {
+                if (res.vertices[i]?.length) c.vertices = res.vertices[i];
+                else delete c.vertices;
+            });
+        } else {
+            // a new synthesis kept the cells placed before (src/keep_layout.mjs): the
+            // new ones go below them, as ELK arranged them; their wires route around cells
+            // ponytail: below, not woven in; the user moves them where they belong
+            const fresh = Object.keys(s.graph.devices).filter((id) => !s.graph.devices[id].position);
+            const x0 = Math.min(...kept.map(([, d]) => d.position!.x));
+            const y1 = Math.max(...kept.map(([id, d]) => d.position!.y + s.shapes.get(id)!.h));
+            const fx = Math.min(...fresh.map((id) => res.positions[id].x));
+            const fy = Math.min(...fresh.map((id) => res.positions[id].y));
+            for (const id of fresh)
+                s.graph.devices[id].position = { x: res.positions[id].x - fx + x0, y: res.positions[id].y - fy + y1 + 60 };
+        }
+        return true;
+    }
+
+    // A layout made on showing a graph is saved with the document as part of
+    // the last edit.
+    #autolayout() {
         vscode.postMessage({ command: 'autolayout', circuit: this.circuit });
     }
 
@@ -386,7 +458,7 @@ class App {
             const view: View = { schematic: s, dialog, exportId: ++this.#exportIds };
             this.#views.set(g, view);
             this.#send({ op: 'observe', graph: g });
-            await this.#layout(s);
+            if (await this.#layout(s)) this.#autolayout();
             s.render();
             const b = s.bbox();
             dialog.fit(b.width + 60, b.height + 60);
@@ -527,6 +599,7 @@ class App {
             this.#io.set(id, String(value));
             this.#send({ op: 'set_param', path: id, name: 'propagation', value });
             this.#views.get('')?.schematic.render();
+            this.#edited('param');
         } else if (isInput(d)) {
             this.#setInput(id, value);
         }

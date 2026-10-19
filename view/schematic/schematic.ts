@@ -11,8 +11,10 @@ export interface SchematicHooks {
     setParam(id: string, name: string, value: any): void;
     open(id: string): void;
     marker(item: Device | Connector | null): void;
-    moved(): void;
+    // the graph changed (a cell moved, a parameter or number format): an edit of the document
+    edited(type: 'pos' | 'param'): void;
     watch(c: Connector): void;
+    panned(t: { x: number, y: number, k: number }): void; // the view moved or zoomed
 }
 
 interface Wire {
@@ -126,9 +128,9 @@ export class Schematic {
             const s = this.#shapes.get(id)!;
             const view = draw(d, s, this.#top, {
                 setInput: (v) => this.#hooks.setInput(id, v),
-                setParam: (name, value) => { d[name] = value; this.#hooks.setParam(id, name, value); },
+                setParam: (name, value) => { d[name] = value; this.#hooks.setParam(id, name, value); this.#hooks.edited('param'); },
                 numbase: () => d.numbase ?? 'hex',
-                setNumbase: (b) => { d.numbase = b; this.#update(id); },
+                setNumbase: (b) => { d.numbase = b; this.#update(id); this.#hooks.edited('param'); },
                 open: () => this.#hooks.open(id),
             });
             view.g.setAttribute('transform', `translate(${d.position!.x},${d.position!.y})`);
@@ -302,7 +304,7 @@ export class Schematic {
                 window.removeEventListener('pointercancel', up);
                 if (!moved) return;
                 for (const w of wires) this.#routeWire(w);
-                this.#hooks.moved();
+                this.#hooks.edited('pos');
             };
             window.addEventListener('pointermove', move);
             window.addEventListener('pointerup', up);
@@ -316,6 +318,7 @@ export class Schematic {
     set transform(t: { x: number, y: number, k: number }) {
         this.#t = { ...t };
         this.#viewport.setAttribute('transform', `translate(${t.x},${t.y}) scale(${t.k})`);
+        this.#hooks.panned(this.transform);
     }
     // The drawing's extent, in its own coordinates.
     bbox() {
@@ -363,7 +366,9 @@ export class Schematic {
         let pinch: { d: number, k: number } | undefined;
         let dragging = false;
         svg.addEventListener('pointerdown', (e) => {
-            if ((e.target as Element).closest('.cell, foreignObject, .wiretool')) return;
+            // only the primary button: a right click opens the menu, which
+            // takes the pointerup, and the pan would never end
+            if (e.button !== 0 || (e.target as Element).closest('.cell, foreignObject, .wiretool')) return;
             pointers.set(e.pointerId, local(e));
             dragging = false;
             if (pointers.size === 2) {

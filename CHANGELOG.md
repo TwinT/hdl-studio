@@ -7,7 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- A project (`.hdls`) saves the waveforms in the monitor (with their number
+  format and pause condition), the zoom of the circuit, and the simulation
+  speed; opening it brings them back.
+- "Reset layout" in the schematic's right-click menu (also in a subcircuit's
+  window): back to the automatic layout; Undo brings yours back.
+- The waveform monitor shows PAUSED while it doesn't follow the simulation
+  (after a click on a waveform, a drag or a trigger), and RUNNING while it
+  follows a running one; a click on it switches between the two.
+
+### Changed
+- Synthesizing again keeps the cells where you placed them; cells that are new
+  in the design go below the rest.
+- A clock's period and a display's number format are edits of the project:
+  they are saved, and Undo reverts them (without restarting the simulation).
+- The simulation speed belongs to each project; the last one set is the
+  default for a new project.
+
 ### Fixed
+- Resetting the simulation while the waveform monitor was fetching data (a
+  fast run, "show everything recorded") froze the monitor for good. After a
+  reset it now follows the new run from tick 0, at the starting zoom.
+- A right click on the schematic no longer leaves it panning with the mouse.
 - After a "combinational loop did not settle" error, changing an input no
   longer stops the engine (the circuit view lost its simulation).
 - A Lua script that runs for 5 s without `sim.sleep` or `sim.wait` (say, a

@@ -9,6 +9,7 @@ import { run_yosys } from './requests.mjs';
 import { convert_yosys_json } from './hdlstudio_bin.mjs';
 import { Sources } from './sources.mjs';
 import { write_txt_file } from './utils.mjs';
+import { keep_layout } from './keep_layout.mjs';
 
 const default_synth_options = {
     opt: false,
@@ -30,6 +31,9 @@ export class Document {
     #synth_options = { ...default_synth_options }
     #circuit = { devices: {}, connectors: [], subcircuits: {} }
     #last_circuit_changed
+    // what the circuit view shows and how it runs, saved as `view`:
+    // { speed, zoom: {x, y, k}, waves: [{path, port, name, bits, base, pause}] }
+    #view_state = {}
 
     #tick = 0
     #iopanelViews = []
@@ -121,6 +125,16 @@ export class Document {
     get circuit() {
         return this.#circuit;
     }
+    get viewState() {
+        return this.#view_state;
+    }
+    // `dirty`: the user changed it (a waveform, the speed), so the document
+    // needs saving; else (the zoom) it is only saved along with the next save.
+    setViewState(patch, dirty) {
+        this.#view_state = { ...this.#view_state, ...patch };
+        if (dirty)
+            this.#documentEdited.fire({ document: this }); // no undo: a content change
+    }
     get iopanelViews() {
         return this.#iopanelViews;
     }
@@ -158,6 +172,8 @@ export class Document {
         if (data.options)
             this.#synth_options = { ...default_synth_options, ...data.options };
         delete data.options;
+        this.#view_state = data.view ?? {};
+        delete data.view;
 
         // Raw yosys netlist JSON (e.g. from `json -o` in an external build),
         // as opposed to an already-saved circuit: convert it here so
@@ -179,6 +195,7 @@ export class Document {
         return {
             sources: this.#sources.toBackup(),
             options: this.#synth_options,
+            view: this.#view_state,
             ...this.#circuit,
             ...this.#extra_data,
         };
@@ -190,6 +207,7 @@ export class Document {
         return {
             sources: sources,
             options: this.#synth_options,
+            view: this.#view_state,
             ...this.#circuit,
             ...this.#extra_data,
         };
@@ -305,7 +323,7 @@ export class Document {
             return;
         // The side panel should receive focus when we do synthesis
         // but it should already have focus so we don't need to do anything.
-        this.#circuitEdit(res.output, 'Synthesis', true);
+        this.#circuitEdit(keep_layout(this.#circuit, res.output), 'Synthesis', true);
         this.tick = 0;
         this.#circuitUpdated.fire({ run: true, keep: false }); // force a run
         return true;
@@ -420,6 +438,9 @@ export class Document {
                 return;
             case 'tick':
                 this.tick = message.tick;
+                return;
+            case 'viewstate':
+                this.setViewState(message.state, message.dirty);
                 return;
             case 'runstate':
                 this.#runStates = { hascircuit: message.hascircuit,

@@ -6,10 +6,12 @@
 
 import { formatTimeAt } from '../../src/time_units.mjs';
 import { read, show } from './values.ts';
+import { popupMenu } from './dialog.ts';
 
 export interface WatchSpec {
     path: string; port: string; // the output driving the wire
     name: string; bits: number;
+    base?: string; pause?: Pause; // the row's number format and pause condition
 }
 
 // Colours, from the `hdl-studio.waveform.colors` setting.
@@ -25,7 +27,7 @@ export const defaultColors: WaveColors = {
 
 // When a watched signal pauses the simulation: the engine's trigger values
 // (null: any change).
-interface Pause { label: string; values: string[] | null }
+export interface Pause { label: string; values: string[] | null }
 
 interface Watch extends WatchSpec {
     id: number;
@@ -45,9 +47,12 @@ export interface MonitorHooks {
     // a trigger pauses the simulation; returns its id
     trigger(path: string, port: string, values: string[] | null): number;
     untrigger(id: number): void;
+    // the user changed a row (format, pause, removed it)
+    changed(): void;
 }
 
 const ROW = 24;
+const PPT = 5; // the zoom a run starts with, in pixels per tick
 
 // Ticks between labelled ruler lines: 1, 2, 5, 10, 20... at least `px` apart.
 function step(ppt: number, px: number) {
@@ -68,10 +73,12 @@ export class Monitor {
     #range: HTMLSpanElement;
     #status: HTMLSpanElement;
     #followBtn: HTMLButtonElement;
+    #badge: HTMLButtonElement; // PAUSED or RUNNING
+    #running = false; // the simulation
     #watches = new Map<number, Watch>();
     #ids = 0;
     #start = 0;
-    #ppt = 5; // pixels per tick
+    #ppt = PPT; // pixels per tick
     #follow = true; // the view's right edge is the present
     #tick = 0;
     #tickSec = 1e-9;
@@ -80,7 +87,6 @@ export class Monitor {
     #colors = defaultColors;
     #asking = false;
     #again = false;
-    #menu?: HTMLDivElement;
 
     constructor(parent: HTMLElement, hooks: MonitorHooks) {
         this.#hooks = hooks;
@@ -91,6 +97,7 @@ export class Monitor {
             <button name="out" class="codicon codicon-zoom-out" title="Zoom out (Ctrl+wheel)"></button>
             <button name="fit" class="codicon codicon-screen-full" title="Show everything recorded"></button>
             <button name="follow" class="codicon codicon-debug-continue" title=""></button>
+            <button name="badge" class="badge"></button>
             <span class="range"></span><span class="status"></span></div>
             <div class="grid"><div class="head">Signal</div><div class="head">Value</div><canvas class="ruler"></canvas></div>`;
         parent.appendChild(this.root);
@@ -104,6 +111,8 @@ export class Monitor {
         $('[name=out]').addEventListener('click', () => this.#zoom(0.5));
         $('[name=fit]').addEventListener('click', () => this.#fit());
         this.#followBtn.addEventListener('click', () => this.#setFollow(!this.#follow));
+        this.#badge = $('[name=badge]');
+        this.#badge.addEventListener('click', () => this.#setFollow(!this.#follow));
         const gutter = $<HTMLElement>('.gutter');
         gutter.addEventListener('pointerdown', (e) => {
             gutter.setPointerCapture(e.pointerId);
@@ -119,7 +128,7 @@ export class Monitor {
     }
 
     get specs(): WatchSpec[] {
-        return [...this.#watches.values()].map(({ path, port, name, bits }) => ({ path, port, name, bits }));
+        return [...this.#watches.values()].map(({ path, port, name, bits, base, pause }) => ({ path, port, name, bits, base, pause }));
     }
 
     setColors(c: Partial<WaveColors> | undefined) {
@@ -144,12 +153,13 @@ export class Monitor {
         value_.className = 'value';
         const canvas = document.createElement('canvas');
         this.#grid.append(name_, value_, canvas);
-        const w: Watch = { ...spec, id, base: 'hex', name_, value_, canvas };
+        const w: Watch = { ...spec, id, base: spec.base ?? 'hex', pause: undefined, name_, value_, canvas };
         this.#watches.set(id, w);
         this.#label(w);
         for (const e of [name_, value_, canvas])
             e.addEventListener('contextmenu', (ev) => { ev.preventDefault(); this.#openMenu(w, (ev as MouseEvent).clientX, (ev as MouseEvent).clientY); });
         this.#hooks.send({ op: 'watch', id, path: spec.path, port: spec.port });
+        if (spec.pause) this.#setPause(w, spec.pause);
         this.#show();
         this.#restripe();
         this.#resize();
@@ -172,18 +182,19 @@ export class Monitor {
         for (const id of [...this.#watches.keys()]) this.remove(id);
     }
 
-    // After the engine loaded the circuit again (a reset): watch again, from tick 0.
+    // After the engine loaded the circuit again (a reset): watch again, from
+    // tick 0, following the new run at the starting zoom (a "show everything"
+    // would leave it a sliver).
     reloaded() {
         this.#tick = 0;
         this.#start = 0;
-        this.#marker = undefined;
-        this.#status.textContent = '';
+        this.#ppt = PPT;
         for (const w of this.#watches.values()) {
             w.data = undefined;
             this.#hooks.send({ op: 'watch', id: w.id, path: w.path, port: w.port });
             if (w.pause) w.triggerId = this.#hooks.trigger(w.path, w.port, w.pause.values);
         }
-        this.#ask();
+        this.#setFollow(true); // clears the trigger's marker, asks for the window
     }
 
     // The engine's tick, after an update.
@@ -259,9 +270,26 @@ export class Monitor {
         this.#start = first;
         this.#ask();
     }
+    // The simulation started or stopped.
+    setRunning(on: boolean) {
+        this.#running = on;
+        this.#showBadge();
+    }
+    // PAUSED: the waveforms don't follow the simulation (which may still
+    // run); RUNNING: they follow it while it runs; nothing while it's stopped.
+    #showBadge() {
+        const b = this.#badge, paused = !this.#follow;
+        b.hidden = !paused && !this.#running;
+        b.className = `badge ${paused ? 'paused' : 'running'}`;
+        b.textContent = paused ? 'PAUSED' : 'RUNNING';
+        b.title = paused ? 'The waveforms stopped following the simulation (it may still be running): click here or on a waveform to follow it again'
+            : 'The waveforms follow the running simulation: click here or on a waveform to stop and look back';
+    }
+
     #setFollow(on: boolean) {
         this.#follow = on;
         this.#followBtn.classList.toggle('on', on);
+        this.#showBadge();
         this.#followBtn.title = on ? 'Following the simulation: click the waveform (or here) to stop'
             : 'Paused view: click the waveform (or here) to follow the simulation again';
         if (on) {
@@ -318,54 +346,34 @@ export class Monitor {
     }
 
     #openMenu(w: Watch, x: number, y: number) {
-        this.#menu?.remove();
-        const menu = this.#menu = document.createElement('div');
-        menu.className = 'wavemenu';
-        const item = (label: string, on: boolean, fn: () => void) => {
-            const b = document.createElement('button');
-            b.textContent = (on ? '✓ ' : ' ') + label;
-            b.addEventListener('click', () => { fn(); close(); });
-            menu.append(b);
-        };
-        const head = (t: string) => menu.append(Object.assign(document.createElement('div'), { className: 'head', textContent: t }));
-        if (w.bits > 1) {
-            head('Format');
-            for (const [b, l] of [['hex', 'hexadecimal'], ['dec', 'decimal'], ['dec2c', 'signed decimal'], ['oct', 'octal'], ['bin', 'binary']])
-                item(l, w.base === b, () => { w.base = b; this.#drawAll(); });
-        }
-        head('Pause the simulation when it…');
-        const pauses: Pause[] = w.bits === 1 ? bitPauses : [{ label: 'changes', values: null }];
-        for (const p of pauses) item(p.label, w.pause?.label === p.label, () => this.#setPause(w, p));
-        if (w.bits > 1) {
-            const input = document.createElement('input');
-            input.placeholder = `equals… (${w.base}), Enter`;
-            if (w.pause?.values) input.value = show(w.base, w.pause.values[0]);
-            input.addEventListener('keydown', (e) => {
-                if (e.key !== 'Enter') return;
-                const v = read(w.base, input.value, w.bits);
-                input.classList.toggle('invalid', v === undefined);
-                if (v === undefined) return;
-                this.#setPause(w, { label: `equals ${show(w.base, v)}`, values: [v] });
-                close();
-            });
-            menu.append(input);
-        }
-        item('never', !w.pause, () => this.#setPause(w, undefined));
-        menu.append(document.createElement('hr'));
-        item('Remove', false, () => this.remove(w.id));
-        document.body.append(menu);
-        const r = menu.getBoundingClientRect();
-        menu.style.left = `${Math.min(x, innerWidth - r.width - 4)}px`;
-        menu.style.top = `${Math.max(0, Math.min(y, innerHeight - r.height - 4))}px`;
-        const outside = (e: Event) => { if (!menu.contains(e.target as Node)) close(); };
-        const key = (e: KeyboardEvent) => { if (e.key === 'Escape') close(); };
-        const close = () => {
-            menu.remove();
-            document.removeEventListener('pointerdown', outside, true);
-            document.removeEventListener('keydown', key, true);
-        };
-        document.addEventListener('pointerdown', outside, true);
-        document.addEventListener('keydown', key, true);
+        popupMenu(x, y, ({ menu, item, head, close }) => {
+            if (w.bits > 1) {
+                head('Format');
+                for (const [b, l] of [['hex', 'hexadecimal'], ['dec', 'decimal'], ['dec2c', 'signed decimal'], ['oct', 'octal'], ['bin', 'binary']])
+                    item(l, w.base === b, () => { w.base = b; this.#drawAll(); this.#hooks.changed(); });
+            }
+            head('Pause the simulation when it…');
+            const pauses: Pause[] = w.bits === 1 ? bitPauses : [{ label: 'changes', values: null }];
+            for (const p of pauses) item(p.label, w.pause?.label === p.label, () => { this.#setPause(w, p); this.#hooks.changed(); });
+            if (w.bits > 1) {
+                const input = document.createElement('input');
+                input.placeholder = `equals… (${w.base}), Enter`;
+                if (w.pause?.values) input.value = show(w.base, w.pause.values[0]);
+                input.addEventListener('keydown', (e) => {
+                    if (e.key !== 'Enter') return;
+                    const v = read(w.base, input.value, w.bits);
+                    input.classList.toggle('invalid', v === undefined);
+                    if (v === undefined) return;
+                    this.#setPause(w, { label: `equals ${show(w.base, v)}`, values: [v] });
+                    this.#hooks.changed();
+                    close();
+                });
+                menu.append(input);
+            }
+            item('never', !w.pause, () => { this.#setPause(w, undefined); this.#hooks.changed(); });
+            menu.append(document.createElement('hr'));
+            item('Remove', false, () => { this.remove(w.id); this.#hooks.changed(); });
+        });
     }
 
     #setPause(w: Watch, p: Pause | undefined) {
@@ -387,12 +395,14 @@ export class Monitor {
         const from = Math.floor(this.#start), to = Math.ceil(this.#start + this.#span());
         const res = await this.#hooks.request({ op: 'wave', watches: [...this.#watches.keys()], from, to, bins: this.#width() });
         this.#asking = false;
-        this.#tick = Math.max(this.#tick, res.tick);
-        for (const [id, win] of Object.entries(res.waves as Record<string, Win>)) {
-            const w = this.#watches.get(Number(id));
-            if (w) w.data = win;
+        if (res) { // none: the engine reloaded meanwhile (a reset)
+            this.#tick = Math.max(this.#tick, res.tick);
+            for (const [id, win] of Object.entries(res.waves as Record<string, Win>)) {
+                const w = this.#watches.get(Number(id));
+                if (w) w.data = win;
+            }
+            this.#drawAll();
         }
-        this.#drawAll();
         if (this.#again) {
             this.#again = false;
             this.#ask();

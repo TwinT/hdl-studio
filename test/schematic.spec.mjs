@@ -16,7 +16,8 @@ import { level, read, show } from '../view/schematic/values.ts';
 import { route } from '../view/schematic/route.ts';
 import { ledLayout } from '../view/schematic/cells.ts';
 import { hdlstudio_bin } from '../src/hdlstudio_bin.mjs';
-import { formatTimeAt } from '../src/time_units.mjs';
+import { keep_layout } from '../src/keep_layout.mjs';
+import { formatTimeAt, parseTime } from '../src/time_units.mjs';
 import { designs, synthesize, slangAvailable, convert } from './designs.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -81,6 +82,28 @@ describe('schematic wire routes', function () {
         const pts = route({ x: 0, y: 100 }, 'right', { x: 300, y: 0 }, 'top', undefined, [{ x0: 250, y0: 10, x1: 350, y1: 100 }]);
         assert.ok(orthogonal(pts), JSON.stringify(pts));
         assert.ok(pts.at(-2).y < 0 && pts.at(-2).x === 300, JSON.stringify(pts));
+    });
+});
+
+describe('a new synthesis keeps the layout', function () {
+    const graph = (notType) => ({
+        devices: { a: { type: 'Button', net: 'a' }, g: { type: notType } },
+        connectors: [{ from: { id: 'a', port: 'out' }, to: { id: 'g', port: 'in' } }],
+        subcircuits: { s: { devices: { i: { type: 'Input', net: 'x' } }, connectors: [] } },
+    });
+    const old = graph('Not');
+    old.devices.a.position = { x: 1, y: 2 };
+    old.devices.g.position = { x: 5, y: 6 };
+    old.connectors[0].vertices = [{ x: 3, y: 3 }];
+    old.subcircuits.s.devices.i.position = { x: 9, y: 9 };
+    it('the same circuit gets every position and bend back', function () {
+        const c = keep_layout(old, graph('Not'));
+        assert.deepStrictEqual([c.devices.a.position, c.devices.g.position, c.connectors[0].vertices, c.subcircuits.s.devices.i.position],
+                               [{ x: 1, y: 2 }, { x: 5, y: 6 }, [{ x: 3, y: 3 }], { x: 9, y: 9 }]);
+    });
+    it('another cell under the same id is new: no position, and no bends', function () {
+        const c = keep_layout(old, graph('Repeater'));
+        assert.deepStrictEqual([c.devices.a.position, c.devices.g.position, c.connectors[0].vertices], [{ x: 1, y: 2 }, undefined, undefined]);
     });
 });
 
@@ -163,6 +186,7 @@ describe('schematic webview on the engine', function () {
         await show('04_counter');
         await post({ command: 'startsim' });
         const id = await page.evaluate(() => [...document.querySelectorAll('.cell')].find((g) => g.querySelector('.numvalue'))?.dataset.id);
+        const auto = (await lastPosted('autolayout')).circuit.devices[id].position; // a copy, from before the move
         const r = await page.evaluate((id) => document.querySelector(`.cell[data-id="${id}"] rect`).getBoundingClientRect().toJSON(), id);
         await page.mouse.move(r.x + 5, r.y + 5);
         await page.mouse.down();
@@ -174,6 +198,19 @@ describe('schematic webview on the engine', function () {
         const tick = (await lastPosted('tick')).tick;
         await post({ command: 'showcircuit', circuit: edit.circuit, opts: { keep: true } });
         await until((t) => window.__posted.some((m) => m.command === 'tick' && m.tick > t), tick);
+        // "Reset layout" (right click on the schematic): back where ELK put it, as an edit
+        assert.notDeepStrictEqual(edit.circuit.devices[id].position, auto);
+        const n = (await posted('updatecircuit')).length;
+        const svg = await page.evaluate(() => document.querySelector('svg.schematic').getBoundingClientRect().toJSON());
+        const zoom = () => page.evaluate(() => document.querySelector('svg.schematic > g').getAttribute('transform'));
+        await page.mouse.click(svg.x + svg.width - 20, svg.y + 20, { button: 'right' });
+        // with the menu open, moving the mouse doesn't pan
+        const before = await zoom();
+        await page.mouse.move(svg.x + svg.width - 120, svg.y + 120, { steps: 5 });
+        assert.strictEqual(await zoom(), before);
+        await page.locator('.wavemenu button', { hasText: 'Reset layout' }).click();
+        await until((n) => window.__posted.filter((m) => m.command === 'updatecircuit').length > n, n);
+        assert.deepStrictEqual((await lastPosted('updatecircuit')).circuit.devices[id].position, auto);
     });
 
     it('exports the drawing as SVG and PNG', async function () {
@@ -231,14 +268,112 @@ describe('schematic webview on the engine', function () {
             return [...seen];
         });
         assert.ok(colours.includes('86,193,38'), colours.slice(0, 20).join(' '));
-        // the trigger stopped following; a click on a waveform follows again, another stops
+        // the trigger stopped following, which the toolbar says; a click on a waveform
+        // follows again, another stops
         const following = () => page.evaluate(() => document.querySelector('#monitor [name=follow]').classList.contains('on'));
-        assert.strictEqual(await following(), false);
+        const badge = () => page.evaluate(() => {
+            const b = document.querySelector('#monitor [name=badge]');
+            return b.hidden ? '' : b.textContent;
+        });
+        assert.deepStrictEqual([await following(), await badge()], [false, 'PAUSED']);
         const wave = await page.evaluate(() => document.querySelector('#monitor .grid canvas:not(.ruler)').getBoundingClientRect().toJSON());
         await page.mouse.click(wave.x + 40, wave.y + 10);
-        assert.strictEqual(await following(), true);
+        assert.deepStrictEqual([await following(), await badge()], [true, '']); // following, the simulation stopped
+        await post({ command: 'startsim' });
+        await until(() => document.querySelector('#monitor [name=badge]').textContent === 'RUNNING'
+                          && !document.querySelector('#monitor [name=badge]').hidden);
+        await post({ command: 'pausesim' });
         await page.mouse.click(wave.x + 40, wave.y + 10);
         assert.strictEqual(await following(), false);
+    });
+
+    it('keeps what the project saves: waveforms, zoom, clock period, a layout', async function () {
+        // as if just opened: no circuit before, so no waveforms carried over
+        await post({ command: 'showcircuit', circuit: { devices: {}, connectors: [] }, opts: {} });
+        await show('04_counter');
+        const circuit = (await lastPosted('autolayout')).circuit;
+        // a waveform, then its format: both mark the project modified
+        const mid = await page.evaluate(() => {
+            const h = document.querySelector('.wirehit');
+            const p = h.getPointAtLength(h.getTotalLength() / 2).matrixTransform(h.getScreenCTM());
+            return { x: p.x, y: p.y };
+        });
+        await page.mouse.dblclick(mid.x, mid.y);
+        assert.strictEqual((await lastPosted('viewstate')).state.waves.length, 1);
+        await page.locator('#monitor .name').first().click({ button: 'right' });
+        await page.locator('.wavemenu button', { hasText: 'never' }).click();
+        const saved = await lastPosted('viewstate');
+        assert.strictEqual(saved.dirty, true);
+        // the clock's period is an edit of the circuit
+        const clk = Object.keys(circuit.devices).find((id) => circuit.devices[id].type === 'Clock');
+        await page.evaluate((id) => {
+            const input = document.querySelector(`.cell[data-id="${id}"] input`);
+            input.value = '7';
+            input.dispatchEvent(new Event('input'));
+        }, clk);
+        const edit = await lastPosted('updatecircuit');
+        assert.deepStrictEqual([edit.type, edit.circuit.devices[clk].propagation], ['param', 7]);
+        // undoing it keeps simulating: set_param, no load
+        await page.evaluate(() => {
+            const send = window.__engineSend;
+            window.__sent = [];
+            window.__engineSend = (l) => { window.__sent.push(JSON.parse(l)); return send(l); };
+        });
+        await post({ command: 'showcircuit', circuit, opts: { keep: true } });
+        await until(() => window.__sent.some((r) => r.op === 'observe'));
+        const sent = await page.evaluate(() => window.__sent.map((r) => r.op));
+        assert.ok(sent.includes('set_param') && !sent.includes('load'), sent.join());
+        // reopening the project: its waveforms and zoom come back
+        await post({ command: 'showcircuit', circuit: { devices: {}, connectors: [] }, opts: {} });
+        await post({ command: 'showcircuit', circuit, opts: { view: { waves: saved.state.waves, zoom: { x: 7, y: 8, k: 2 } } } });
+        await until(() => document.querySelectorAll('#monitor .name').length === 1);
+        assert.strictEqual(await page.evaluate(() => document.querySelector('svg.schematic > g').getAttribute('transform')), 'translate(7,8) scale(2)');
+        // a cell without a position (new in this synthesis) goes below the others, which stay
+        const partial = JSON.parse(JSON.stringify(circuit));
+        delete partial.devices[clk].position;
+        await post({ command: 'showcircuit', circuit: { devices: {}, connectors: [] }, opts: {} });
+        await post({ command: 'showcircuit', circuit: partial, opts: {} });
+        await until(() => window.__posted.filter((m) => m.command === 'autolayout').length >= 2);
+        const placed = (await lastPosted('autolayout')).circuit.devices;
+        const others = Object.keys(placed).filter((id) => id !== clk);
+        for (const id of others) assert.deepStrictEqual(placed[id].position, circuit.devices[id].position);
+        assert.ok(others.every((id) => placed[clk].position.y > placed[id].position.y), JSON.stringify(placed[clk].position));
+    });
+
+    it('the waveforms keep drawing after a reset that crossed a request', async function () {
+        await post({ command: 'showcircuit', circuit: { devices: {}, connectors: [] }, opts: {} });
+        const view = await show('04_counter');
+        const count = view.find((r) => r.label === 'count').id;
+        const clk = view.find((r) => r.dir === 'clock').id;
+        const circuit = (await lastPosted('autolayout')).circuit;
+        await post({ command: 'showcircuit', circuit: { devices: {}, connectors: [] }, opts: {} });
+        const into = (id) => circuit.connectors.find((c) => c.to.id === id);
+        const wave = (id) => ({ path: into(id).from.id, port: into(id).from.port, name: into(id).name, bits: circuit.devices[id].bits ?? 1 });
+        const clkWire = circuit.connectors.find((c) => c.from.id === clk);
+        await post({ command: 'showcircuit', circuit,
+                     opts: { view: { waves: [{ path: clk, port: 'out', name: clkWire.name, bits: 1 }, wave(count)] } } });
+        await until(() => document.querySelectorAll('#monitor .name').length === 2);
+        await post({ command: 'setspeed', speed: null });
+        await post({ command: 'startsim' });
+        await page.waitForTimeout(500);
+        // "show everything recorded", then a reset while running: a window
+        // asked for before it is answered for the replaced session
+        const range = () => page.evaluate(() => document.querySelector('#monitor .range').textContent);
+        await page.evaluate(() => document.querySelector('#monitor [name=fit]').click());
+        await page.waitForTimeout(300);
+        const before = await range();
+        await post({ command: 'resetsim' });
+        await post({ command: 'startsim' });
+        // the monitor goes on: a new window, from tick 0, at the starting zoom
+        await until((before) => document.querySelector('#monitor .range').textContent !== before, before);
+        await page.waitForTimeout(300);
+        const a = await range();
+        await page.waitForTimeout(300);
+        assert.notStrictEqual(await range(), a, 'the monitor stopped after the reset');
+        // the window's span: a few hundred ticks (ns), not the whole run "show everything" fitted
+        const [from, to] = (await range()).split(' – ').map((t) => parseTime(t.replace(' ', '')));
+        assert.ok(to - from < 1e-6, await range());
+        await post({ command: 'pausesim' });
     });
 
     it('runs a Lua script in the engine', async function () {

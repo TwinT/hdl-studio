@@ -61,3 +61,39 @@ export class Dialog {
         this.#onClose();
     }
 }
+
+export interface PopupMenu {
+    menu: HTMLDivElement;
+    item(label: string, on: boolean, fn: () => void): void;
+    head(text: string): void;
+    close(): void;
+}
+
+// A context menu at (x, y), filled by `fill`; a choice, Escape or a click
+// outside closes it.
+export function popupMenu(x: number, y: number, fill: (m: PopupMenu) => void) {
+    document.querySelector('.wavemenu')?.remove();
+    const menu = document.createElement('div');
+    menu.className = 'wavemenu';
+    const outside = (e: Event) => { if (!menu.contains(e.target as Node)) close(); };
+    const key = (e: KeyboardEvent) => { if (e.key === 'Escape') close(); };
+    const close = () => {
+        menu.remove();
+        document.removeEventListener('pointerdown', outside, true);
+        document.removeEventListener('keydown', key, true);
+    };
+    const item = (label: string, on: boolean, fn: () => void) => {
+        const b = document.createElement('button');
+        b.textContent = (on ? '✓ ' : ' ') + label;
+        b.addEventListener('click', () => { fn(); close(); });
+        menu.append(b);
+    };
+    const head = (text: string) => menu.append(Object.assign(document.createElement('div'), { className: 'head', textContent: text }));
+    fill({ menu, item, head, close });
+    document.body.append(menu);
+    const r = menu.getBoundingClientRect();
+    menu.style.left = `${Math.min(x, innerWidth - r.width - 4)}px`;
+    menu.style.top = `${Math.max(0, Math.min(y, innerHeight - r.height - 4))}px`;
+    document.addEventListener('pointerdown', outside, true);
+    document.addEventListener('keydown', key, true);
+}

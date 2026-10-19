@@ -140,7 +140,8 @@ export class CircuitView {
                     defaultcomb: this.#document.synth_options.defaultcomb,
                     timescale: this.#document.synth_options.timescale,
                     waveColors: waveColors(),
-                    speed: this.#studio.simSpeed }
+                    view: this.#document.viewState,
+                    speed: this.#studio.speedOf(this.#document) }
         });
     }
     #getViewContent(studio, webview) {

@@ -46,6 +46,33 @@ body {
     padding: 2px 4px;
 }
 
+/* the waveforms don't follow the simulation (a click on them, a drag, a trigger) */
+#monitor .toolbar .badge {
+    margin-left: 6px;
+    padding: 0 6px;
+    border: none;
+    border-radius: 3px;
+    font: inherit;
+    font-size: 11px;
+    font-weight: bold;
+    letter-spacing: 0.05em;
+    cursor: pointer;
+}
+
+#monitor .toolbar .badge.paused {
+    background: var(--vscode-statusBarItem-warningBackground, #c19c00);
+    color: var(--vscode-statusBarItem-warningForeground, #000);
+}
+
+#monitor .toolbar .badge.running {
+    background: #c586ff;
+    color: #000;
+}
+
+#monitor .toolbar .badge[hidden] {
+    display: none;
+}
+
 #monitor .toolbar .range {
     margin-left: 8px;
     opacity: 0.8;

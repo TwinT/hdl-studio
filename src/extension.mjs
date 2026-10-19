@@ -348,16 +348,23 @@ class HdlStudio {
         if (this.#document)
             this.#document.setTimescale(timescale);
     }
-    // Simulation speed in ticks/s, null = as fast as possible. Global (not per
-    // document) and sent to every circuit view, not just the active one, so
-    // switching documents doesn't pick up a stale speed.
+    // Simulation speed in ticks/s, null = as fast as possible. Saved with each
+    // project; the last one set is the default for projects that have none.
+    speedOf(document) {
+        const view = document?.viewState ?? {};
+        return 'speed' in view ? view.speed : this.#global_state.get('simSpeed', 100);
+    }
     get simSpeed() {
-        return this.#global_state.get('simSpeed', 100);
+        return this.speedOf(this.#document);
     }
     set simSpeed(speed) {
         this.#global_state.update('simSpeed', speed);
+        if (!this.#document)
+            return;
+        this.#document.setViewState({ speed }, true);
         for (const view of this.#openCircuitViews)
-            view.post({ command: 'setspeed', speed });
+            if (view.document === this.#document)
+                view.post({ command: 'setspeed', speed });
     }
     postPanelMessage(msg) {
         if (!this.#circuitView)
@@ -478,6 +485,7 @@ class HdlStudio {
             this.#processMarker({});
             this.#tickUpdated.fire(this.tick);
             this.#iopanelMessage.fire({ command: 'iopanel:view', view: this.iopanelViews });
+            this.#iopanelMessage.fire({ command: 'speed', speed: this.simSpeed });
             this.#runStatesUpdated.fire(this.runStates);
         };
 
