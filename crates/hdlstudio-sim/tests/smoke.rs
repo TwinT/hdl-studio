@@ -32,7 +32,13 @@ fn counter_counts() {
     let (_, circuit) = golden().into_iter().find(|(n, _)| n == "04_counter").unwrap();
     let mut sim = Sim::new(&circuit, false).unwrap();
     let id = |net: &str| {
-        circuit.devices.iter().find(|(_, d)| matches!(&d.cell, Cell::Button(io) | Cell::NumDisplay(io) if io.net == net)).unwrap().0.clone()
+        circuit
+            .devices
+            .iter()
+            .find(|(_, d)| matches!(&d.cell, Cell::Button(io) | Cell::NumDisplay(io) if io.net == net))
+            .unwrap()
+            .0
+            .clone()
     };
     // the count is the input of the `count` display: find its driver's probe
     let display = id("count");

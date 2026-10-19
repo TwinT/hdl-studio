@@ -212,13 +212,49 @@ fn port_name(p: &str, i: usize) -> String {
 }
 
 const UNARY_GATES: &[&str] = &[
-    "$repeater", "$not", "$neg", "$pos", "$reduce_and", "$reduce_nand", "$reduce_or", "$reduce_nor", "$reduce_xor",
-    "$reduce_xnor", "$reduce_bool", "$logic_not",
+    "$repeater",
+    "$not",
+    "$neg",
+    "$pos",
+    "$reduce_and",
+    "$reduce_nand",
+    "$reduce_or",
+    "$reduce_nor",
+    "$reduce_xor",
+    "$reduce_xnor",
+    "$reduce_bool",
+    "$logic_not",
 ];
 const TECHMAP_UNARY_GATES: &[&str] = &["$_BUF_", "$_NOT_"];
 const BINARY_GATES: &[&str] = &[
-    "$and", "$nand", "$or", "$nor", "$xor", "$xnor", "$add", "$sub", "$mul", "$div", "$mod", "$pow", "$lt", "$le", "$eq",
-    "$ne", "$ge", "$gt", "$eqx", "$nex", "$shl", "$shr", "$sshl", "$sshr", "$shift", "$shiftx", "$logic_and", "$logic_or",
+    "$and",
+    "$nand",
+    "$or",
+    "$nor",
+    "$xor",
+    "$xnor",
+    "$add",
+    "$sub",
+    "$mul",
+    "$div",
+    "$mod",
+    "$pow",
+    "$lt",
+    "$le",
+    "$eq",
+    "$ne",
+    "$ge",
+    "$gt",
+    "$eqx",
+    "$nex",
+    "$shl",
+    "$shr",
+    "$sshl",
+    "$sshr",
+    "$shift",
+    "$shiftx",
+    "$logic_and",
+    "$logic_or",
 ];
 const TECHMAP_BINARY_GATES: &[&str] = &["$_AND_", "$_NAND_", "$_OR_", "$_NOR_", "$_XOR_", "$_XNOR_"];
 const DFFS: &[&str] = &[
@@ -413,7 +449,8 @@ impl Conv<'_> {
             if !con.iter().all(Bit::is_const) && self.get_net(con).sources.is_empty() {
                 // "potentially troublesome hack for readability" (the original)
                 let extend = Extend { input: ccon.len() as u32, output: con.len() as u32 };
-                let ext = self.add_device(if signed { Cell::SignExtend { extend } } else { Cell::ZeroExtend { extend } });
+                let ext =
+                    self.add_device(if signed { Cell::SignExtend { extend } } else { Cell::ZeroExtend { extend } });
                 self.add_net_target(&ccon, &ext, "in");
                 self.add_net_source(con, &ext, "out", false);
             }
@@ -456,7 +493,14 @@ impl Conv<'_> {
 
         // Add inputs/outputs
         for (pname, port) in &module.ports {
-            let mut io = Io { net: pname.clone(), order: self.n, bits: port.bits.len() as u32, rows: None, cols: None, momentary: false };
+            let mut io = Io {
+                net: pname.clone(),
+                order: self.n,
+                bits: port.bits.len() as u32,
+                rows: None,
+                cols: None,
+                momentary: false,
+            };
             // A port has no attributes of its own in yosys's JSON, but its
             // backing wire (same name, in netnames) does.
             if let Some(attrs) = module.netnames.get(pname).map(|n| &n.attributes) {
@@ -1291,7 +1335,15 @@ pub fn convert(design: &Design) -> R<Circuit> {
     let mut order = module_order(&design.modules);
     let top = order.pop().ok_or("no modules in the yosys netlist")?;
     let mut circuit = out.shift_remove(&top).unwrap();
-    circuit.subcircuits = Some(order.into_iter().map(|m| { let c = out.shift_remove(&m).unwrap(); (m, c) }).collect());
+    circuit.subcircuits = Some(
+        order
+            .into_iter()
+            .map(|m| {
+                let c = out.shift_remove(&m).unwrap();
+                (m, c)
+            })
+            .collect(),
+    );
     Ok(circuit)
 }
 

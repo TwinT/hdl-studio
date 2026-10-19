@@ -30,11 +30,11 @@ use crate::wave::Wave;
 use hdlstudio_logic::LogicVec;
 use hdlstudio_netlist::Circuit;
 use hdlstudio_sim::{Event, Sim};
-use std::cell::RefCell;
-use std::rc::Rc;
 use serde_json::{Value, json};
+use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 use std::io::{BufRead, Write};
+use std::rc::Rc;
 use std::sync::mpsc::{self, RecvTimeoutError};
 use std::time::{Duration, Instant};
 
@@ -46,7 +46,10 @@ const UPDATE: Duration = Duration::from_millis(25);
 enum Mode {
     Stopped,
     /// `start`: `interval` ms per tick (fractional for >1k ticks/s).
-    Interval { last: Instant, owed: f64 },
+    Interval {
+        last: Instant,
+        owed: f64,
+    },
     Fast,
 }
 
@@ -97,12 +100,20 @@ impl Server {
         let Some(sim) = b.as_mut() else { return };
         let mut probes: Vec<usize> = std::mem::take(&mut self.resend);
         for net in sim.take_changed() {
-            probes.extend(self.probes_by_net.get(&net).into_iter().flatten().filter(|&&p| self.observed.contains(&self.probe_graph[p])));
+            probes.extend(
+                self.probes_by_net
+                    .get(&net)
+                    .into_iter()
+                    .flatten()
+                    .filter(|&&p| self.observed.contains(&self.probe_graph[p])),
+            );
         }
         probes.sort_unstable();
         probes.dedup();
-        let changes: Vec<Value> =
-            probes.iter().map(|&p| json!([sim.probes[p].path, sim.probes[p].port, bin(sim.value(&sim.probes[p]))])).collect();
+        let changes: Vec<Value> = probes
+            .iter()
+            .map(|&p| json!([sim.probes[p].path, sim.probes[p].port, bin(sim.value(&sim.probes[p]))]))
+            .collect();
         let (tick, pending) = (sim.tick(), sim.has_pending_events());
         let ev = json!({
             "ev": "update", "tick": tick, "pending": pending, "changes": changes,
@@ -138,10 +149,12 @@ impl Server {
         }
         for e in events {
             match e {
-                Event::Monitor { id, tick, value, stop, once } => {
-                    self.send(json!({"ev": "monitor", "id": id, "tick": tick, "value": bin(&value), "stop": stop, "once": once}))
+                Event::Monitor { id, tick, value, stop, once } => self.send(
+                    json!({"ev": "monitor", "id": id, "tick": tick, "value": bin(&value), "stop": stop, "once": once}),
+                ),
+                Event::Alarm { id, tick, stop } => {
+                    self.send(json!({"ev": "alarm", "id": id, "tick": tick, "stop": stop}))
                 }
-                Event::Alarm { id, tick, stop } => self.send(json!({"ev": "alarm", "id": id, "tick": tick, "stop": stop})),
                 Event::Memory { path, addr, value } => self.mems.push(json!([path, addr, bin(&value)])),
                 Event::FsmState { path, state } => {
                     if self.observed.contains(&graph_of(&path)) {
@@ -176,7 +189,10 @@ impl Server {
         match &mut self.mode {
             Mode::Stopped => {}
             Mode::Fast => {
-                while start.elapsed() < SLICE && matches!(self.mode, Mode::Fast) && self.with(|s| Ok(s.has_pending_events()))? {
+                while start.elapsed() < SLICE
+                    && matches!(self.mode, Mode::Fast)
+                    && self.with(|s| Ok(s.has_pending_events()))?
+                {
                     self.step(true)?;
                 }
             }
@@ -191,7 +207,9 @@ impl Server {
                 }
                 *owed -= steps;
                 let target = self.with(|s| Ok(s.tick()))? + steps as u64;
-                while matches!(self.mode, Mode::Interval { .. }) && self.with(|s| Ok(s.next_event_tick()))?.is_some_and(|k| k < target) {
+                while matches!(self.mode, Mode::Interval { .. })
+                    && self.with(|s| Ok(s.next_event_tick()))?.is_some_and(|k| k < target)
+                {
                     self.step(true)?;
                     if start.elapsed() >= SLICE {
                         if let Mode::Interval { owed, .. } = &mut self.mode {
@@ -228,7 +246,8 @@ impl Server {
         };
         match str_("op")? {
             "load" => {
-                let circuit: Circuit = serde_json::from_value(req["circuit"].clone()).map_err(|e| format!("bad circuit: {e}"))?;
+                let circuit: Circuit =
+                    serde_json::from_value(req["circuit"].clone()).map_err(|e| format!("bad circuit: {e}"))?;
                 let sim = Sim::new(&circuit, flag("defaultcomb"))?;
                 self.session = req["session"].clone();
                 self.probes_by_net.clear();
@@ -410,7 +429,8 @@ pub fn serve() -> Result<(), String> {
     let mut next_slice = Instant::now();
     loop {
         let running = !matches!(s.mode, Mode::Stopped);
-        let wait = if running { next_slice.saturating_duration_since(Instant::now()) } else { Duration::from_secs(3600) };
+        let wait =
+            if running { next_slice.saturating_duration_since(Instant::now()) } else { Duration::from_secs(3600) };
         let first = match rx.recv_timeout(wait) {
             Ok(line) => Some(line),
             Err(RecvTimeoutError::Timeout) => None,

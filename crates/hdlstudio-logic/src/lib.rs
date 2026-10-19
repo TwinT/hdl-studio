@@ -311,10 +311,7 @@ impl LogicVec {
     /// `nbits`: just enough bits for a non-negative value (at least 1), and
     /// one more than the magnitude's for a negative one.
     pub fn from_magnitude(neg: bool, mag: &[u64], nbits: Option<usize>) -> LogicVec {
-        let mag_bits = mag
-            .iter()
-            .rposition(|&x| x != 0)
-            .map_or(0, |k| 64 * k + 64 - mag[k].leading_zeros() as usize);
+        let mag_bits = mag.iter().rposition(|&x| x != 0).map_or(0, |k| 64 * k + 64 - mag[k].leading_zeros() as usize);
         let neg = neg && mag_bits > 0;
         let bits = nbits.unwrap_or(if neg { mag_bits + 1 } else { mag_bits.max(1) });
         let n = nwords(bits);

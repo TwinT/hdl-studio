@@ -96,7 +96,9 @@ fn lua_headless(args: &[String]) -> Result<(), String> {
             let line = match (e, json) {
                 (lua::LuaEvent::Print { messages, .. }, false) => messages.join("\t"),
                 (lua::LuaEvent::Error { message, .. }, false) => format!("ERROR: {message}"),
-                (lua::LuaEvent::Print { messages, .. }, true) => serde_json::json!({"print": messages.join("\t")}).to_string(),
+                (lua::LuaEvent::Print { messages, .. }, true) => {
+                    serde_json::json!({"print": messages.join("\t")}).to_string()
+                }
                 (lua::LuaEvent::Error { message, .. }, true) => serde_json::json!({"error": message}).to_string(),
                 _ => continue,
             };

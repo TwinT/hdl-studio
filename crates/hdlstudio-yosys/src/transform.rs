@@ -64,7 +64,8 @@ impl Model {
             conn.name = from.iter().find_map(|c| c.name.clone());
         }
         if conn.source_positions.is_none() {
-            conn.source_positions = Some(from.iter().flat_map(|c| c.source_positions.iter().flatten().cloned()).collect());
+            conn.source_positions =
+                Some(from.iter().flat_map(|c| c.source_positions.iter().flatten().cloned()).collect());
         }
         self.count += 1;
         self.forward.entry(conn.from.id.clone()).or_default().insert(self.count);
@@ -276,7 +277,9 @@ fn make_nary_gates(m: &mut Model, id: &str) -> bool {
     let Some(want) = m.dev(id).and_then(mergeable) else { return false };
     let dev = m.devices[id].clone();
     let inputs = match &dev.cell {
-        Cell::And(g) | Cell::Nand(g) | Cell::Or(g) | Cell::Nor(g) | Cell::Xor(g) | Cell::Xnor(g) => g.inputs.unwrap_or(2),
+        Cell::And(g) | Cell::Nand(g) | Cell::Or(g) | Cell::Nor(g) | Cell::Xor(g) | Cell::Xnor(g) => {
+            g.inputs.unwrap_or(2)
+        }
         _ => unreachable!(),
     };
     let ins = m.inputs(id);
@@ -296,7 +299,9 @@ fn make_nary_gates(m: &mut Model, id: &str) -> bool {
         m.remove_device(&in_id);
         m.remove_device(id);
         let mut new_dev = dev.clone();
-        if let Cell::And(g) | Cell::Nand(g) | Cell::Or(g) | Cell::Nor(g) | Cell::Xor(g) | Cell::Xnor(g) = &mut new_dev.cell {
+        if let Cell::And(g) | Cell::Nand(g) | Cell::Or(g) | Cell::Nor(g) | Cell::Xor(g) | Cell::Xnor(g) =
+            &mut new_dev.cell
+        {
             g.inputs = Some((inputs as i64 + extra) as u32);
         }
         m.add_device(new_dev, id.into());

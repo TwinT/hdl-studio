@@ -149,13 +149,28 @@ pub enum Cell {
     #[serde(rename = "FSM")]
     Fsm(Fsm),
 
-    BusGroup { groups: Vec<u32> },
-    BusSlice { slice: Slice },
-    ZeroExtend { extend: Extend },
-    SignExtend { extend: Extend },
-    Constant { constant: String },
-    TriMerge { bits: u32, inputs: u32 },
-    Subcircuit { celltype: String },
+    BusGroup {
+        groups: Vec<u32>,
+    },
+    BusSlice {
+        slice: Slice,
+    },
+    ZeroExtend {
+        extend: Extend,
+    },
+    SignExtend {
+        extend: Extend,
+    },
+    Constant {
+        constant: String,
+    },
+    TriMerge {
+        bits: u32,
+        inputs: u32,
+    },
+    Subcircuit {
+        celltype: String,
+    },
 }
 
 /// A saved Clock has no `net`, `order` or `bits`.

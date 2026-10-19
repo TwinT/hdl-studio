@@ -21,7 +21,8 @@ fn convert(yosys: &Value, transform: bool) -> Result<Value, String> {
 #[test]
 fn matches_the_js_chain() {
     let path = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/golden.json");
-    let mut golden: serde_json::Map<String, Value> = serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
+    let mut golden: serde_json::Map<String, Value> =
+        serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
     let bless = std::env::var_os("BLESS").is_some();
     let mut failures = vec![];
     for (name, case) in golden.iter_mut() {

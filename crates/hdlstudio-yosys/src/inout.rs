@@ -103,10 +103,7 @@ fn visit(design: &mut Design, split: &mut Split, next: &mut u64, name: &str) {
         let i = m.ports.get_index_of(&p).unwrap();
         m.ports[i].direction = "input".into();
         m.ports.shift_insert(i + 1, out.clone(), Port { direction: "output".into(), bits: out_bits.clone() });
-        m.netnames.insert(
-            out.clone(),
-            NetName { hide_name: 0.into(), bits: out_bits, attributes: IndexMap::new() },
-        );
+        m.netnames.insert(out.clone(), NetName { hide_name: 0.into(), bits: out_bits, attributes: IndexMap::new() });
         split.get_mut(name).unwrap().insert(p, Some(out));
     }
 

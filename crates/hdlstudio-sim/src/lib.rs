@@ -57,12 +57,29 @@ struct Net {
 #[derive(Clone, Debug, PartialEq)]
 pub enum Event {
     /// A monitored output changed (to one of its trigger values, if given).
-    Monitor { id: u64, tick: u64, value: LogicVec, stop: bool, once: bool },
-    Alarm { id: u64, tick: u64, stop: bool },
+    Monitor {
+        id: u64,
+        tick: u64,
+        value: LogicVec,
+        stop: bool,
+        once: bool,
+    },
+    Alarm {
+        id: u64,
+        tick: u64,
+        stop: bool,
+    },
     /// The circuit wrote a memory word.
-    Memory { path: String, addr: usize, value: LogicVec },
+    Memory {
+        path: String,
+        addr: usize,
+        value: LogicVec,
+    },
     /// An FSM moved to another state.
-    FsmState { path: String, state: i64 },
+    FsmState {
+        path: String,
+        state: i64,
+    },
 }
 
 struct Monitor {
@@ -466,7 +483,8 @@ impl Sim {
         let s = &mut self.sched[c as usize];
         let (target, slot) = s.last;
         s.lazy_since = NONE;
-        let q = if self.running && target == self.tick { &mut self.current } else { self.queue.get_mut(&target).unwrap() };
+        let q =
+            if self.running && target == self.tick { &mut self.current } else { self.queue.get_mut(&target).unwrap() };
         q.entries[slot as usize].copy = q.copies.len() as u32;
         for &n in &self.cells[c as usize].inputs {
             q.copies.push(if n == net { old.clone() } else { self.nets[n as usize].value.clone() });
@@ -535,7 +553,12 @@ mod build {
     }
 
     impl<'a> Builder<'a> {
-        fn add_inst(&mut self, circuit: &'a Circuit, path: String, parent: Option<(usize, String)>) -> Result<usize, String> {
+        fn add_inst(
+            &mut self,
+            circuit: &'a Circuit,
+            path: String,
+            parent: Option<(usize, String)>,
+        ) -> Result<usize, String> {
             let idx = self.insts.len();
             let mut into = HashMap::new();
             let mut from: HashMap<_, Vec<_>> = HashMap::new();
@@ -567,7 +590,12 @@ mod build {
                             .initial
                             .iter()
                             .map(|v| {
-                                self.nets.push(Net { value: v.clone(), fanout: vec![], changed: false, monitored: false });
+                                self.nets.push(Net {
+                                    value: v.clone(),
+                                    fanout: vec![],
+                                    changed: false,
+                                    monitored: false,
+                                });
                                 (self.nets.len() - 1) as NetId
                             })
                             .collect();
@@ -783,7 +811,12 @@ mod build {
 /// The differential harness's trace (see test/simdiff/trace.mjs): every
 /// cell output's initial value, then each tick's end values that changed.
 /// `stimulus` is `(tick, top-level device id, binary value)`, by tick.
-pub fn trace(circuit: &Circuit, ticks: u64, stimulus: &[(u64, String, String)], defaultcomb: bool) -> Result<Vec<String>, String> {
+pub fn trace(
+    circuit: &Circuit,
+    ticks: u64,
+    stimulus: &[(u64, String, String)],
+    defaultcomb: bool,
+) -> Result<Vec<String>, String> {
     let mut sim = Sim::new(circuit, defaultcomb)?;
     let mut by_net: HashMap<NetId, Vec<usize>> = HashMap::new();
     let mut last = Vec::with_capacity(sim.probes.len());
@@ -802,7 +835,8 @@ pub fn trace(circuit: &Circuit, ticks: u64, stimulus: &[(u64, String, String)], 
             sim.set_input(id, v)?;
         }
         sim.update_gates()?;
-        let mut idx: Vec<usize> = sim.take_changed().iter().flat_map(|n| by_net.get(n).into_iter().flatten().copied()).collect();
+        let mut idx: Vec<usize> =
+            sim.take_changed().iter().flat_map(|n| by_net.get(n).into_iter().flatten().copied()).collect();
         idx.sort_unstable();
         idx.dedup();
         for i in idx {

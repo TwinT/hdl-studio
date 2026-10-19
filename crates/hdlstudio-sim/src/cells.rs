@@ -34,25 +34,76 @@ pub enum Op {
     Not,
     Gate(BinGate),
     Reduce(Reduce),
-    Extend { sign: bool, output: usize },
-    Slice { first: usize, count: usize },
+    Extend {
+        sign: bool,
+        output: usize,
+    },
+    Slice {
+        first: usize,
+        count: usize,
+    },
     Group,
     Constant(LogicVec),
     Clock,
-    Arith1 { neg: bool, signed: bool, out: usize },
-    Arith2 { op: ArithOp, signed: bool, out: usize },
-    Compare { op: CmpOp, signed: bool },
-    Equal { ne: bool, bits1: usize, bits2: usize, signed: bool },
+    Arith1 {
+        neg: bool,
+        signed: bool,
+        out: usize,
+    },
+    Arith2 {
+        op: ArithOp,
+        signed: bool,
+        out: usize,
+    },
+    Compare {
+        op: CmpOp,
+        signed: bool,
+    },
+    Equal {
+        ne: bool,
+        bits1: usize,
+        bits2: usize,
+        signed: bool,
+    },
     Shift(Shift),
-    ArithConst { op: ArithOp, left: bool, constant: i64, signed: bool, out: usize },
-    ShiftConst { left: bool, constant: i64, shift: Shift },
-    CompareConst { op: CmpOp, left: bool, constant: i64, signed: bool },
-    EqualConst { ne: bool, constant: i64, bits: usize },
+    ArithConst {
+        op: ArithOp,
+        left: bool,
+        constant: i64,
+        signed: bool,
+        out: usize,
+    },
+    ShiftConst {
+        left: bool,
+        constant: i64,
+        shift: Shift,
+    },
+    CompareConst {
+        op: CmpOp,
+        left: bool,
+        constant: i64,
+        signed: bool,
+    },
+    EqualConst {
+        ne: bool,
+        constant: i64,
+        bits: usize,
+    },
     /// Binary select (`sel` first, then the inputs).
-    Mux { bits: usize },
-    Mux1Hot { bits: usize },
-    MuxSparse { bits: usize, values: Vec<i64>, default: bool },
-    Tribuf { bits: usize },
+    Mux {
+        bits: usize,
+    },
+    Mux1Hot {
+        bits: usize,
+    },
+    MuxSparse {
+        bits: usize,
+        values: Vec<i64>,
+        default: bool,
+    },
+    Tribuf {
+        bits: usize,
+    },
     TriMerge,
     Dff(Box<Dff>),
     Memory(Box<Memory>),
@@ -229,7 +280,9 @@ pub fn spec(cell: &Cell) -> Result<Spec, String> {
     use Cell as C;
     let bits = |b: Option<u32>| b.unwrap_or(1) as usize;
     let in_out = |i: usize, o: usize| (one("in", i), one("out", o));
-    let bin_ports = |b1: u32, b2: u32, out: usize| (vec![("in1".into(), b1 as usize), ("in2".into(), b2 as usize)], one("out", out));
+    let bin_ports = |b1: u32, b2: u32, out: usize| {
+        (vec![("in1".into(), b1 as usize), ("in2".into(), b2 as usize)], one("out", out))
+    };
     Ok(match cell {
         C::Not(u) => Spec::new(Op::Not, one("in", bits(u.bits)), one("out", bits(u.bits)), 1),
         C::Repeater(u) => Spec::new(Op::Repeater, one("in", bits(u.bits)), one("out", bits(u.bits)), 1),
@@ -338,8 +391,13 @@ pub fn spec(cell: &Cell) -> Result<Spec, String> {
         | C::ModuloConst(c)
         | C::PowerConst(c) => {
             let out = c.bits.out.unwrap_or(1) as usize;
-            let op =
-                Op::ArithConst { op: arith_op(cell).unwrap(), left: c.left_op, constant: c.constant, signed: c.signed.r#in, out };
+            let op = Op::ArithConst {
+                op: arith_op(cell).unwrap(),
+                left: c.left_op,
+                constant: c.constant,
+                signed: c.signed.r#in,
+                out,
+            };
             let (i, o) = in_out(c.bits.r#in as usize, out);
             Spec::new(op, i, o, 1)
         }
@@ -358,12 +416,18 @@ pub fn spec(cell: &Cell) -> Result<Spec, String> {
             Spec::new(Op::ShiftConst { left: c.left_op, constant: c.constant, shift }, i, o, 1)
         }
         C::LtConst(c) | C::LeConst(c) | C::GtConst(c) | C::GeConst(c) => {
-            let op = Op::CompareConst { op: cmp_op(cell).unwrap(), left: c.left_op, constant: c.constant, signed: c.signed.r#in };
+            let op = Op::CompareConst {
+                op: cmp_op(cell).unwrap(),
+                left: c.left_op,
+                constant: c.constant,
+                signed: c.signed.r#in,
+            };
             let (i, o) = in_out(c.bits.r#in as usize, 1);
             Spec::new(op, i, o, 1)
         }
         C::EqConst(ConstOp { bits, constant, .. }) | C::NeConst(ConstOp { bits, constant, .. }) => {
-            let op = Op::EqualConst { ne: matches!(cell, C::NeConst(_)), constant: *constant, bits: bits.r#in as usize };
+            let op =
+                Op::EqualConst { ne: matches!(cell, C::NeConst(_)), constant: *constant, bits: bits.r#in as usize };
             let (i, o) = in_out(bits.r#in as usize, 1);
             Spec::new(op, i, o, 1)
         }
@@ -503,15 +567,7 @@ fn memory(m: &hdlstudio_netlist::Memory) -> Result<Spec, String> {
             last_clk: Bit::X,
         });
     }
-    let op = Memory {
-        bits,
-        words: words as i64,
-        offset: m.offset.unwrap_or(0),
-        rd,
-        wr,
-        mem,
-        writes: vec![],
-    };
+    let op = Memory { bits, words: words as i64, offset: m.offset.unwrap_or(0), rd, wr, mem, writes: vec![] };
     let mut s = Spec::new(Op::Memory(Box::new(op)), inputs, outputs, 1);
     s.initial = initial;
     Ok(s)
@@ -545,9 +601,25 @@ fn fsm(f: &hdlstudio_netlist::Fsm) -> Result<Spec, String> {
 }
 
 /// A shift by `am` (negative: the other way), extended to `bits_out`.
-fn shift_help(in1: &LogicVec, am: i64, bits_in: usize, bits_out: usize, sgn_in: bool, sgn_out: bool, fillx: bool) -> LogicVec {
+fn shift_help(
+    in1: &LogicVec,
+    am: i64,
+    bits_in: usize,
+    bits_out: usize,
+    sgn_in: bool,
+    sgn_out: bool,
+    fillx: bool,
+) -> LogicVec {
     let msb = |v: &LogicVec| v.bits().checked_sub(1).map_or(Bit::Zero, |i| v.get(i));
-    let fill = |signed: bool, v: &LogicVec| if fillx { Bit::X } else if signed { msb(v) } else { Bit::Zero };
+    let fill = |signed: bool, v: &LogicVec| {
+        if fillx {
+            Bit::X
+        } else if signed {
+            msb(v)
+        } else {
+            Bit::Zero
+        }
+    };
     let ext = LogicVec::make(bits_out.saturating_sub(bits_in), fill(sgn_in, in1));
     let my_in = LogicVec::concat(&[in1, &ext]);
     // (pad ++ my_in) or (my_in[am..] ++ pad), cut to `bits_out`
@@ -565,7 +637,12 @@ impl Op {
     /// returns its output, for the cells with one, and whether it must run
     /// again after its propagation delay (the clock). Memory pushes
     /// `(output index, value)` to `multi` instead, in port order.
-    pub(crate) fn eval(&mut self, args: &Args, cur: &Args, multi: &mut Vec<(usize, LogicVec)>) -> (Option<LogicVec>, bool) {
+    pub(crate) fn eval(
+        &mut self,
+        args: &Args,
+        cur: &Args,
+        multi: &mut Vec<(usize, LogicVec)>,
+    ) -> (Option<LogicVec>, bool) {
         let v = match self {
             Op::Nop => None,
             Op::Repeater => Some(args[0].clone()),
@@ -834,7 +911,9 @@ impl Memory {
                 _ => args[i].reduce_and().get(0) == Bit::Zero,
             })
         };
-        let active = |clk: Option<(usize, Bit)>, last: Bit| clk.is_none_or(|(i, lvl)| bit0(&args[i]) == lvl && last == opposite(lvl));
+        let active = |clk: Option<(usize, Bit)>, last: Bit| {
+            clk.is_none_or(|(i, lvl)| bit0(&args[i]) == lvl && last == opposite(lvl))
+        };
         let write_value = |w: &WrPort, old: &LogicVec, val: &LogicVec| match w.en {
             Some((i, lvl)) if w.bit_enable => {
                 let mask = if lvl == Bit::One { args[i].clone() } else { args[i].not() };
@@ -926,7 +1005,12 @@ impl Fsm {
         if arst == self.arst_pol {
             self.state = self.init;
         } else if clk == self.clk_pol && self.last_clk == opposite(self.clk_pol) {
-            let next = self.transitions.get(&self.state).into_iter().flatten().find(|t| Self::matches(input, &t.0, &t.0.xmask()));
+            let next = self
+                .transitions
+                .get(&self.state)
+                .into_iter()
+                .flatten()
+                .find(|t| Self::matches(input, &t.0, &t.0.xmask()));
             self.state = next.map_or(self.init, |t| t.1);
         }
         self.last_clk = clk;

@@ -23,10 +23,7 @@ impl LogicMem {
     }
 
     pub fn from_data(bits: usize, data: Vec<LogicVec>) -> LogicMem {
-        assert!(
-            data.iter().all(|v| v.bits() == bits),
-            "LogicMem::from_data() called with vectors of different sizes"
-        );
+        assert!(data.iter().all(|v| v.bits() == bits), "LogicMem::from_data() called with vectors of different sizes");
         LogicMem { bits, data }
     }
 

@@ -74,8 +74,20 @@ pub fn arith(op: ArithOp, i: Int, j: Int, bits: usize) -> LogicVec {
             ArithOp::Sub => x.wrapping_sub(y),
             ArithOp::Mul => x.wrapping_mul(y),
             // as in IEEE Verilog: a zero divisor gives the dividend
-            ArithOp::Div => if y == 0 { x } else { x / y },
-            ArithOp::Mod => if y == 0 { x } else { x % y },
+            ArithOp::Div => {
+                if y == 0 {
+                    x
+                } else {
+                    x / y
+                }
+            }
+            ArithOp::Mod => {
+                if y == 0 {
+                    x
+                } else {
+                    x % y
+                }
+            }
             ArithOp::Pow if y >= 0 => {
                 let (mut acc, mut base, mut e) = (1i128, x, y as u128);
                 while e > 0 {
@@ -97,8 +109,20 @@ pub fn arith(op: ArithOp, i: Int, j: Int, bits: usize) -> LogicVec {
         ArithOp::Add => x + y,
         ArithOp::Sub => x - y,
         ArithOp::Mul => x * y,
-        ArithOp::Div => if y == zero { x } else { x / y },
-        ArithOp::Mod => if y == zero { x } else { x % y },
+        ArithOp::Div => {
+            if y == zero {
+                x
+            } else {
+                x / y
+            }
+        }
+        ArithOp::Mod => {
+            if y == zero {
+                x
+            } else {
+                x % y
+            }
+        }
         ArithOp::Pow if y >= zero => {
             // only the low `bits` bits are kept, so work mod 2^bits
             let m = BigInt::from(1) << bits;

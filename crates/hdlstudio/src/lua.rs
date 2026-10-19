@@ -10,7 +10,9 @@
 
 use hdlstudio_logic::{Bit, LogicVec};
 use hdlstudio_sim::{Event, Sim};
-use mlua::{AnyUserData, Function, Lua, MetaMethod, MultiValue, ThreadStatus, UserData, UserDataMethods, Value, Variadic};
+use mlua::{
+    AnyUserData, Function, Lua, MetaMethod, MultiValue, ThreadStatus, UserData, UserDataMethods, Value, Variadic,
+};
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -20,11 +22,21 @@ pub type SharedSim = Rc<RefCell<Option<Sim>>>;
 /// What scripts tell the client, by script name.
 #[derive(Debug)]
 pub enum LuaEvent {
-    Print { name: String, messages: Vec<String> },
+    Print {
+        name: String,
+        messages: Vec<String>,
+    },
     /// The script waits for the simulation (it didn't finish at once).
-    Started { name: String },
-    Stopped { name: String },
-    Error { name: String, message: String },
+    Started {
+        name: String,
+    },
+    Stopped {
+        name: String,
+    },
+    Error {
+        name: String,
+        message: String,
+    },
 }
 
 /// Monitor and alarm ids for scripts, apart from the client's.
@@ -116,7 +128,9 @@ fn to_vec(v: &Value, bits: Option<usize>) -> mlua::Result<Option<LogicVec>> {
         Value::UserData(ud) if ud.is::<LVec>() => ud.borrow::<LVec>()?.0.clone(),
         Value::Boolean(b) => LogicVec::from_bool(*b, bits.unwrap_or(1)),
         Value::Integer(i) => LogicVec::from_i64(*i, bits),
-        Value::String(s) => LogicVec::parse(&s.to_str()?).ok_or_else(|| err(format!("invalid vector {}", s.to_string_lossy())))?,
+        Value::String(s) => {
+            LogicVec::parse(&s.to_str()?).ok_or_else(|| err(format!("invalid vector {}", s.to_string_lossy())))?
+        }
         Value::Number(n) => LogicVec::parse(&n.to_string()).ok_or_else(|| err(format!("invalid vector {n}")))?,
         _ => return Ok(None),
     };
@@ -224,7 +238,8 @@ impl UserData for LVec {
 fn vec_library(lua: &Lua) -> mlua::Result<()> {
     let vec = lua.create_table()?;
     type Parse = fn(&str, Option<usize>) -> Option<LogicVec>;
-    let parsers: [(&str, Parse); 3] = [("frombin", LogicVec::from_bin), ("fromoct", LogicVec::from_oct), ("fromhex", LogicVec::from_hex)];
+    let parsers: [(&str, Parse); 3] =
+        [("frombin", LogicVec::from_bin), ("fromoct", LogicVec::from_oct), ("fromhex", LogicVec::from_hex)];
     for (name, f) in parsers {
         vec.set(
             name,
@@ -233,10 +248,18 @@ fn vec_library(lua: &Lua) -> mlua::Result<()> {
             })?,
         )?;
     }
-    vec.set("frombool", lua.create_function(|_, (b, n): (Value, Option<usize>)| Ok(LVec(LogicVec::from_bool(b.as_boolean().unwrap_or(!b.is_nil()), n.unwrap_or(1)))))?)?;
+    vec.set(
+        "frombool",
+        lua.create_function(|_, (b, n): (Value, Option<usize>)| {
+            Ok(LVec(LogicVec::from_bool(b.as_boolean().unwrap_or(!b.is_nil()), n.unwrap_or(1))))
+        })?,
+    )?;
     vec.set("frominteger", lua.create_function(|_, (k, n): (i64, Option<usize>)| Ok(LVec(LogicVec::from_i64(k, n))))?)?;
     let meta = lua.create_table()?;
-    meta.set("__call", lua.create_function(|_, (_, v, n): (Value, Value, Option<usize>)| Ok(LVec(check_vec(&v, n, 1, "vec")?)))?)?;
+    meta.set(
+        "__call",
+        lua.create_function(|_, (_, v, n): (Value, Value, Option<usize>)| Ok(LVec(check_vec(&v, n, 1, "vec")?)))?,
+    )?;
     vec.set_metatable(Some(meta))?;
     lua.globals().set("vec", vec)
 }
@@ -268,7 +291,13 @@ impl LuaEngine {
 
     fn new_runner(&self, key: Key) -> mlua::Result<Runner> {
         let lua = Lua::new();
-        let state = Rc::new(RefCell::new(RunnerState { key, name: String::new(), thread: None, print_result: false, waits: vec![] }));
+        let state = Rc::new(RefCell::new(RunnerState {
+            key,
+            name: String::new(),
+            thread: None,
+            print_result: false,
+            waits: vec![],
+        }));
         vec_library(&lua)?;
         let (g, st) = (self.globals.clone(), state.clone());
         lua.globals().set(
@@ -300,7 +329,9 @@ impl LuaEngine {
                 (*w)(lua, &mut |s| {
                     let dev = s.find_input(&name).ok_or("sim.setinput: input not found")?.to_string();
                     let bits = s.input_bits(&dev);
-                    let v = to_vec(&v, bits).map_err(|e| message(&e))?.ok_or("bad argument #2 to 'setinput' (not convertible to vec)")?;
+                    let v = to_vec(&v, bits)
+                        .map_err(|e| message(&e))?
+                        .ok_or("bad argument #2 to 'setinput' (not convertible to vec)")?;
                     s.set_input(&dev, v).map(|_| Value::Nil)
                 })
             })?,
@@ -310,7 +341,9 @@ impl LuaEngine {
             "setinput_id",
             lua.create_function(move |lua, (id, v): (String, Value)| {
                 (*w)(lua, &mut |s| {
-                    let v = to_vec(&v, None).map_err(|e| message(&e))?.ok_or("bad argument #2 to 'setinput_id' (not convertible to vec)")?;
+                    let v = to_vec(&v, None)
+                        .map_err(|e| message(&e))?
+                        .ok_or("bad argument #2 to 'setinput_id' (not convertible to vec)")?;
                     s.set_input(&id, v).map(|_| Value::Nil)
                 })
             })?,
@@ -392,7 +425,9 @@ impl LuaEngine {
                 let mut ev = None;
                 (*w)(lua, &mut |s| {
                     let (net, bits) = find(s, &names, "value")?;
-                    let v = to_vec(&v, Some(bits)).map_err(|e| message(&e))?.ok_or("bad argument #1 to 'value' (not convertible to vec)")?;
+                    let v = to_vec(&v, Some(bits))
+                        .map_err(|e| message(&e))?
+                        .ok_or("bad argument #1 to 'value' (not convertible to vec)")?;
                     ev = Some(LEvent(vec![(net, v)]));
                     Ok(Value::Nil)
                 })?;
@@ -432,7 +467,9 @@ impl LuaEngine {
             "_wait",
             lua.create_function(move |lua, (e, n): (AnyUserData, Option<i64>)| {
                 current(lua, &st.borrow(), "wait")?;
-                let e = e.borrow::<LEvent>().map_err(|_| lerr(lua, "bad argument #1 to 'wait' (not convertible to event)"))?;
+                let e = e
+                    .borrow::<LEvent>()
+                    .map_err(|_| lerr(lua, "bad argument #1 to 'wait' (not convertible to event)"))?;
                 let mut g = g.borrow_mut();
                 let key = st.borrow().key.clone();
                 let mut ids = vec![];
@@ -455,9 +492,12 @@ impl LuaEngine {
                 Ok(())
             })?,
         )?;
-        sim.set("registerdisplay", lua.create_function(|lua, _: MultiValue| -> mlua::Result<()> {
-            Err(lerr(lua, "sim.registerdisplay is not supported yet"))
-        })?)?;
+        sim.set(
+            "registerdisplay",
+            lua.create_function(|lua, _: MultiValue| -> mlua::Result<()> {
+                Err(lerr(lua, "sim.registerdisplay is not supported yet"))
+            })?,
+        )?;
         lua.globals().set("sim", sim)?;
         lua.load(
             r#"
@@ -576,8 +616,9 @@ impl LuaEngine {
                 let print = runner.state.borrow().print_result && !values.is_empty();
                 if print {
                     let tostring: mlua::Result<Function> = runner.lua.globals().get("tostring");
-                    let messages = tostring
-                        .and_then(|f| values.iter().map(|v| f.call::<String>(v.clone())).collect::<mlua::Result<Vec<_>>>());
+                    let messages = tostring.and_then(|f| {
+                        values.iter().map(|v| f.call::<String>(v.clone())).collect::<mlua::Result<Vec<_>>>()
+                    });
                     match messages {
                         Ok(messages) => self.event(LuaEvent::Print { name: name.clone(), messages }),
                         Err(e) => self.event(LuaEvent::Error { name: name.clone(), message: message(&e) }),

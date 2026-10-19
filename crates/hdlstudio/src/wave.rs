@@ -52,7 +52,11 @@ impl Wave {
                 j += 1;
             }
             let value = self.values[j - 1].to_bin();
-            changes.push(if j - i == 1 { json!([self.ticks[i], value]) } else { json!([self.ticks[i], value, self.ticks[j - 1]]) });
+            changes.push(if j - i == 1 {
+                json!([self.ticks[i], value])
+            } else {
+                json!([self.ticks[i], value, self.ticks[j - 1]])
+            });
             i = j;
         }
         json!({"start": start, "first": self.ticks.first(), "changes": changes})

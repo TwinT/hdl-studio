@@ -146,7 +146,6 @@ fn matches_the_fixtures() {
     );
 }
 
-
 /// `shift` against its definition with concat and slice, on every width
 /// around the word boundaries.
 #[test]

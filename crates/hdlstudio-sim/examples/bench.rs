@@ -26,7 +26,11 @@ fn main() {
     let start = sim.tick();
     run_to(&mut sim, start + ticks);
     let secs = t0.elapsed().as_secs_f64();
-    println!("{ticks} ticks in {secs:.2} s: {:.0} ticks/s, {:.0} cycles/s (200-tick clock)", ticks as f64 / secs, ticks as f64 / secs / 200.0);
+    println!(
+        "{ticks} ticks in {secs:.2} s: {:.0} ticks/s, {:.0} cycles/s (200-tick clock)",
+        ticks as f64 / secs,
+        ticks as f64 / secs / 200.0
+    );
     let matrix = circuit.devices.iter().find(|(_, d)| matches!(d.cell, Cell::LedMatrix(_)));
     if let Some((id, _)) = matrix {
         let c = circuit.connectors.iter().find(|c| &c.to.id == id).unwrap();
