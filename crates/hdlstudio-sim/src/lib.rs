@@ -424,7 +424,11 @@ impl Sim {
             count += 1;
             if count > limit {
                 self.running = false;
-                self.current = TickQueue::default();
+                // the cells still queued are dropped: nothing points at their entries
+                for e in std::mem::take(&mut self.current).entries.iter().filter(|e| e.cell != PHANTOM) {
+                    let s = &mut self.sched[e.cell as usize];
+                    (s.last, s.lazy_since) = ((u64::MAX, 0), NONE);
+                }
                 self.tick = k + 1;
                 return Err(format!("combinational loop did not settle in tick {k}"));
             }

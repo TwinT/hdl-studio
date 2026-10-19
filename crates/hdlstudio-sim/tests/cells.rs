@@ -70,3 +70,27 @@ fn a_one_hot_mux_with_a_z_select_is_all_x() {
     settle(&mut s);
     assert_eq!(out(&s, "mux"), "xxxx");
 }
+
+#[test]
+fn an_input_change_after_a_zero_delay_loop_error_does_not_panic() {
+    // a = 1 makes g = a & !g oscillate in zero ticks
+    let mut s = sim(serde_json::json!({
+        "devices": {
+            "a": { "type": "Button", "net": "a", "bits": 1 },
+            "g": { "type": "And", "bits": 1, "propagation": 0 },
+            "n": { "type": "Not", "bits": 1, "propagation": 0 }
+        },
+        "connectors": [
+            { "from": { "id": "a", "port": "out" }, "to": { "id": "g", "port": "in1" } },
+            { "from": { "id": "n", "port": "out" }, "to": { "id": "g", "port": "in2" } },
+            { "from": { "id": "g", "port": "out" }, "to": { "id": "n", "port": "in" } }
+        ]
+    }));
+    s.set_input("a", v("0")).unwrap();
+    settle(&mut s);
+    s.set_input("a", v("1")).unwrap();
+    assert!(s.update_gates_next().is_err());
+    s.set_input("a", v("0")).unwrap();
+    settle(&mut s);
+    assert_eq!(out(&s, "g"), "0");
+}
