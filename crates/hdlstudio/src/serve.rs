@@ -206,7 +206,7 @@ impl Server {
                     return Ok(());
                 }
                 *owed -= steps;
-                let target = self.with(|s| Ok(s.tick()))? + steps as u64;
+                let target = self.with(|s| Ok(s.tick()))?.saturating_add(steps as u64);
                 while matches!(self.mode, Mode::Interval { .. })
                     && self.with(|s| Ok(s.next_event_tick()))?.is_some_and(|k| k < target)
                 {
@@ -287,7 +287,13 @@ impl Server {
                 }
                 ack(self, Value::Null);
             }
-            "interval" => self.interval = req["ms"].as_f64().ok_or("ms missing")?,
+            "interval" => {
+                let ms = req["ms"].as_f64().ok_or("ms missing")?;
+                if ms <= 0.0 {
+                    return Err(format!("bad interval {ms}"));
+                }
+                self.interval = ms;
+            }
             "set_input" => {
                 let (path, v) = (str_("path")?, vec_("value")?);
                 self.with(|s| s.set_input(path, v))?;

@@ -11,11 +11,13 @@
 use hdlstudio_logic::{Bit, LogicVec};
 use hdlstudio_sim::{Event, Sim};
 use mlua::{
-    AnyUserData, Function, Lua, MetaMethod, MultiValue, ThreadStatus, UserData, UserDataMethods, Value, Variadic,
+    AnyUserData, Function, HookTriggers, Lua, MetaMethod, MultiValue, ThreadStatus, UserData, UserDataMethods, Value,
+    Variadic, VmState,
 };
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
 use std::rc::Rc;
+use std::time::{Duration, Instant};
 
 pub type SharedSim = Rc<RefCell<Option<Sim>>>;
 
@@ -75,7 +77,16 @@ struct RunnerState {
 pub struct LuaEngine {
     globals: Rc<RefCell<Globals>>,
     runners: HashMap<Key, Runner>,
+    /// When the running script was last resumed, and how long it may run
+    /// before it sleeps or waits: the simulation (and `lua_stop`) can't run
+    /// meanwhile, so `while true do end` would hang the engine.
+    // ponytail: wall-clock budget per resume; a script computing for longer
+    // than this without sim.sleep fails, raise BUDGET if one legitimately does.
+    resumed: Rc<Cell<Instant>>,
+    budget: Duration,
 }
+
+const BUDGET: Duration = Duration::from_secs(5);
 
 fn err(msg: impl Into<String>) -> mlua::Error {
     mlua::Error::RuntimeError(msg.into())
@@ -96,7 +107,12 @@ fn message(e: &mlua::Error) -> String {
 /// An error raised by a library function, with the script position that
 /// called it (like `luaL_error`).
 fn lerr(lua: &Lua, msg: &str) -> mlua::Error {
-    let at = lua.inspect_stack(1, |d| {
+    lerr_at(lua, 1, msg)
+}
+
+/// `lerr` for the function at stack `level` (0 inside a hook).
+fn lerr_at(lua: &Lua, level: usize, msg: &str) -> mlua::Error {
+    let at = lua.inspect_stack(level, |d| {
         let src = d.source().short_src.map(|s| s.to_string()).unwrap_or_default();
         d.current_line().map(|l| format!("{src}:{l}: "))
     });
@@ -269,6 +285,8 @@ impl LuaEngine {
         LuaEngine {
             globals: Rc::new(RefCell::new(Globals { sim, next_id: FIRST_ID, wakes: HashMap::new(), events: vec![] })),
             runners: HashMap::new(),
+            resumed: Rc::new(Cell::new(Instant::now())),
+            budget: BUDGET,
         }
     }
 
@@ -545,7 +563,17 @@ impl LuaEngine {
             st.name = name.into();
             st.print_result = repl;
         }
-        let thread = func.and_then(|f| runner.lua.create_thread(f));
+        let (resumed, budget) = (self.resumed.clone(), self.budget);
+        let thread = func.and_then(|f| runner.lua.create_thread(f)).and_then(|t| {
+            t.set_hook(HookTriggers::new().every_nth_instruction(100_000), move |lua, _| {
+                if resumed.get().elapsed() < budget {
+                    return Ok(VmState::Continue);
+                }
+                let s = budget.as_secs_f64();
+                Err(lerr_at(lua, 0, &format!("the script ran for {s} s without sim.sleep or sim.wait")))
+            })?;
+            Ok(t)
+        });
         match thread {
             Ok(t) => {
                 runner.state.borrow_mut().thread = Some(t);
@@ -604,6 +632,7 @@ impl LuaEngine {
         self.clear_waits(key);
         let runner = &self.runners[key];
         let Some(thread) = runner.state.borrow().thread.clone() else { return };
+        self.resumed.set(Instant::now());
         let result = thread.resume::<MultiValue>(());
         let name = runner.state.borrow().name.clone();
         match result {
@@ -658,5 +687,23 @@ impl LuaEngine {
             }
         }
         client
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_script_that_never_yields_is_stopped() {
+        let mut engine = LuaEngine::new(Rc::new(RefCell::new(None)));
+        engine.budget = Duration::from_millis(50);
+        engine.run("t", "local n = 0\nwhile true do n = n + 1 end", false, "t.lua");
+        let events = engine.take_events();
+        assert!(
+            matches!(&events[..], [LuaEvent::Stopped { .. }, LuaEvent::Error { message, .. }] if message.contains("t.lua:2: the script ran for")),
+            "{events:?}"
+        );
+        assert!(!engine.active());
     }
 }
