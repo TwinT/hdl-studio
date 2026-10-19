@@ -236,7 +236,7 @@ sim.setinput("rst", false)
 
 for i = 1, 20 do
   sim.wait(sim.posedge("clk"))
-  print(string.format("cycle %2d: count = %s", i, sim.getoutput("count"):tohex()))
+  print(string.format("cycle %2d: count = %s\n", i, sim.getoutput("count"):tohex()))
 end
 ```
 
@@ -265,7 +265,8 @@ first: `sim.getvalue("core_i", "pc")`.
 | `e1 \| e2` | Event: whichever happens first. |
 
 Values given to `sim` can be vecs, booleans, integers or strings like `"8hff"`.
-`print` shows its arguments.
+`print` shows its arguments; in the Lua terminal it doesn't end the line, so add
+`"\n"` yourself.
 
 ### `vec`: 4-valued vectors
 
