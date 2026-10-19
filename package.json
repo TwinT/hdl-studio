@@ -2,7 +2,7 @@
     "name": "hdl-studio",
     "displayName": "HDL Studio",
     "description": "Synthesize Verilog/SystemVerilog with Yosys and simulate the circuit on an interactive schematic, with waveforms and Lua scripting.",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "license": "See LICENSE",
     "publisher": "TwinT",
     "repository": {

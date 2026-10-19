@@ -5,6 +5,17 @@ All notable changes to HDL Studio will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.1] - 2026-10-19
+
+### Changed
+- README rewritten: quick start, how ports become widgets, the synthesis
+  options, a Lua API reference, settings and troubleshooting. Screenshots of
+  the current version.
+
+### Added
+- A `Makefile` for releases (`make bump VERSION=patch|minor|major`, then
+  `make release`).
+
 ## [1.0.0] - 2026-10-16
 
 HDL Studio no longer uses DigitalJS: the simulator, the netlist converter and

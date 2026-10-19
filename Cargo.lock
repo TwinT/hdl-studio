@@ -72,7 +72,7 @@ checksum = "ed5909b6e89a2db4456e54cd5f673791d7eca6732202bbf2a9cc504fe2f9b84a"
 
 [[package]]
 name = "hdlstudio"
-version = "1.0.0"
+version = "1.0.1"
 dependencies = [
  "hdlstudio-logic",
  "hdlstudio-netlist",
@@ -84,7 +84,7 @@ dependencies = [
 
 [[package]]
 name = "hdlstudio-logic"
-version = "1.0.0"
+version = "1.0.1"
 dependencies = [
  "serde",
  "serde_json",
@@ -93,7 +93,7 @@ dependencies = [
 
 [[package]]
 name = "hdlstudio-netlist"
-version = "1.0.0"
+version = "1.0.1"
 dependencies = [
  "hdlstudio-logic",
  "indexmap",
@@ -103,7 +103,7 @@ dependencies = [
 
 [[package]]
 name = "hdlstudio-sim"
-version = "1.0.0"
+version = "1.0.1"
 dependencies = [
  "hdlstudio-logic",
  "hdlstudio-netlist",
@@ -114,7 +114,7 @@ dependencies = [
 
 [[package]]
 name = "hdlstudio-yosys"
-version = "1.0.0"
+version = "1.0.1"
 dependencies = [
  "hdlstudio-logic",
  "hdlstudio-netlist",
