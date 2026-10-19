@@ -5,6 +5,15 @@ All notable changes to HDL Studio will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+- After a "combinational loop did not settle" error, changing an input no
+  longer stops the engine (the circuit view lost its simulation).
+- A Lua script that runs for 5 s without `sim.sleep` or `sim.wait` (say, a
+  `while true do end`) stops with an error that names its line, instead of
+  freezing the circuit view, where Stop couldn't reach it.
+
 ## [1.0.1] - 2026-10-19
 
 ### Changed
