@@ -12,7 +12,7 @@ CURRENT := $(shell node -p "require('./package.json').version")
 TARGET  := linux-x64
 VSIX    := hdl-studio-$(TARGET)-$(CURRENT).vsix
 
-.PHONY: bump check test tag package ovsx release
+.PHONY: bump check test tag package token ovsx release
 
 bump:
 	@test -n "$(VERSION)" || { echo "usage: make bump VERSION=patch|minor|major|x.y.z"; exit 1; }
@@ -39,11 +39,15 @@ tag: check
 package:
 	npx @vscode/vsce package --target $(TARGET)
 
-ovsx:
+token:
+	@ovsx --version > /dev/null 2>&1 
 	@test -n "$$OVSX_PAT" || { echo "set OVSX_PAT"; exit 1; }
-	npx ovsx publish $(VSIX)
 
-release: check test tag package ovsx
+ovsx: token
+	ovsx publish $(VSIX)
+
+# the token first, so a missing one doesn't leave a release half done
+release: token check test tag package ovsx
 	@echo
 	@echo "Open VSX: done. Marketplace: upload $(VSIX) at"
 	@echo "  https://marketplace.visualstudio.com/manage/publishers/TwinT"
