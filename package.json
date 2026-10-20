@@ -2,7 +2,7 @@
     "name": "hdl-studio",
     "displayName": "HDL Studio",
     "description": "Synthesize Verilog/SystemVerilog with Yosys and simulate the circuit on an interactive schematic, with waveforms and Lua scripting.",
-    "version": "1.1.0",
+    "version": "1.2.0",
     "license": "See LICENSE",
     "publisher": "TwinT",
     "repository": {
@@ -35,43 +35,64 @@
             {
                 "command": "hdl-studio.openView",
                 "title": "Open HDL Studio",
-                "icon": { "light": "imgs/hdl-studio-light.svg", "dark": "imgs/hdl-studio-dark.svg" },
+                "icon": {
+                    "light": "imgs/hdl-studio-light.svg",
+                    "dark": "imgs/hdl-studio-dark.svg"
+                },
                 "category": "HDL Studio"
             },
             {
                 "command": "hdl-studio.showPanel",
                 "title": "Show HDL Studio Panel",
-                "icon": { "light": "imgs/hdl-studio-light.svg", "dark": "imgs/hdl-studio-dark.svg" },
+                "icon": {
+                    "light": "imgs/hdl-studio-light.svg",
+                    "dark": "imgs/hdl-studio-dark.svg"
+                },
                 "category": "HDL Studio"
             },
             {
                 "command": "hdl-studio.openViewJSON",
                 "title": "Open as circuit in HDL Studio",
-                "icon": { "light": "imgs/hdl-studio-light.svg", "dark": "imgs/hdl-studio-dark.svg" },
+                "icon": {
+                    "light": "imgs/hdl-studio-light.svg",
+                    "dark": "imgs/hdl-studio-dark.svg"
+                },
                 "category": "HDL Studio"
             },
             {
                 "command": "hdl-studio.addToViewSource",
                 "title": "Add to HDL Studio",
-                "icon": { "light": "imgs/hdl-studio-light.svg", "dark": "imgs/hdl-studio-dark.svg" },
+                "icon": {
+                    "light": "imgs/hdl-studio-light.svg",
+                    "dark": "imgs/hdl-studio-dark.svg"
+                },
                 "category": "HDL Studio"
             },
             {
                 "command": "hdl-studio.addToViewSourceRecursive",
                 "title": "Add to HDL Studio (Recursive)",
-                "icon": { "light": "imgs/hdl-studio-light.svg", "dark": "imgs/hdl-studio-dark.svg" },
+                "icon": {
+                    "light": "imgs/hdl-studio-light.svg",
+                    "dark": "imgs/hdl-studio-dark.svg"
+                },
                 "category": "HDL Studio"
             },
             {
                 "command": "hdl-studio.newViewSource",
                 "title": "Create circuit in HDL Studio",
-                "icon": { "light": "imgs/hdl-studio-light.svg", "dark": "imgs/hdl-studio-dark.svg" },
+                "icon": {
+                    "light": "imgs/hdl-studio-light.svg",
+                    "dark": "imgs/hdl-studio-dark.svg"
+                },
                 "category": "HDL Studio"
             },
             {
                 "command": "hdl-studio.newViewSourceRecursive",
                 "title": "Create circuit in HDL Studio (Recursive)",
-                "icon": { "light": "imgs/hdl-studio-light.svg", "dark": "imgs/hdl-studio-dark.svg" },
+                "icon": {
+                    "light": "imgs/hdl-studio-light.svg",
+                    "dark": "imgs/hdl-studio-dark.svg"
+                },
                 "category": "HDL Studio"
             },
             {
