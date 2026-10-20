@@ -104,6 +104,9 @@ describe('data_file_paths', function () {
         assert.deepStrictEqual(data_file_paths('control_unit.hex'), ['control_unit.hex']);
         assert.deepStrictEqual(data_file_paths('core/control_unit.hex'), ['core/control_unit.hex', 'control_unit.hex']);
     });
+    it('gives only the alias to a data file outside the project directory', function () {
+        assert.deepStrictEqual(data_file_paths('../../rtl/core/control_unit.hex'), [undefined, 'control_unit.hex']);
+    });
 });
 
 describe('build_yosys_script with a data file entry', function () {

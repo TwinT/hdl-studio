@@ -22,10 +22,14 @@ export function isHdlFile(name) {
 // relative to the source file) only resolves if the file is also at the
 // root; a project-relative reference (`"core/control_unit.hex"`) needs the
 // nested path. Write both. Exact names are written first by the caller, so
-// an alias never shadows a file that really lives at the root.
+// an alias never shadows a file that really lives at the root. A file outside
+// the project directory ("../../rtl/control_unit.hex") has no place inside the
+// synthesis directory: only its alias (no exact name).
 export function data_file_paths(name) {
     const base = path.basename(name);
-    return base === name ? [name] : [name, base];
+    if (base === name) return [name];
+    if (name.split(/[\\/]/)[0] === '..') return [undefined, base];
+    return [name, base];
 }
 
 export function build_yosys_script(files, opts = {}) {

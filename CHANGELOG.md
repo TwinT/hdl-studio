@@ -5,6 +5,14 @@ All notable changes to HDL Studio will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+- A saved project with a data file (`.hex`/`.mem`) outside its folder failed to
+  synthesize ("Refusing to write source ... outside the synthesis directory").
+  Such a file is found by its bare name, as a `$readmemh("control_unit.hex")`
+  in a source file references it.
+
 ## [1.1.0] - 2026-10-19
 
 ### Added

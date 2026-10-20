@@ -66,12 +66,14 @@ export async function run_yosys(files, options) {
                 // kept out of mappedFiles/FileMap entirely. Its bare-name
                 // alias (see data_file_paths) is written after all exact names.
                 const [exact, alias] = data_file_paths(name);
-                const fullPath = path.join(tmpDir, exact);
-                if (!fullPath.startsWith(tmpDir + path.sep)) {
-                    throw { error: `Refusing to write source "${name}" outside the synthesis directory.` };
+                if (exact) {
+                    const fullPath = path.join(tmpDir, exact);
+                    if (!fullPath.startsWith(tmpDir + path.sep)) {
+                        throw { error: `Refusing to write source "${name}" outside the synthesis directory.` };
+                    }
+                    fs.mkdirSync(path.dirname(fullPath), { recursive: true });
+                    fs.writeFileSync(fullPath, content);
                 }
-                fs.mkdirSync(path.dirname(fullPath), { recursive: true });
-                fs.writeFileSync(fullPath, content);
                 if (alias) dataAliases.push([alias, content]);
                 continue;
             }
