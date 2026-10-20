@@ -14,9 +14,13 @@ module led_panel #(
     output logic [ROWS*COLS-1:0]    matrix      // bit y*COLS + x
 );
 
-    always_ff @(posedge clk) begin
-        if (rst) matrix <= '0;
-        else if (row_strobe) matrix[row_idx*COLS+:COLS] <= col_data;
+    // una fila por registro, cada una con su comparador: sin part-select de índice variable,
+    // que yosys sintetiza como un $shiftx que el simulador de HDL Studio no resuelve bien
+    for (genvar r = 0; r < ROWS; r++) begin : g_fila
+        always_ff @(posedge clk) begin
+            if (rst) matrix[r*COLS+:COLS] <= '0;
+            else if (row_strobe && row_idx == r) matrix[r*COLS+:COLS] <= col_data;
+        end
     end
 
 endmodule

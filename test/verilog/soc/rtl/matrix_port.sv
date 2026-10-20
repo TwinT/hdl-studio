@@ -1,6 +1,6 @@
 // Puerto de matriz de LEDs: una VRAM que el CPU escribe como cualquier memoria y un escáner que
 // la recorre fila a fila. Hacia el panel no hay un cable por LED: salen la fila, sus columnas y
-// un strobe, como en un panel multiplexado real.
+// un strobe
 //
 // Formato: 1 bit por píxel, fila-mayor, LSB primero. El píxel (x, y) es el bit i = y*COLS + x,
 // o sea la palabra i/32, bit i%32.
