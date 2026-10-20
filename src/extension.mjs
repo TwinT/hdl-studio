@@ -133,7 +133,8 @@ class HdlStudio {
         this.#global_state = context.globalState;
         // Paths
         const ext_uri = context.extensionUri;
-        this.iconPath = vscode.Uri.joinPath(ext_uri, 'imgs', 'hdl-studio.svg');
+        this.iconPath = { light: vscode.Uri.joinPath(ext_uri, 'imgs', 'hdl-studio-light.svg'),
+                          dark: vscode.Uri.joinPath(ext_uri, 'imgs', 'hdl-studio-dark.svg') };
         this.schematicJSPath = vscode.Uri.joinPath(ext_uri, 'dist', 'schematic.js');
         this.synthJSPath = vscode.Uri.joinPath(ext_uri, 'dist', 'synth_view.js');
         this.statusJSPath = vscode.Uri.joinPath(ext_uri, 'dist', 'status_view.js');

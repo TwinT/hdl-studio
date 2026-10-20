@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- A new icon, with a version for dark themes.
 - "Add to HDL Studio" (and its recursive version) no longer switches the side
   bar away from the Explorer; the status bar says where the files went. With
   several circuits open it asks which one to add to.

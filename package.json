@@ -35,43 +35,43 @@
             {
                 "command": "hdl-studio.openView",
                 "title": "Open HDL Studio",
-                "icon": "imgs/hdl-studio.svg",
+                "icon": { "light": "imgs/hdl-studio-light.svg", "dark": "imgs/hdl-studio-dark.svg" },
                 "category": "HDL Studio"
             },
             {
                 "command": "hdl-studio.showPanel",
                 "title": "Show HDL Studio Panel",
-                "icon": "imgs/hdl-studio.svg",
+                "icon": { "light": "imgs/hdl-studio-light.svg", "dark": "imgs/hdl-studio-dark.svg" },
                 "category": "HDL Studio"
             },
             {
                 "command": "hdl-studio.openViewJSON",
                 "title": "Open as circuit in HDL Studio",
-                "icon": "imgs/hdl-studio.svg",
+                "icon": { "light": "imgs/hdl-studio-light.svg", "dark": "imgs/hdl-studio-dark.svg" },
                 "category": "HDL Studio"
             },
             {
                 "command": "hdl-studio.addToViewSource",
                 "title": "Add to HDL Studio",
-                "icon": "imgs/hdl-studio.svg",
+                "icon": { "light": "imgs/hdl-studio-light.svg", "dark": "imgs/hdl-studio-dark.svg" },
                 "category": "HDL Studio"
             },
             {
                 "command": "hdl-studio.addToViewSourceRecursive",
                 "title": "Add to HDL Studio (Recursive)",
-                "icon": "imgs/hdl-studio.svg",
+                "icon": { "light": "imgs/hdl-studio-light.svg", "dark": "imgs/hdl-studio-dark.svg" },
                 "category": "HDL Studio"
             },
             {
                 "command": "hdl-studio.newViewSource",
                 "title": "Create circuit in HDL Studio",
-                "icon": "imgs/hdl-studio.svg",
+                "icon": { "light": "imgs/hdl-studio-light.svg", "dark": "imgs/hdl-studio-dark.svg" },
                 "category": "HDL Studio"
             },
             {
                 "command": "hdl-studio.newViewSourceRecursive",
                 "title": "Create circuit in HDL Studio (Recursive)",
-                "icon": "imgs/hdl-studio.svg",
+                "icon": { "light": "imgs/hdl-studio-light.svg", "dark": "imgs/hdl-studio-dark.svg" },
                 "category": "HDL Studio"
             },
             {
