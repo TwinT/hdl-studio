@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - "Add to HDL Studio" (and its recursive version) no longer switches the side
   bar away from the Explorer; the status bar says where the files went. With
   several circuits open it asks which one to add to.
+- The project's Files view marks sources that share a file name with another
+  one in the same circuit (a warning icon and "same name").
 
 ### Fixed
 - "Open HDL Studio" on a source file, answered with "Current Circuit", created

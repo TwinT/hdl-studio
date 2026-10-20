@@ -36,7 +36,7 @@ class CircuitFile extends vscode.TreeItem {
 }
 
 class SourceFile extends vscode.TreeItem {
-    constructor(doc_dir, uri, document, circuit_view) {
+    constructor(doc_dir, uri, document, circuit_view, same_name) {
         let name;
         if (rel_compat2(doc_dir, uri)) {
             name = path.relative(doc_dir.path, uri.path);
@@ -47,6 +47,15 @@ class SourceFile extends vscode.TreeItem {
         super(name, vscode.TreeItemCollapsibleState.None);
         const uri_str = uri.toString();
         this.iconPath = new vscode.ThemeIcon('file');
+        if (same_name) {
+            // A $readmemh by bare name gets only one of them (the one in the
+            // project directory, see data_file_paths); two .sv usually means
+            // a module defined twice. Up to the user to remove one.
+            this.iconPath = new vscode.ThemeIcon(
+                'warning', new vscode.ThemeColor('list.warningForeground'));
+            this.description = 'same name';
+            this.tooltip = `Another source in this circuit is also named ${path.basename(uri.path)}`;
+        }
         this.id = uri_str;
         this.resourceUri = uri;
         this.contextValue = uri_str;
@@ -95,12 +104,15 @@ export class FilesView {
         console.assert(element instanceof CircuitFile);
         const document = element.document;
         const doc_dir = document.sources.doc_dir_uri;
-        let res = [];
-        for (let [uri_str, info] of document.sources.entries()) {
-            if (info.deleted)
-                continue;
-            res.push(new SourceFile(doc_dir, info.uri, document, element.circuitView));
+        const infos = document.sources.entries().map(([, info]) => info)
+                                                .filter((info) => !info.deleted);
+        const counts = {};
+        for (const info of infos) {
+            const base = path.basename(info.uri.path);
+            counts[base] = (counts[base] || 0) + 1;
         }
-        return res;
+        return infos.map((info) => new SourceFile(doc_dir, info.uri, document,
+                                                  element.circuitView,
+                                                  counts[path.basename(info.uri.path)] > 1));
     }
 }
