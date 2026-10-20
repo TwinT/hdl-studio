@@ -6,7 +6,8 @@
 #   make release              test, tag, push, package, publish to Open VSX
 #   upload the .vsix by hand: https://marketplace.visualstudio.com/manage/publishers/TwinT
 #
-# Open VSX needs a token in OVSX_PAT (https://open-vsx.org/user-settings/tokens).
+# Open VSX needs a token in OVSX_PAT (https://open-vsx.org/user-settings/tokens), or in the
+# keyring as `name ovsx_pat` (secret-tool).
 
 CURRENT := $(shell node -p "require('./package.json').version")
 TARGET  := linux-x64
@@ -39,8 +40,12 @@ tag: check
 package:
 	npx @vscode/vsce package --target $(TARGET)
 
+# make runs recipes with /bin/sh, which never sees the ovsx() function in ~/.zshrc that
+# loads the token: read the keyring here (only for these targets, only if OVSX_PAT is unset)
+token ovsx: export OVSX_PAT ?= $(shell secret-tool lookup name ovsx_pat 2>/dev/null)
+
 token:
-	@ovsx --version > /dev/null 2>&1 
+	@ovsx --version > /dev/null
 	@test -n "$$OVSX_PAT" || { echo "set OVSX_PAT"; exit 1; }
 
 ovsx: token
