@@ -7,7 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- "Add to HDL Studio" (and its recursive version) no longer switches the side
+  bar away from the Explorer; the status bar says where the files went. With
+  several circuits open it asks which one to add to.
+
 ### Fixed
+- "Open HDL Studio" on a source file, answered with "Current Circuit", created
+  a new circuit instead.
 - A saved project with a data file (`.hex`/`.mem`) outside its folder failed to
   synthesize ("Refusing to write source ... outside the synthesis directory").
   Such a file is found by its bare name, as a `$readmemh("control_unit.hex")`

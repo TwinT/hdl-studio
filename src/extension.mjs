@@ -788,14 +788,36 @@ class HdlStudio {
             vscode.commands.executeCommand("workbench.action.closeActiveEditor");
         vscode.commands.executeCommand("vscode.openWith", uri, EditorProvider.viewType);
     }
+    // Context menus can't list the open circuits, so ask here when there are several.
+    async #pickCircuitView() {
+        const active = this.#circuitView;
+        const views = this.circuitViews;
+        if (views.length <= 1)
+            return active;
+        const items = [active, ...views.filter((v) => v !== active)].map((view) => ({
+            label: path.basename(view.document.uri.path),
+            description: view === active ? 'active' : undefined,
+            detail: vscode.workspace.asRelativePath(view.document.uri),
+            view }));
+        const item = await vscode.window.showQuickPick(items, {
+            title: 'Add to which circuit?'
+        });
+        return item?.view;
+    }
     async #openViewSource(uris, force_new, recursive = false) {
         uris = await expandSources(uris, recursive);
         if (uris.length === 0)
             return;
         if (this.#circuitView && !force_new) {
-            this.#circuitView.reveal();
-            vscode.commands.executeCommand('hdl-studio-proj-files.focus');
-            this.#document.addSources(uris);
+            // No reveal/focus: adding many files from the Explorer shouldn't
+            // keep switching the sidebar away from it.
+            const view = await this.#pickCircuitView();
+            if (!view)
+                return;
+            view.document.addSources(uris);
+            vscode.window.setStatusBarMessage(
+                `HDL Studio: ${uris.length} file(s) added to ${path.basename(view.document.uri.path)}`,
+                4000);
         }
         else {
             // If we are creating a new document, we won't have the handle to the document
@@ -866,7 +888,11 @@ class HdlStudio {
                     `Add ${uri.path} to?`, 'Current Circuit', 'New Circuit');
                 if (!res) // Cancelled
                     return;
-                this.#openViewSource([uri], res !== 'Add');
+                if (res === 'New Circuit')
+                    return this.#openViewSource([uri], true);
+                this.#document.addSources([uri]);
+                vscode.commands.executeCommand('hdl-studio-proj-files.focus');
+                return this.#circuitView.reveal();
             }
             else {
                 const res = await vscode.window.showInformationMessage(
