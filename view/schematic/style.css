@@ -18,6 +18,22 @@ body {
     background: var(--sch-paper);
 }
 
+/* the circuit shown at the waveform cursor's tick, not the present */
+#pastbanner {
+    position: absolute;
+    top: 8px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 5;
+    padding: 3px 10px;
+    border-radius: 4px;
+    background: var(--vscode-statusBarItem-warningBackground, #c19c00);
+    color: var(--vscode-statusBarItem-warningForeground, #000);
+    font: 12px var(--vscode-font-family, sans-serif);
+    white-space: pre;
+    pointer-events: none;
+}
+
 /* the waveform monitor, under the schematic (colours from the
    hdl-studio.waveform.colors setting, Surfer's dark theme by default) */
 #monitor {

@@ -4,7 +4,9 @@
 // update this asks for the window it shows (`wave`, one entry per pixel
 // column) and draws it. Rows can be dragged into another order and into
 // groups (one level, coloured, collapsible); the whole arrangement is the
-// `config` saved with the project or in a file.
+// `config` saved with the project or in a file. A click or a drag on the
+// waveforms puts the time cursor there: the view stops following and the
+// app shows the circuit at that tick, until Space or "follow".
 
 import { formatTimeAt } from '../../src/time_units.mjs';
 import { read, show } from './values.ts';
@@ -72,6 +74,8 @@ export interface MonitorHooks {
     // the toolbar's buttons: the layout to a file, or from one
     exportLayout(): void;
     importLayout(): void;
+    // the time cursor moved to `tick`, or went (back to the present)
+    cursor(tick: number | undefined): void;
 }
 
 const ROW = 24;
@@ -109,7 +113,7 @@ export class Monitor {
     #tick = 0;
     #tickSec = 1e-9;
     #hover?: number; // tick under the pointer
-    #marker?: number; // tick where a trigger paused the simulation
+    #cursor?: number; // the tick the circuit is shown at (a click, or where a trigger paused)
     #colors = defaultColors;
     #asking = false;
     #again = false;
@@ -167,6 +171,12 @@ export class Monitor {
         // the waveform column's width (the view's, or a column resized)
         new ResizeObserver(() => this.#resize()).observe(this.#ruler);
         this.#waveEvents();
+        // Space: back to the present (and running, if it was)
+        window.addEventListener('keydown', (e) => {
+            if (e.code !== 'Space' || e.repeat || this.#follow || (e.target as Element).closest?.('input, textarea, select, [contenteditable]')) return;
+            e.preventDefault();
+            this.#setFollow(true);
+        });
         this.#setFollow(true);
         this.#show();
     }
@@ -270,7 +280,17 @@ export class Monitor {
             this.#hooks.send({ op: 'watch', id: w.id, path: w.path, port: w.port });
             if (w.pause) w.triggerId = this.#hooks.trigger(w.path, w.port, w.pause.values);
         }
-        this.#setFollow(true); // clears the trigger's marker, asks for the window
+        this.#setFollow(true); // drops the cursor, asks for the window
+    }
+
+    // Following the simulation again, without the cursor.
+    follow() {
+        this.#setFollow(true);
+    }
+
+    // A tick as the ruler's time, precisely.
+    timeOf(tick: number) {
+        return formatTimeAt(tick * this.#tickSec, this.#tickSec);
     }
 
     // The engine's tick, after an update.
@@ -284,10 +304,10 @@ export class Monitor {
     fired(triggerId: number, tick: number) {
         const w = [...this.#watches.values()].find((x) => x.triggerId === triggerId);
         if (!w) return false;
-        this.#marker = tick;
-        this.#setFollow(false);
+        this.#tick = Math.max(this.#tick, tick);
+        this.#setCursor(tick);
         this.#start = Math.max(0, tick - this.#span() * 0.7);
-        this.#status.textContent = `Paused: ${w.name} ${w.pause!.label} at ${formatTimeAt(tick * this.#tickSec, this.#tickSec)}`;
+        this.#status.textContent = `Paused: ${w.name} ${w.pause!.label} at ${this.timeOf(tick)}`;
         this.#ask();
         return true;
     }
@@ -535,49 +555,59 @@ export class Monitor {
         b.hidden = !paused && !this.#running;
         b.className = `badge ${paused ? 'paused' : 'running'}`;
         b.textContent = paused ? 'PAUSED' : 'RUNNING';
-        b.title = paused ? 'The waveforms stopped following the simulation (it may still be running): click here or on a waveform to follow it again'
-            : 'The waveforms follow the running simulation: click here or on a waveform to stop and look back';
+        b.title = paused ? 'The waveforms stopped following the simulation: click here or press Space to follow it again'
+            : 'The waveforms follow the running simulation: click here to stop';
     }
 
     #setFollow(on: boolean) {
         this.#follow = on;
         this.#followBtn.classList.toggle('on', on);
         this.#showBadge();
-        this.#followBtn.title = on ? 'Following the simulation: click the waveform (or here) to stop'
-            : 'Paused view: click the waveform (or here) to follow the simulation again';
+        this.#followBtn.title = on ? 'Following the simulation: click to stop (a click on the waveforms puts the cursor there)'
+            : 'Follow the simulation again (Space)';
         if (on) {
-            this.#marker = undefined;
             this.#status.textContent = '';
+            if (this.#cursor !== undefined) {
+                this.#cursor = undefined;
+                this.#hooks.cursor(undefined);
+            }
             this.tick(this.#tick);
         }
     }
 
-    // On a waveform: a click toggles following, a drag scrolls (and stops
-    // following), Ctrl+wheel zooms, Shift+wheel scrolls; the pointer's time
-    // shows the values there.
+    // The cursor at `t` (within what ran): the view stops following.
+    #setCursor(t: number) {
+        this.#cursor = Math.max(0, Math.min(this.#tick, Math.floor(t)));
+        if (this.#follow) this.#setFollow(false);
+        this.#hooks.cursor(this.#cursor);
+        this.#drawAll();
+    }
+
+    // On the waveforms and the ruler: a click or a drag puts the cursor
+    // there; a drag with the middle button (or Alt) scrolls; Ctrl+wheel
+    // zooms, Shift+wheel scrolls; the pointer's time shows the values there.
     #waveEvents() {
         const over = (e: Event) => e.target instanceof HTMLCanvasElement;
         const x = (e: MouseEvent) => e.clientX - this.#ruler.getBoundingClientRect().left;
         this.#grid.addEventListener('pointerdown', (e) => {
-            if (!over(e) || e.button !== 0) return;
-            const c = e.target as HTMLCanvasElement, x0 = e.clientX, s0 = this.#start;
-            let dragged = false;
-            const move = (ev: PointerEvent) => {
-                if (!dragged && Math.abs(ev.clientX - x0) < 4) return;
-                if (!dragged) {
-                    dragged = true;
-                    c.setPointerCapture(e.pointerId);
-                    this.#setFollow(false);
-                }
-                this.#start = Math.max(0, s0 - (ev.clientX - x0) / this.#ppt);
-                this.#ask();
-            };
-            const up = () => {
-                c.removeEventListener('pointermove', move);
-                if (!dragged) this.#setFollow(!this.#follow);
-            };
+            if (!over(e)) return;
+            const c = e.target as HTMLCanvasElement;
+            let move: (ev: PointerEvent) => void;
+            if (e.button === 1 || (e.button === 0 && e.altKey)) {
+                e.preventDefault(); // no autoscroll
+                const x0 = e.clientX, s0 = this.#start;
+                this.#setFollow(false);
+                move = (ev) => {
+                    this.#start = Math.max(0, s0 - (ev.clientX - x0) / this.#ppt);
+                    this.#ask();
+                };
+            } else if (e.button === 0) {
+                move = (ev) => this.#setCursor(this.#start + x(ev) / this.#ppt);
+                move(e);
+            } else return;
+            c.setPointerCapture(e.pointerId);
             c.addEventListener('pointermove', move);
-            c.addEventListener('pointerup', up, { once: true });
+            c.addEventListener('pointerup', () => c.removeEventListener('pointermove', move), { once: true });
         });
         this.#grid.addEventListener('pointermove', (e) => {
             this.#hover = over(e) ? this.#start + x(e) / this.#ppt : undefined;
@@ -687,7 +717,7 @@ export class Monitor {
         this.#drawRuler();
         for (const w of this.#watches.values()) {
             this.#draw(w);
-            const v = this.#valueAt(w, this.#hover ?? end);
+            const v = this.#valueAt(w, this.#hover ?? this.#cursor ?? end);
             w.value_.textContent = v && v !== '…' ? show(w.base, v) : v;
             w.value_.style.color = /^z+$/.test(v) ? this.#colors.highImpedance : /[xz]/.test(v) ? this.#colors.undefined : '';
         }
@@ -715,9 +745,19 @@ export class Monitor {
             c.fillText(t(k), x + 3, 8);
         }
         this.#lines(c, 20);
+        // the cursor's time, on it
+        const x = this.#cursor === undefined ? -1 : (this.#cursor - this.#start) * this.#ppt;
+        if (x >= 0 && x <= W) {
+            const label = this.timeOf(this.#cursor!), w = c.measureText(label).width + 8;
+            const left = Math.min(W - w, x + 2);
+            c.fillStyle = this.#colors.cursor;
+            c.fillRect(left, 1, w, 13);
+            c.fillStyle = this.#colors.background;
+            c.fillText(label, left + 4, 8);
+        }
     }
 
-    // The hover line and the trigger marker.
+    // The hover line and the cursor.
     #lines(c: CanvasRenderingContext2D, H: number) {
         const at = (tick: number, color: string, width: number) => {
             const x = (tick - this.#start) * this.#ppt;
@@ -726,7 +766,7 @@ export class Monitor {
             c.lineWidth = width;
             c.beginPath(); c.moveTo(x, 0); c.lineTo(x, H); c.stroke();
         };
-        if (this.#marker !== undefined) at(this.#marker, this.#colors.cursor, 2);
+        if (this.#cursor !== undefined) at(this.#cursor, this.#colors.cursor, 2);
         if (this.#hover !== undefined) {
             c.globalAlpha = 0.5;
             at(this.#hover, this.#colors.foreground, 1);

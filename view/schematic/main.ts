@@ -77,6 +77,11 @@ class App {
     #monitor: Monitor;
     #theme: { name?: string, waveColors?: any } = {};
     #names?: Map<string, { path: string, port: string }>; // watchable outputs by name
+    // while the waveform cursor shows the circuit at an earlier tick: whether
+    // to run again once it goes
+    #resume?: boolean;
+    #inspecting = false;
+    #inspectNext?: number | null;
 
     constructor() {
         this.#lua = new LuaRunner(vscode, engineChannel, this);
@@ -97,6 +102,7 @@ class App {
             changed: () => this.#wavesChanged(),
             exportLayout: () => vscode.postMessage({ command: 'savewaves', config: this.#monitor.config }),
             importLayout: () => vscode.postMessage({ command: 'loadwaves' }),
+            cursor: (tick) => this.#cursor(tick),
         });
         this.#applyTheme();
         // the VS Code theme changed: the "VS Code" theme's waveforms follow it
@@ -179,6 +185,9 @@ class App {
     #load() {
         for (const resolve of this.#acks.values()) resolve(undefined);
         this.#acks.clear();
+        // a new run: no cursor in it
+        this.#resume = this.#inspectNext = undefined;
+        this.#banner(undefined);
         this.#session = Math.floor(Math.random() * 2 ** 31);
         this.#running = false;
         this.#tick = 0;
@@ -212,8 +221,9 @@ class App {
                 return;
             }
             case 'monitor':
-                // a waveform trigger fired: the engine stopped
+                // a waveform trigger fired: the engine stopped; Space goes on
                 if (ev.stop && this.#triggers.has(ev.id)) {
+                    this.#resume = true;
                     this.#monitor.fired(ev.id, ev.tick);
                     if (this.#running) {
                         this.#running = false;
@@ -245,7 +255,54 @@ class App {
         }
     }
 
+    // ---- the waveform cursor: the circuit as it was at a tick
+
+    #cursor(tick: number | undefined) {
+        if (tick === undefined) {
+            if (this.#resume === undefined) return;
+            const resume = this.#resume;
+            this.#leavePast();
+            if (resume) this.startSim();
+            return;
+        }
+        if (this.#resume === undefined) {
+            this.#resume = this.running;
+            this.pauseSim();
+        }
+        this.#inspect(tick);
+        this.#banner(tick);
+    }
+    // Back to the present, without running (what changes the run does that
+    // itself, and the engine leaves the past on its own).
+    #leavePast() {
+        if (this.#resume === undefined) return;
+        this.#resume = undefined;
+        this.#monitor.follow();
+        this.#inspect(null);
+        this.#banner(undefined);
+    }
+    // One request at a time; the latest tick wins.
+    async #inspect(tick: number | null) {
+        if (this.#inspecting) {
+            this.#inspectNext = tick;
+            return;
+        }
+        this.#inspecting = true;
+        await this.#request({ op: 'inspect', tick });
+        this.#inspecting = false;
+        const next = this.#inspectNext;
+        this.#inspectNext = undefined;
+        if (next !== undefined) this.#inspect(next);
+    }
+    #banner(tick: number | undefined) {
+        let b = document.getElementById('pastbanner');
+        if (tick === undefined) return b?.remove();
+        if (!b) document.getElementById('paper')!.append(b = Object.assign(document.createElement('div'), { id: 'pastbanner' }));
+        b.textContent = `t = ${this.#monitor.timeOf(tick)}  ·  Space: back to the present${this.#resume ? ' and run' : ''}`;
+    }
+
     startSim() {
+        this.#leavePast();
         if (!this.circuit || this.#running) return;
         if (this.#speed === null) {
             this.#send({ op: 'start_fast' });
@@ -264,12 +321,14 @@ class App {
         this.updateRunStates();
     }
     async #step(next: boolean) {
+        this.#leavePast();
         if (!this.circuit || this.#running) return;
         await this.#request({ op: 'step', next, sync: true });
         this.updateRunStates();
     }
     // `ticks` ticks flat out, then pause.
     async #runFor(ticks: number) {
+        this.#leavePast();
         if (!this.circuit) return;
         await this.#request({ op: 'stop', sync: true });
         const id = ++this.#reqId;
@@ -508,7 +567,10 @@ class App {
             const ed = memoryEditor(d, mem, {
                 reads: () => d.rdports.map((_: any, i: number) => addr(`rd${i}addr`)),
                 writes: () => d.wrports.map((_: any, i: number) => addr(`wr${i}addr`)),
-            }, (a, value) => this.#send({ op: 'mem_write', path, addr: a, value }));
+            }, (a, value) => {
+                this.#leavePast();
+                this.#send({ op: 'mem_write', path, addr: a, value });
+            });
             const dialog = new Dialog(`Memory contents: ${d.label ?? ''}`, () => { ed.close(); this.#extras.delete(path); });
             dialog.body.appendChild(ed.root);
             dialog.center();
@@ -664,6 +726,7 @@ class App {
         }
     }
     #setInput(path: string, value: string) {
+        this.#leavePast();
         this.#send({ op: 'set_input', path, value });
         // shown at once, the engine confirms it with its next update
         const g = graphOf(path);

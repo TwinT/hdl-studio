@@ -244,6 +244,7 @@ describe('schematic webview on the engine', function () {
     });
 
     it('records waveforms, and a trigger stops the simulation', async function () {
+        await post({ command: 'pausesim' }); // a run from tick 0, watched from the start
         const view = await show('04_counter');
         // real mouse events (synthetic ones once hid a bug: the pan captured
         // the pointer, so a double-click on a wire zoomed instead)
@@ -288,23 +289,44 @@ describe('schematic webview on the engine', function () {
             return [...seen];
         });
         assert.ok(colours.includes('86,193,38'), colours.slice(0, 20).join(' '));
-        // the trigger stopped following, which the toolbar says; a click on a waveform
-        // follows again, another stops
+        // the trigger put the cursor where it stopped, which the toolbar says
         const following = () => page.evaluate(() => document.querySelector('#monitor [name=follow]').classList.contains('on'));
         const badge = () => page.evaluate(() => {
             const b = document.querySelector('#monitor [name=badge]');
             return b.hidden ? '' : b.textContent;
         });
+        const running = async () => (await lastPosted('runstate')).running;
         assert.deepStrictEqual([await following(), await badge()], [false, 'PAUSED']);
+        // Space goes on running, following
+        await page.keyboard.press('Space');
+        assert.deepStrictEqual([await following(), await running()], [true, true]);
+        await page.waitForTimeout(400);
+        // everything recorded in view; a click near its start shows the circuit then:
+        // the simulation pauses, the count display shows the count's waveform there
+        await page.evaluate(() => document.querySelector('#monitor [name=fit]').click());
+        const display = () => page.evaluate((id) => document.querySelector(`.cell[data-id="${id}"] .numvalue`).textContent, count);
         const wave = await page.evaluate(() => document.querySelector('#monitor .grid canvas:not(.ruler)').getBoundingClientRect().toJSON());
-        await page.mouse.click(wave.x + 40, wave.y + 10);
-        assert.deepStrictEqual([await following(), await badge()], [true, '']); // following, the simulation stopped
-        await post({ command: 'startsim' });
-        await until(() => document.querySelector('#monitor [name=badge]').textContent === 'RUNNING'
-                          && !document.querySelector('#monitor [name=badge]').hidden);
+        await page.mouse.click(wave.x + 60, wave.y + 10);
+        assert.deepStrictEqual([await following(), await running()], [false, false]);
+        const present = await display();
+        const valueAt = () => page.evaluate(() => [...document.querySelectorAll('#monitor .row')].find((r) => r.querySelector('.name > span:not(.pause)')?.textContent === 'count').querySelector('.value').textContent);
+        await until((id) => document.querySelector(`.cell[data-id="${id}"] .numvalue`).textContent
+                            === [...document.querySelectorAll('#monitor .row')].find((r) => r.querySelector('.name > span:not(.pause)')?.textContent === 'count').querySelector('.value').textContent, count);
+        assert.notStrictEqual(await display(), present);
+        assert.match(await page.evaluate(() => document.getElementById('pastbanner').textContent), /^t = .* back to the present and run/);
+        // dragging the cursor along shows the circuit along: a later count
+        const earlier = await display();
+        await page.mouse.move(wave.x + 60, wave.y + 10);
+        await page.mouse.down();
+        await page.mouse.move(wave.x + wave.width * 0.6, wave.y + 10, { steps: 6 });
+        await page.mouse.up();
+        await until((id) => document.querySelector(`.cell[data-id="${id}"] .numvalue`).textContent
+                            === [...document.querySelectorAll('#monitor .row')].find((r) => r.querySelector('.name > span:not(.pause)')?.textContent === 'count').querySelector('.value').textContent, count);
+        assert.notStrictEqual(await valueAt(), earlier);
+        // Space: the present, running again
+        await page.keyboard.press('Space');
+        assert.deepStrictEqual([await following(), await running(), await page.evaluate(() => !!document.getElementById('pastbanner'))], [true, true, false]);
         await post({ command: 'pausesim' });
-        await page.mouse.click(wave.x + 40, wave.y + 10);
-        assert.strictEqual(await following(), false);
     });
 
     it('keeps what the project saves: waveforms, zoom, clock period, a layout', async function () {
