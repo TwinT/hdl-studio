@@ -70,8 +70,11 @@ More examples, each with a Lua test script, are in
 - **Gate-level simulation** with 4-valued logic, tri-state buses and per-cell delays:
   run continuously at an adjustable speed (or flat out), one tick, one clock cycle, or
   a given time (`2 us`), and reset to tick 0.
-- **Waveform monitor** for any wire, with number formats and *pause when* conditions
-  (rises, falls, changes, becomes x, equals a value).
+- **Waveform monitor** for any wire, with number formats, *pause when* conditions
+  (rises, falls, changes, becomes x, equals a value), coloured collapsible groups and
+  layouts saved with the project or to a file.
+- **Time cursor**: click a waveform and the whole circuit shows the values it had then.
+- **Themes** for the circuit view: Classic, VS Code, Solarized, Dracula, Nord and more.
 - **I/O widgets** inferred from the top module's ports: clocks, switches, push buttons,
   number fields, lamps, number displays, 7-segment displays and LED matrices.
 - **Source highlighting**: hover a cell or a wire to see the lines of code it came from.
@@ -150,6 +153,11 @@ that produced it:
   | orange | high impedance (z) |
   | grey | undefined (x) |
 
+  (in the *Classic* theme; the others have their own shades of these).
+- **Theme:** right-click the background and pick one — *Classic*, *VS Code* (its
+  colours), *Solarized Light*, *Solarized Dark*, *Dracula*, *Nord*, *Night Owl*,
+  *Gruvbox Dark*. The waveforms take its colours too.
+
 ### Simulation
 
 Start and pause with ▶/⏸ in the editor title or the *Control* panel, which also has:
@@ -173,14 +181,27 @@ over a number field) or in the *Control* panel, which also shows the outputs.
 Hover a wire and click its waveform button, or double-click the wire, to add it to the
 monitor under the schematic.
 
-- Values are shown under the pointer (otherwise at the right edge), with a ruler in the
-  project's time units.
-- Click the waveforms to stop following the simulation and look around; click again to
-  follow it. Drag to scroll, `Ctrl` + wheel to zoom.
+- Values are shown under the pointer (otherwise at the cursor, or the right edge), with a
+  ruler in the project's time units.
+- **Time cursor:** click (or drag) on the waveforms to put the cursor at a time. The
+  simulation pauses and the whole circuit — schematic, *Control* panel, memories, FSMs —
+  shows the values it had then; drag the cursor to move through the run. `Space` (or the
+  follow button) goes back to the present and runs again if it was running; so does
+  anything that changes the run (*Start*, a step, an input).
+- Scroll with the wheel (`Shift` + wheel, or sideways) or by dragging with the middle
+  button (or `Alt` + drag); `Ctrl` + wheel zooms.
 - Right-click a signal (or its `…` button) to change its number format, remove it, or
   **pause the simulation** when it rises, falls, changes, becomes x or equals a value.
-  Press *Start*: the simulation runs until that happens, and the monitor marks the moment
-  and says why it paused.
+  Press *Start*: the simulation runs until that happens, the cursor marks the moment and
+  the monitor says why it paused; `Space` goes on.
+- **Arrange:** drag a signal by its name to reorder it. *New group* in a signal's menu
+  puts it in a group (named in place); drag others onto the group's header. Groups have a
+  colour (their signals are drawn in it) and collapse with their arrow. Drag the edges of
+  the *Signal* and *Value* headers to resize the columns.
+- The monitor's arrangement is saved with the project; the 💾/📂 buttons save it to or
+  open it from a `.waves.json` file (also *Open a waveform layout…* in the schematic's
+  menu), to share or keep several. Signals are found by name, so a layout survives a
+  new synthesis.
 
 ### Saving, undo and export
 
@@ -284,7 +305,8 @@ Values given to `sim` can be vecs, booleans, integers or strings like `"8hff"`.
 | Setting | Default | |
 |---|---|---|
 | `hdl-studio.yosysPath` | `""` (use `PATH`) | Path to the `yosys` executable. |
-| `hdl-studio.waveform.colors` | [Surfer](https://surfer-project.org)'s dark theme | Waveform colours as CSS colours: `background`, `altBackground`, `foreground`, `grid`, `signal`, `undefined`, `highImpedance`, `cursor`, `fillOpacity`. Any key can be left out. |
+| `hdl-studio.theme` | `classic` | Colours of the circuit view: `classic`, `vscode`, `solarized-light`, `solarized-dark`, `dracula`, `nord`, `night-owl`, `gruvbox-dark`. |
+| `hdl-studio.waveform.colors` | `{}` (the theme's) | Waveform colours as CSS colours, over the theme's: `background`, `altBackground`, `foreground`, `grid`, `signal`, `undefined`, `highImpedance`, `cursor`, `fillOpacity`. Any key can be left out. |
 
 The simulation speed is global and remembered between sessions.
 

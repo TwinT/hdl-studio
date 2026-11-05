@@ -50,6 +50,16 @@ simulator), `hdlstudio` (the binary).
   (`crates/hdlstudio/src/wave.rs`, up to 1M changes per signal); `wave {from, to,
   bins}` returns a window with one entry per pixel column (several changes in one
   column come back as a dense block), so a flat-out run never streams its changes.
+- The past (`inspect {tick}`, the waveform cursor): no net history is kept. The
+  `Sim` logs what came from outside (`set_input`, `write_memory`,
+  `set_propagation`: every caller, host or Lua, goes through them) with its tick;
+  `checkpoint()` copies the simulation (without monitors/alarms) and
+  `replay_to(&live, t)` runs it to where the live run was at `t` (events before
+  `t`, stimuli up to `t`). `serve` keeps a checkpoint at load and one per second of
+  running (32, thinned by halves) plus the states a long replay went through, and
+  while inspecting sends the replica's values/memory words/FSM states; ops that
+  change the run (`step`, `start*`, `set_input`, `mem_write`, `lua_run`) leave it
+  first. `crates/hdlstudio-sim/tests/replay.rs` checks replays against the run.
 
 ## The circuit view (`view/schematic/`, TypeScript)
 
@@ -73,13 +83,27 @@ SVG drawn by hand, laid out by `elkjs`, simulated by the engine through the host
   position/vertices/numbase) didn't change only redraws: undo/redo of a move keeps
   simulating.
 - `waves.ts`, the waveform monitor (like Surfer/VaporView): name, value (under the
-  pointer, else at the view's right edge), waveform, and a ruler in the project's
-  time units (`timescale` comes with `showcircuit` and on change). Colours: the
-  `hdl-studio.waveform.colors` setting (sent as `wavecolors`), Surfer's dark theme by
-  default. A click on a waveform toggles following the simulation, a drag scrolls
-  back, Ctrl+wheel zooms. A row's menu (right-click or "…") picks the number format
-  and a pause condition: an engine `monitor` with `stop` (triggers null = any
-  change); when it fires the view marks the tick and says why it paused.
+  pointer, else at the cursor or the view's right edge), waveform, and a ruler in the
+  project's time units (`timescale` comes with `showcircuit` and on change). Each
+  signal is a `.row` (CSS subgrid of the name/value/wave columns, resizable): rows
+  are dragged by the name, into groups (one level, colour, collapsed). `config`
+  (`{waves: [spec | {group, color, collapsed, items}], columns}`) is saved as the
+  document's `view.waves`/`view.waveColumns` and to `.waves.json` files
+  (`savewaves`/`loadwaves`/`wavesconfig`, dialogs in `circuit_view.mjs`); `main.ts`
+  `#resolve` finds a saved signal at its path, else by its name (a new synthesis
+  renumbers cells). A click/drag on the waves or ruler sets the cursor: `main.ts`
+  `#cursor` pauses (remembering whether it ran), sends `inspect` (one in flight,
+  latest wins) and shows `#pastbanner`; Space/follow clear it and run again;
+  `#leavePast` runs first in everything that changes the run. Middle/Alt-drag
+  scrolls, Ctrl+wheel zooms. A row's menu (right-click or "…") picks the number
+  format, a pause condition (an engine `monitor` with `stop`, triggers null = any
+  change; firing puts the cursor there and Space goes on) and its group.
+- Themes (`themes.ts`, setting `hdl-studio.theme`, also in the schematic's
+  right-click menu → `settheme`): a palette per theme set as `--sch-*` variables on
+  `:root`; the drawing uses `var(...)` colours (`cells.ts` `C`, `values.ts`
+  `levelColor`), which `el()`/`paint()` put in the style, not in presentation
+  attributes. The waveforms get concrete colours (the theme's, `var()`s resolved,
+  under `hdl-studio.waveform.colors`), sent with `showcircuit` and as `theme`.
 - Pan captures the pointer only once it drags: capturing on pointerdown sends the
   click/dblclick to the svg instead of the wire under it.
 - TypeScript: `tsc` only type-checks (`tsconfig.json`, part of `npm run lint`);

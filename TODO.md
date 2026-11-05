@@ -39,15 +39,14 @@ Done items leave this list; git history keeps them.
       - no wire editing (on purpose: an edited netlist no longer matches the
         sources);
       - a number base picked on a NumEntry/NumDisplay is only saved with the
-        next edit;
-      - the paper is white in dark themes too.
+        next edit.
 - [ ] The waveform monitor: its history is capped at 1M changes per signal
       (the oldest quarter goes), which a clock fills in seconds at flat-out
-      speed; watched signals survive a re-synthesis only if the same cell id
-      and name still exist; dragging a waveform scrolls back and so stops
-      following the simulation (a click follows again) — Marcos found that
-      odd, to discuss; a light theme, or one following VS Code's, is a matter
-      of the colours setting.
+      speed; groups are one level deep, coloured per group (not per signal),
+      with no multiple selection.
+- [ ] The time cursor (`inspect`): a first jump back on a long flat-out run
+      replays up to a checkpoint's spacing (~1 s of running at first, more
+      once they're thinned); the stimulus log grows for the whole run.
 - [ ] The README's screenshots other than the first show the pre-1.0 UI.
 
 ## Known Bugs 🐛
