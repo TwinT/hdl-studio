@@ -223,6 +223,26 @@ describe('schematic webview on the engine', function () {
         assert.strictEqual(png.base64, true);
     });
 
+    it('draws in the theme picked in its menu', async function () {
+        await show('04_counter');
+        const svg = await page.evaluate(() => document.querySelector('svg.schematic').getBoundingClientRect().toJSON());
+        await page.mouse.click(svg.x + svg.width - 20, svg.y + 20, { button: 'right' });
+        await page.locator('.wavemenu button', { hasText: 'Solarized Dark' }).click();
+        assert.strictEqual((await lastPosted('settheme')).theme, 'solarized-dark');
+        // the host writes the setting, which comes back
+        await post({ command: 'theme', theme: 'solarized-dark' });
+        const colours = () => page.evaluate(() => [
+            getComputedStyle(document.getElementById('paper')).backgroundColor,
+            getComputedStyle(document.querySelector('.cell .body rect')).fill,
+            getComputedStyle(document.querySelector('.cell text')).fill,
+        ]);
+        await until(() => getComputedStyle(document.getElementById('paper')).backgroundColor === 'rgb(0, 43, 54)');
+        assert.deepStrictEqual(await colours(), ['rgb(0, 43, 54)', 'rgb(7, 54, 66)', 'rgb(147, 161, 161)']);
+        await post({ command: 'theme', theme: 'classic' });
+        await until(() => getComputedStyle(document.getElementById('paper')).backgroundColor === 'rgb(255, 255, 255)');
+        assert.deepStrictEqual(await colours(), ['rgb(255, 255, 255)', 'rgb(255, 255, 255)', 'rgb(0, 0, 0)']);
+    });
+
     it('records waveforms, and a trigger stops the simulation', async function () {
         const view = await show('04_counter');
         // real mouse events (synthetic ones once hid a bug: the pan captured

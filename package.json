@@ -378,20 +378,22 @@
                     "default": "",
                     "description": "Path to the yosys executable. If empty, yosys from the PATH will be used."
                 },
+                "hdl-studio.theme": {
+                    "type": "string",
+                    "default": "classic",
+                    "enum": ["classic", "vscode", "solarized-light", "solarized-dark", "dracula", "nord", "night-owl", "gruvbox-dark"],
+                    "enumItemLabels": ["Classic", "VS Code", "Solarized Light", "Solarized Dark", "Dracula", "Nord", "Night Owl", "Gruvbox Dark"],
+                    "enumDescriptions": [
+                        "White paper; the waveforms in Surfer's dark theme.",
+                        "The colours of the VS Code theme.",
+                        "", "", "", "", "", ""
+                    ],
+                    "markdownDescription": "Colours of the circuit view: the schematic and the waveform monitor (also in the schematic's right-click menu)."
+                },
                 "hdl-studio.waveform.colors": {
                     "type": "object",
-                    "markdownDescription": "Colours of the waveform monitor, as CSS colours (any key can be left out). The default is [Surfer](https://surfer-project.org)'s dark theme.",
-                    "default": {
-                        "background": "#0b151d",
-                        "altBackground": "#1b252d",
-                        "foreground": "#d4d4d4",
-                        "grid": "#222222",
-                        "signal": "#56c126",
-                        "undefined": "#f44747",
-                        "highImpedance": "#c9e124",
-                        "cursor": "#b63935",
-                        "fillOpacity": 0.2
-                    },
+                    "markdownDescription": "Colours of the waveform monitor, as CSS colours, over the theme's (`#hdl-studio.theme#`); any key can be left out.",
+                    "default": {},
                     "properties": {
                         "background": {
                             "type": "string",
@@ -423,7 +425,7 @@
                         },
                         "cursor": {
                             "type": "string",
-                            "description": "Where a trigger paused the simulation."
+                            "description": "The time cursor."
                         },
                         "fillOpacity": {
                             "type": "number",

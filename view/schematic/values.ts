@@ -16,8 +16,9 @@ export function level(v: string): Level {
     return zeros === 0 ? 'high' : ones === 0 ? 'low' : 'def';
 }
 
+// the theme's (themes.ts)
 export const levelColor: Record<Level, string> = {
-    high: '#03c03c', low: '#fc7c68', def: '#779ecb', highz: '#f39c12', undef: '#999',
+    high: 'var(--sch-high)', low: 'var(--sch-low)', def: 'var(--sch-def)', highz: 'var(--sch-highz)', undef: 'var(--sch-undef)',
 };
 
 export const xes = (bits: number) => 'x'.repeat(bits);

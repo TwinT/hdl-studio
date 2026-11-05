@@ -27,15 +27,28 @@ export interface Port {
 const SVG = 'http://www.w3.org/2000/svg';
 export const FONT = 'verdana, sans-serif';
 
+// The theme's colours (themes.ts sets the variables).
+export const C = { fill: 'var(--sch-fill)', ink: 'var(--sch-ink)', lead: 'var(--sch-lead)', lamp: 'var(--sch-lamp)', hl: 'var(--sch-hl)' };
+
+// A colour that may be a variable: presentation attributes aren't sure to
+// take var(), so it goes in the style.
+export function paint(e: Element, prop: string, color: string) {
+    (e as SVGElement).style.setProperty(prop, color);
+}
+
 export function el<K extends keyof SVGElementTagNameMap>(tag: K, attrs: Record<string, any> = {}, parent?: Element): SVGElementTagNameMap[K] {
     const e = document.createElementNS(SVG, tag);
-    for (const k in attrs) e.setAttribute(k, String(attrs[k]));
+    for (const k in attrs) {
+        const s = String(attrs[k]);
+        if (s.startsWith('var(')) paint(e, k, s);
+        else e.setAttribute(k, s);
+    }
     parent?.appendChild(e);
     return e;
 }
 
 export function text(parent: Element, x: number, y: number, s: string, attrs: Record<string, any> = {}) {
-    const t = el('text', { x, y, 'font-size': '8pt', fill: 'black', ...attrs }, parent);
+    const t = el('text', { x, y, 'font-size': '8pt', fill: C.ink, ...attrs }, parent);
     t.textContent = s;
     return t;
 }
@@ -341,8 +354,8 @@ export function draw(d: Device, s: Shape, top: boolean, hooks: CellHooks): CellV
     const checks = new Map<string, SVGPathElement>();
     // leads, circles and port texts first: the body covers the leads
     for (const p of s.ports) {
-        el('line', { x1: p.ax, y1: p.ay, x2: p.x, y2: p.y, stroke: '#4B4F6A' }, g);
-        circles.set(p.id, el('circle', { cx: p.x, cy: p.y, r: 7, fill: 'white', stroke: levelColor.undef, 'stroke-width': 2, 'stroke-opacity': 0.5, class: 'port' }, g));
+        el('line', { x1: p.ax, y1: p.ay, x2: p.x, y2: p.y, stroke: C.lead }, g);
+        circles.set(p.id, el('circle', { cx: p.x, cy: p.y, r: 7, fill: C.fill, stroke: levelColor.undef, 'stroke-width': 2, 'stroke-opacity': 0.5, class: 'port' }, g));
         if (p.bits > 1) {
             const left = p.side === 'left';
             text(g, p.side === 'top' ? p.x + 3 : left ? p.x + 8 : p.x - 8, p.y - 8, String(p.bits),
@@ -351,7 +364,7 @@ export function draw(d: Device, s: Shape, top: boolean, hooks: CellHooks): CellV
     }
     const body = el('g', { class: 'body' }, g);
     const rect = (attrs: Record<string, any> = {}) =>
-        el('rect', { width: s.w, height: s.h, fill: 'white', stroke: 'black', 'stroke-width': 2, ...attrs }, body);
+        el('rect', { width: s.w, height: s.h, fill: C.fill, stroke: C.ink, 'stroke-width': 2, ...attrs }, body);
     let update: CellView['update'];
     if (t in gates) {
         const [kind, arc, neg] = gates[t];
@@ -361,17 +374,17 @@ export function draw(d: Device, s: Shape, top: boolean, hooks: CellHooks): CellV
         const gg = el('g', x1 ? { transform: `translate(-4,0) scale(${sc})` } : {}, body);
         // 2px however the shape is scaled (a non-scaling-stroke would also
         // keep it at 2 screen pixels when zoomed out)
-        const attrs = { stroke: 'black', 'stroke-width': 2 / sc };
-        el('path', { d: gatePaths[kind], fill: 'white', ...attrs }, gg);
-        if (arc) el('path', { d: xorArc, fill: 'black' }, gg);
-        if (neg) el('circle', { cx: 56, cy: 16, r: 4, fill: 'white', ...attrs }, gg);
+        const attrs = { stroke: C.ink, 'stroke-width': 2 / sc };
+        el('path', { d: gatePaths[kind], fill: C.fill, ...attrs }, gg);
+        if (arc) el('path', { d: xorArc, fill: C.ink }, gg);
+        if (neg) el('circle', { cx: 56, cy: 16, r: 4, fill: C.fill, ...attrs }, gg);
     } else if (t in arithSymbols || t.endsWith('Const')) {
-        el('circle', { cx: s.w / 2, cy: s.h / 2, r: s.w / 2, fill: 'white', stroke: 'black', 'stroke-width': 2 }, body);
+        el('circle', { cx: s.w / 2, cy: s.h / 2, r: s.w / 2, fill: C.fill, stroke: C.ink, 'stroke-width': 2 }, body);
         let sym = arithSymbols[t.replace(/Const$/, '')];
         if (t.endsWith('Const')) sym = d.leftOp ? d.constant + sym : sym + d.constant;
         text(body, s.w / 2, s.h / 2, sym, { 'font-size': '12pt', 'text-anchor': 'middle', 'dominant-baseline': 'central' });
     } else if (t === 'Mux' || t === 'Mux1Hot' || t === 'MuxSparse') {
-        el('polygon', { points: `0,-5 ${s.w},5 ${s.w},${s.h - 5} 0,${s.h + 5}`, fill: 'white', stroke: 'black', 'stroke-width': 2 }, body);
+        el('polygon', { points: `0,-5 ${s.w},5 ${s.w},${s.h - 5} 0,${s.h + 5}`, fill: C.fill, stroke: C.ink, 'stroke-width': 2 }, body);
         if (t === 'Mux1Hot')
             text(body, 0, 0, '1Hot', { transform: `translate(${s.w / 2},${s.h / 2}) rotate(90)`, 'text-anchor': 'middle', 'dominant-baseline': 'central' });
         const inputs = muxInputs(d);
@@ -420,7 +433,7 @@ export function draw(d: Device, s: Shape, top: boolean, hooks: CellHooks): CellV
         };
     } else if (t === 'Clock') {
         rect();
-        el('path', { d: 'M7.5 7.5 L7.5 22.5 L15 22.5 L15 7.5 L22.5 7.5 L22.5 22.5', stroke: 'black', fill: 'none' }, body);
+        el('path', { d: 'M7.5 7.5 L7.5 22.5 L15 22.5 L15 7.5 L22.5 7.5 L22.5 22.5', stroke: C.ink, fill: 'none' }, body);
         const div = foreign(g, 0, -30, Math.max(s.w, 55), 30, 'tooltip');
         const input = document.createElement('input');
         input.type = 'number'; input.min = '1'; input.step = '1';
@@ -443,9 +456,9 @@ export function draw(d: Device, s: Shape, top: boolean, hooks: CellHooks): CellV
         if (mode === 0) {
             text(body, s.w / 2, s.h / 2, d.net ?? '', { 'font-size': '10pt', 'font-weight': 'bold', 'text-anchor': 'middle', 'dominant-baseline': 'central' });
         } else if (mode === 1 && isInput(d)) {
-            const face = el('rect', { x: 6, y: 6, width: 18, height: 18, fill: 'white', stroke: 'black', 'stroke-width': 2, class: 'button' }, body);
+            const face = el('rect', { x: 6, y: 6, width: 18, height: 18, fill: C.fill, stroke: C.ink, 'stroke-width': 2, class: 'button' }, body);
             let cur = '0';
-            update = (value) => { cur = value('out'); face.setAttribute('fill', cur === '1' ? 'black' : 'white'); };
+            update = (value) => { cur = value('out'); paint(face, 'fill', cur === '1' ? C.ink : C.fill); };
             face.addEventListener('pointerdown', (e) => e.stopPropagation()); // not a drag
             if (t === 'PushButton') {
                 // high only while held
@@ -456,10 +469,10 @@ export function draw(d: Device, s: Shape, top: boolean, hooks: CellHooks): CellV
                 face.addEventListener('click', () => hooks.setInput(cur === '1' ? '0' : '1'));
             }
         } else if (mode === 1) {
-            const led = el('circle', { cx: 15, cy: 15, r: 10.5, fill: '#bfc5c6' }, body);
+            const led = el('circle', { cx: 15, cy: 15, r: 10.5, fill: C.lamp }, body);
             update = (value) => {
                 const l = level(value('in'));
-                led.setAttribute('fill', l === 'high' ? '#03c03c' : l === 'low' ? '#fc7c68' : l === 'highz' ? '#f39c12' : '#bfc5c6');
+                paint(led, 'fill', l === 'high' || l === 'low' || l === 'highz' ? levelColor[l] : C.lamp);
             };
         } else if (isInput(d)) {
             const div = foreign(g, 5, 5, s.w - 10, s.h - 10, 'valinput');
@@ -497,12 +510,12 @@ export function draw(d: Device, s: Shape, top: boolean, hooks: CellHooks): CellV
         if (t === 'ZeroExtend' || t === 'SignExtend')
             text(body, s.w / 2, s.h / 2, t === 'ZeroExtend' ? 'zero-extend' : 'sign-extend', { 'text-anchor': 'middle', 'dominant-baseline': 'central' });
         for (const k of s.splits ?? [])
-            el('line', { x1: 0, y1: 16 * k + 4, x2: s.w, y2: 16 * k + 4, stroke: 'black' }, body);
+            el('line', { x1: 0, y1: 16 * k + 4, x2: s.w, y2: 16 * k + 4, stroke: C.ink }, body);
     }
     // port labels and decorations go over the body
     for (const p of s.ports) {
-        if (p.clock) el('path', { d: clockDecor, transform: `translate(${p.ax},${p.ay})`, stroke: 'black', fill: 'none' }, g);
-        if (p.check) checks.set(p.id, el('path', { d: checkDecor, transform: `translate(${p.ax},${p.ay})`, stroke: 'black', fill: 'none', visibility: 'hidden' }, g));
+        if (p.clock) el('path', { d: clockDecor, transform: `translate(${p.ax},${p.ay})`, stroke: C.ink, fill: 'none' }, g);
+        if (p.check) checks.set(p.id, el('path', { d: checkDecor, transform: `translate(${p.ax},${p.ay})`, stroke: C.ink, fill: 'none', visibility: 'hidden' }, g));
         if (p.label !== undefined) {
             const left = p.side === 'left';
             text(g, p.ax + (left ? (p.clock || p.check ? 10 : 5) : -5), p.ay, p.label,
@@ -513,9 +526,9 @@ export function draw(d: Device, s: Shape, top: boolean, hooks: CellHooks): CellV
     if (s.top !== undefined) text(g, s.w / 2, -10, s.top, { 'text-anchor': 'middle', 'dominant-baseline': 'central' });
     if (s.open) {
         const icon = el('g', { class: 'open', transform: `translate(${s.w - 14},${s.top !== undefined ? -34 : -20})` }, g);
-        el('rect', { x: -2, y: -2, width: 16, height: 16, fill: 'white', stroke: '#888', rx: 2 }, icon);
-        el('circle', { cx: 5, cy: 5, r: 4, fill: 'none', stroke: 'black', 'stroke-width': 1.5 }, icon);
-        el('path', { d: 'M8 8 L12 12 M3 5 H7 M5 3 V7', stroke: 'black', 'stroke-width': 1.5 }, icon);
+        el('rect', { x: -2, y: -2, width: 16, height: 16, fill: C.fill, stroke: C.lead, rx: 2 }, icon);
+        el('circle', { cx: 5, cy: 5, r: 4, fill: 'none', stroke: C.ink, 'stroke-width': 1.5 }, icon);
+        el('path', { d: 'M8 8 L12 12 M3 5 H7 M5 3 V7', stroke: C.ink, 'stroke-width': 1.5 }, icon);
         const title = el('title', {}, icon);
         title.textContent = 'Open';
         icon.addEventListener('pointerdown', (e) => e.stopPropagation());

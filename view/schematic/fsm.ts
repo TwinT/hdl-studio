@@ -3,7 +3,8 @@
 
 import ELK from 'elkjs/lib/elk.bundled.js';
 import type { ElkExtendedEdge, ElkNode } from 'elkjs/lib/elk-api';
-import { Device, el, text, textWidth } from './cells.ts';
+import { C, Device, el, paint, text, textWidth } from './cells.ts';
+import { levelColor } from './values.ts';
 
 interface Trans { id: string; from: number; to: number; ctrlIn: string; ctrlOut: string }
 
@@ -33,7 +34,7 @@ export async function fsmView(d: Device) {
     const res = await new ELK().layout(graph);
     const svg = el('svg', { class: 'fsm', 'font-family': 'sans-serif' }) as SVGSVGElement;
     const defs = el('defs', {}, svg);
-    for (const [id, color] of [['arrow', 'black'], ['arrow-next', '#03c03c']]) {
+    for (const [id, color] of [['arrow', C.ink], ['arrow-next', levelColor.high]]) {
         const m = el('marker', { id, viewBox: '0 0 10 10', refX: 10, refY: 5, markerWidth: 8, markerHeight: 8, orient: 'auto-start-reverse' }, defs);
         el('path', { d: 'M0 0 L10 5 L0 10 z', fill: color }, m);
     }
@@ -43,14 +44,14 @@ export async function fsmView(d: Device) {
         const s = e.sections?.[0];
         if (!s) continue;
         const pts = [s.startPoint, ...(s.bendPoints ?? []), s.endPoint];
-        edges.set(e.id, el('path', { d: 'M' + pts.map((p) => `${p.x} ${p.y}`).join(' L'), fill: 'none', stroke: 'black', 'stroke-width': 1.5, 'marker-end': 'url(#arrow)' }, g));
+        edges.set(e.id, el('path', { d: 'M' + pts.map((p) => `${p.x} ${p.y}`).join(' L'), fill: 'none', stroke: C.ink, 'stroke-width': 1.5, 'marker-end': 'url(#arrow)' }, g));
         for (const l of e.labels ?? [])
             text(g, l.x!, l.y! + 10, l.text!, { 'font-size': '10px', 'font-family': 'sans-serif' });
     }
     const states = new Map<number, SVGCircleElement>();
     for (const n of res.children ?? []) {
         const k = Number(n.id.slice(5));
-        states.set(k, el('circle', { cx: n.x! + 25, cy: n.y! + 25, r: 25, fill: 'white', stroke: 'black', 'stroke-width': k === d.init_state ? 3 : 1.5 }, g));
+        states.set(k, el('circle', { cx: n.x! + 25, cy: n.y! + 25, r: 25, fill: C.fill, stroke: C.ink, 'stroke-width': k === d.init_state ? 3 : 1.5 }, g));
         text(g, n.x! + 25, n.y! + 25, String(k), { 'font-size': '14px', 'text-anchor': 'middle', 'dominant-baseline': 'central' });
     }
     svg.setAttribute('width', String((res.width ?? 0) + 60));
@@ -58,10 +59,10 @@ export async function fsmView(d: Device) {
     return {
         svg,
         update(state: number, input: string) {
-            for (const [k, c] of states) c.setAttribute('fill', k === state ? 'yellow' : 'white');
+            for (const [k, c] of states) paint(c, 'fill', k === state ? C.hl : C.fill);
             const next = nextTransition(trans, state, input)?.id;
             for (const [id, p] of edges) {
-                p.setAttribute('stroke', id === next ? '#03c03c' : 'black');
+                paint(p, 'stroke', id === next ? levelColor.high : C.ink);
                 p.setAttribute('marker-end', id === next ? 'url(#arrow-next)' : 'url(#arrow)');
             }
         },

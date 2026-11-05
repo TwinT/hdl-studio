@@ -10,7 +10,8 @@ import { hdlstudio_bin } from './hdlstudio_bin.mjs';
 import { WebviewMsgQueue } from './webview_msg_queue.mjs';
 import { write_txt_file } from './utils.mjs';
 
-const waveColors = () => vscode.workspace.getConfiguration('hdl-studio').get('waveform.colors');
+const config = () => vscode.workspace.getConfiguration('hdl-studio');
+const waveColors = () => config().get('waveform.colors');
 
 export class CircuitView {
     #panel
@@ -40,12 +41,12 @@ export class CircuitView {
             this.#showCircuit({ ...opts, pause: false });
             this.reveal();
         });
-        // the waveform monitor shows time in the project's units, in the user's colours
+        // the waveform monitor shows time in the project's units; the colours are the user's
         const timescale_listener = this.#document.synthOptionUpdated(() =>
             this.post({ command: 'timescale', value: this.#document.synth_options.timescale }));
         const colors_listener = vscode.workspace.onDidChangeConfiguration((e) => {
-            if (e.affectsConfiguration('hdl-studio.waveform'))
-                this.post({ command: 'wavecolors', colors: waveColors() });
+            if (e.affectsConfiguration('hdl-studio.theme') || e.affectsConfiguration('hdl-studio.waveform'))
+                this.post({ command: 'theme', theme: config().get('theme'), waveColors: waveColors() });
         });
         this.onDidDispose(() => {
             circuit_listener.dispose();
@@ -108,6 +109,8 @@ export class CircuitView {
             case 'subcircuits':
                 this.#subcircuits = msg.subcircuits;
                 return;
+            case 'settheme':
+                return config().update('theme', msg.theme, vscode.ConfigurationTarget.Global);
             case 'saveimg-error':
                 return vscode.window.showErrorMessage(
                     `Unable to save image ${msg.uri}: ${msg.message}`);
@@ -139,6 +142,7 @@ export class CircuitView {
             opts: { ...opts,
                     defaultcomb: this.#document.synth_options.defaultcomb,
                     timescale: this.#document.synth_options.timescale,
+                    theme: config().get('theme'),
                     waveColors: waveColors(),
                     view: this.#document.viewState,
                     speed: this.#studio.speedOf(this.#document) }

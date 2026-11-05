@@ -2,7 +2,7 @@
 // live with the engine's values. Pan with a drag on the background or the
 // wheel, zoom with ctrl+wheel or a pinch, drag cells to move them.
 
-import { CellView, Connector, Device, GraphData, Point, Shape, draw, el, shape, text, textWidth } from './cells.ts';
+import { C, CellView, Connector, Device, GraphData, Point, Shape, draw, el, paint, shape, text, textWidth } from './cells.ts';
 import { Rect, midpoint, pathD, route } from './route.ts';
 import { Level, level, levelColor, show, xes } from './values.ts';
 
@@ -88,8 +88,8 @@ export class Schematic {
         this.#wireLayer = el('g', {}, this.#viewport);
         this.#cellLayer = el('g', {}, this.#viewport);
         this.#tool = el('g', { class: 'wiretool', visibility: 'hidden' }, this.#viewport);
-        el('rect', { x: 6, y: -24, width: 18, height: 16, rx: 2, fill: 'white', stroke: '#888' }, this.#tool);
-        el('path', { d: 'M8 -11 H11 V-21 H15 V-11 H19 V-21 H22', fill: 'none', stroke: 'black', 'stroke-width': 1.5 }, this.#tool);
+        el('rect', { x: 6, y: -24, width: 18, height: 16, rx: 2, fill: C.fill, stroke: C.lead }, this.#tool);
+        el('path', { d: 'M8 -11 H11 V-21 H15 V-11 H19 V-21 H22', fill: 'none', stroke: C.ink, 'stroke-width': 1.5 }, this.#tool);
         el('title', {}, this.#tool).textContent = 'Add to the waveform monitor';
         this.#tool.addEventListener('pointerdown', (e) => e.stopPropagation());
         this.#tool.addEventListener('click', (e) => {
@@ -242,8 +242,8 @@ export class Schematic {
             if (!r) continue;
             const v = this.#values.get(key);
             const lv: Level = v === undefined ? 'undef' : level(v);
-            for (const w of r.wires) w.path.setAttribute('stroke', levelColor[lv]);
-            for (const c of r.circles) c.setAttribute('stroke', levelColor[lv]);
+            for (const w of r.wires) paint(w.path, 'stroke', levelColor[lv]);
+            for (const c of r.circles) paint(c, 'stroke', levelColor[lv]);
             for (const id of r.cells) cells.add(id);
         }
         this.#dirty.clear();

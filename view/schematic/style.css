@@ -10,11 +10,12 @@ body {
     flex-direction: column;
 }
 
+/* the circuit's colours are the theme's (themes.ts) */
 #paper {
     position: relative;
     flex: 1;
     min-height: 0;
-    background: white;
+    background: var(--sch-paper);
 }
 
 /* the waveform monitor, under the schematic (colours from the
@@ -169,7 +170,7 @@ body {
 
 #monitor button:hover,
 #monitor button.on {
-    background: rgba(255, 255, 255, 0.12);
+    background: rgba(127, 127, 127, 0.25);
 }
 
 /* a waveform row's menu: format, pause on..., remove */
@@ -261,7 +262,9 @@ svg.schematic foreignObject > div {
 svg.schematic foreignObject input,
 svg.schematic foreignObject select {
     font-size: 8pt;
-    border: 1px solid gray;
+    background: var(--sch-fill);
+    color: var(--sch-ink);
+    border: 1px solid var(--sch-lead);
     box-sizing: border-box;
     width: 100%;
 }
@@ -291,9 +294,9 @@ svg.schematic foreignObject.tooltip:hover {
 }
 
 svg.schematic foreignObject.tooltip > div {
-    border: 1px solid gray;
+    border: 1px solid var(--sch-lead);
     box-sizing: border-box;
-    background: white;
+    background: var(--sch-fill);
     padding: 5px;
 }
 
@@ -304,9 +307,9 @@ input.invalid {
 div.wire_hover {
     position: fixed;
     pointer-events: none;
-    background: white;
-    color: black;
-    border: 1px solid black;
+    background: var(--sch-fill);
+    color: var(--sch-ink);
+    border: 1px solid var(--sch-ink);
     padding: 5px;
     font-size: 8pt;
     font-family: verdana, sans-serif;
@@ -315,7 +318,7 @@ div.wire_hover {
 
 .nocircuit {
     text-align: center;
-    color: black;
+    color: var(--sch-ink);
     font-family: var(--vscode-font-family, sans-serif);
 }
 
@@ -369,14 +372,14 @@ div.wire_hover {
     position: relative;
     overflow: auto;
     resize: both;
-    background: white;
+    background: var(--sch-paper);
     min-width: 100px;
     min-height: 60px;
 }
 
 .memeditor {
     padding: 6px;
-    color: black;
+    color: var(--sch-ink);
 }
 
 .memeditor .toolbar {
@@ -395,7 +398,9 @@ div.wire_hover {
 
 .memeditor input {
     font-family: monospace;
-    border: 1px solid #aaa;
+    background: var(--sch-fill);
+    color: var(--sch-ink);
+    border: 1px solid var(--sch-lead);
     border-radius: 4px;
     padding: 0.2em 0.5em;
 }
@@ -418,5 +423,5 @@ div.wire_hover {
 
 @keyframes flash-animation {
     from { background-color: yellow; }
-    to { background-color: white; }
+    to { background-color: var(--sch-fill); }
 }

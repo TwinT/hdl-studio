@@ -10,6 +10,7 @@ import { fsmView } from './fsm.ts';
 import { layout } from './layout.ts';
 import { MemContents, memoryEditor } from './memory.ts';
 import { Schematic } from './schematic.ts';
+import { applyTheme, themes } from './themes.ts';
 import { Monitor, WatchSpec } from './waves.ts';
 import { parseTime } from '../../src/time_units.mjs';
 
@@ -74,6 +75,7 @@ class App {
     #triggers = new Set<number>(); // the monitor's (they stop the simulation)
     #exportIds = 0;
     #monitor: Monitor;
+    #theme: { name?: string, waveColors?: any } = {};
 
     constructor() {
         this.#lua = new LuaRunner(vscode, engineChannel, this);
@@ -93,6 +95,9 @@ class App {
             },
             changed: () => this.#wavesChanged(),
         });
+        this.#applyTheme();
+        // the VS Code theme changed: the "VS Code" theme's waveforms follow it
+        new MutationObserver(() => this.#applyTheme()).observe(document.body, { attributes: true, attributeFilter: ['class'] });
         engineChannel.listen((ev) => { if (ev.session === this.#session) this.#engineEvent(ev); });
         window.addEventListener('message', (e) => this.#message(e.data));
         for (const t of ['touchstart', 'mousedown', 'click'])
@@ -114,10 +119,13 @@ class App {
             case 'showcircuit':
                 if ('speed' in m.opts) this.#speed = m.opts.speed;
                 this.#monitor.setTimescale(m.opts.timescale, parseTime);
-                this.#monitor.setColors(m.opts.waveColors);
+                this.#theme = { name: m.opts.theme, waveColors: m.opts.waveColors };
+                this.#applyTheme();
                 return this.#show(m.circuit, m.opts);
             case 'timescale': return this.#monitor.setTimescale(m.value, parseTime);
-            case 'wavecolors': return this.#monitor.setColors(m.colors);
+            case 'theme':
+                this.#theme = { name: m.theme, waveColors: m.waveColors };
+                return this.#applyTheme();
             case 'setspeed':
                 this.#speed = m.speed;
                 if (this.#running) {
@@ -136,6 +144,10 @@ class App {
             case 'stoplua': return this.#lua.stop(m.name, m.isrepl, m.quit);
             case 'exportimage': return this.#exportImage(m);
         }
+    }
+
+    #applyTheme() {
+        this.#monitor.setColors(applyTheme(this.#theme.name, this.#theme.waveColors));
     }
 
     // ---- the engine
@@ -350,7 +362,12 @@ class App {
         });
         s.svg.addEventListener('contextmenu', (e) => {
             e.preventDefault();
-            popupMenu(e.clientX, e.clientY, ({ item }) => item('Reset layout', false, () => this.#resetLayout(prefix)));
+            popupMenu(e.clientX, e.clientY, ({ item, head }) => {
+                item('Reset layout', false, () => this.#resetLayout(prefix));
+                head('Theme');
+                for (const [name, t] of Object.entries(themes))
+                    item(t.label, (this.#theme.name ?? 'classic') === name, () => vscode.postMessage({ command: 'settheme', theme: name }));
+            });
         });
         return s;
     }
@@ -628,7 +645,10 @@ class App {
         }
         if (!svg) return fail('Unable to find subcircuit');
         // the drawing at zoom 1, without the pan
-        const opts = { stripAttr: true, replaceInput: true, global_postclone: (c: SVGSVGElement) => c.querySelector(':scope > g')?.removeAttribute('transform') };
+        const opts = { stripAttr: true, replaceInput: true, global_postclone: (c: SVGSVGElement) => {
+            c.querySelector(':scope > g')?.removeAttribute('transform');
+            c.style.background = getComputedStyle(document.getElementById('paper')!).backgroundColor; // the theme's paper
+        } };
         try {
             if (m.type === 'image/svg+xml') return reply(imgutils.toSvg(svg, opts)!, false);
             const url = (await imgutils.toCanvas(svg, opts))!.toDataURL(m.type, 1);
