@@ -11,7 +11,7 @@ import { layout } from './layout.ts';
 import { MemContents, memoryEditor } from './memory.ts';
 import { Schematic } from './schematic.ts';
 import { applyTheme, themes } from './themes.ts';
-import { Monitor, WatchSpec } from './waves.ts';
+import { Monitor, WaveConfig, WatchSpec } from './waves.ts';
 import { parseTime } from '../../src/time_units.mjs';
 
 declare function acquireVsCodeApi(): { postMessage(msg: any): void };
@@ -76,6 +76,7 @@ class App {
     #exportIds = 0;
     #monitor: Monitor;
     #theme: { name?: string, waveColors?: any } = {};
+    #names?: Map<string, { path: string, port: string }>; // watchable outputs by name
 
     constructor() {
         this.#lua = new LuaRunner(vscode, engineChannel, this);
@@ -94,6 +95,8 @@ class App {
                 this.#send({ op: 'unmonitor', id });
             },
             changed: () => this.#wavesChanged(),
+            exportLayout: () => vscode.postMessage({ command: 'savewaves', config: this.#monitor.config }),
+            importLayout: () => vscode.postMessage({ command: 'loadwaves' }),
         });
         this.#applyTheme();
         // the VS Code theme changed: the "VS Code" theme's waveforms follow it
@@ -143,6 +146,14 @@ class App {
             case 'runlua': return this.#lua.run(m.name, m.script, m.isrepl, m.label);
             case 'stoplua': return this.#lua.stop(m.name, m.isrepl, m.quit);
             case 'exportimage': return this.#exportImage(m);
+            case 'wavesconfig': {
+                // a layout file
+                if (!this.circuit) return;
+                const missing = this.#monitor.load(m.config, (s) => this.#resolve(s));
+                this.#wavesChanged();
+                if (missing) this.#monitor.say(`${missing} signal${missing > 1 ? 's' : ''} of the layout not found`);
+                return;
+            }
         }
     }
 
@@ -307,8 +318,9 @@ class App {
         this.#mems.clear();
         // the waveforms of a new circuit start afresh, with the same signals
         // where they still exist; on opening a project, the ones it saved
-        const watched = old ? this.#monitor.specs : (opts.view?.waves ?? []);
+        const watched: WaveConfig = old ? this.#monitor.config : { waves: opts.view?.waves ?? [], columns: opts.view?.waveColumns };
         this.#monitor.clear();
+        this.#names = undefined;
         this.circuit = empty(data) ? undefined : data;
         this.#opts = opts;
         const paper = document.getElementById('paper')!;
@@ -325,7 +337,7 @@ class App {
         const top = this.#schematic(this.circuit, '', paper);
         this.#views.set('', { schematic: top });
         this.#load();
-        for (const w of watched) if (this.#watchSpec(w.path, w.port)?.name === w.name) this.#monitor.add(w);
+        this.#monitor.load(watched, (s) => this.#resolve(s));
         if (await this.#layout(top)) this.#autolayout();
         top.render();
         if (opts.keep && transforms.has('')) top.transform = transforms.get('')!;
@@ -364,6 +376,7 @@ class App {
             e.preventDefault();
             popupMenu(e.clientX, e.clientY, ({ item, head }) => {
                 item('Reset layout', false, () => this.#resetLayout(prefix));
+                item('Open a waveform layout…', false, () => vscode.postMessage({ command: 'loadwaves' }));
                 head('Theme');
                 for (const [name, t] of Object.entries(themes))
                     item(t.label, (this.#theme.name ?? 'classic') === name, () => vscode.postMessage({ command: 'settheme', theme: name }));
@@ -390,7 +403,8 @@ class App {
     // Saved with the project (the document's `view`): the waveforms the user
     // changed mark it modified, the zoom goes along with the next save.
     #wavesChanged() {
-        vscode.postMessage({ command: 'viewstate', state: { waves: this.#monitor.specs }, dirty: true });
+        const c = this.#monitor.config;
+        vscode.postMessage({ command: 'viewstate', state: { waves: c.waves, waveColumns: c.columns }, dirty: true });
     }
     #panTimer?: ReturnType<typeof setTimeout>;
     #panned(zoom: { x: number, y: number, k: number }) {
@@ -528,6 +542,34 @@ class App {
         const net = graph.connectors.find((c) => c.from.id === id && c.from.port === port)?.name;
         names.push(...(net ? [net] : [graph.devices[id].label ?? id, port]));
         return { path, port, name: names.join('.'), bits: p.bits };
+    }
+
+    // A saved signal in this circuit: where it was if it's still there, else
+    // the output with its name (a new synthesis numbers cells anew).
+    #resolve(s: WatchSpec): WatchSpec | undefined {
+        for (const at of [s, this.#nameIndex().get(s.name)]) {
+            const w = at && this.#watchSpec(at.path, at.port);
+            if (w?.name === s.name) return { ...s, path: w.path, port: w.port, bits: w.bits };
+        }
+    }
+    // The name #watchSpec gives each output with a wire, in every subcircuit instance.
+    #nameIndex() {
+        if (this.#names) return this.#names;
+        const names = this.#names = new Map();
+        const walk = (graph: GraphData, prefix: string, labels: string[]) => {
+            const seen = new Set<string>();
+            for (const c of graph.connectors) {
+                const key = `${c.from.id}:${c.from.port}`;
+                if (seen.has(key)) continue;
+                seen.add(key);
+                const name = [...labels, ...(c.name ? [c.name] : [graph.devices[c.from.id]?.label ?? c.from.id, c.from.port])].join('.');
+                if (!names.has(name)) names.set(name, { path: prefix + c.from.id, port: c.from.port });
+            }
+            for (const [id, d] of Object.entries(graph.devices))
+                if (d.type === 'Subcircuit') walk(this.circuit!.subcircuits![d.celltype!], prefix + id + '/', [...labels, d.label ?? id]);
+        };
+        walk(this.circuit!, '', []);
+        return names;
     }
 
     #mem(path: string) {

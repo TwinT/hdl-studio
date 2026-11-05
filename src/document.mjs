@@ -32,7 +32,8 @@ export class Document {
     #circuit = { devices: {}, connectors: [], subcircuits: {} }
     #last_circuit_changed
     // what the circuit view shows and how it runs, saved as `view`:
-    // { speed, zoom: {x, y, k}, waves: [{path, port, name, bits, base, pause}] }
+    // { speed, zoom: {x, y, k}, waveColumns: [name, value],
+    //   waves: [{path, port, name, bits, base, pause} or {group, color, collapsed, items: [...]}] }
     #view_state = {}
 
     #tick = 0

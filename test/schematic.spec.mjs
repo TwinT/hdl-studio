@@ -360,6 +360,60 @@ describe('schematic webview on the engine', function () {
         assert.ok(others.every((id) => placed[clk].position.y > placed[id].position.y), JSON.stringify(placed[clk].position));
     });
 
+    it('arranges the waveforms: order, groups, columns, a layout file', async function () {
+        await post({ command: 'showcircuit', circuit: { devices: {}, connectors: [] }, opts: {} });
+        await show('04_counter');
+        const circuit = (await lastPosted('autolayout')).circuit;
+        await page.evaluate(() => { for (const h of document.querySelectorAll('.wirehit')) h.dispatchEvent(new MouseEvent('dblclick', { bubbles: true })); });
+        const names = () => page.evaluate(() => [...document.querySelectorAll('#monitor .row:not([hidden]) .name > span')].map((n) => n.textContent));
+        const saved = async () => (await lastPosted('viewstate')).state;
+        const shape = (waves) => waves.map((w) => w.items ? { [w.group]: w.items.map((i) => i.name), collapsed: w.collapsed } : w.name);
+        const box = (name) => page.locator('#monitor .name', { hasText: new RegExp(`^${name.replace(/\$/g, '\\$')}`) }).boundingBox();
+        const drag = async (from, to, dy = 0) => {
+            await page.mouse.move(from.x + 30, from.y + from.height / 2);
+            await page.mouse.down();
+            await page.mouse.move(to.x + 30, to.y + dy, { steps: 5 });
+            await page.mouse.up();
+        };
+        const first = await names();
+        assert.ok(first.length >= 4, first.join());
+        // the third row dragged above the first
+        await drag(await box(first[2]), await box(first[0]), 2);
+        assert.deepStrictEqual(await names(), [first[2], first[0], first[1], ...first.slice(3)]);
+        assert.deepStrictEqual(shape((await saved()).waves), await names());
+        // a group from a row's menu, named at once; another row dropped onto its header
+        await page.locator('#monitor .name', { hasText: first[0] }).click({ button: 'right' });
+        await page.locator('.wavemenu button', { hasText: 'New group' }).click();
+        await page.keyboard.press('Control+A');
+        await page.keyboard.type('Regs');
+        await page.keyboard.press('Enter');
+        const header = await page.locator('#monitor .row.group .name').boundingBox();
+        await drag(await box(first[3]), header, header.height * 0.75);
+        // (at its start, under the header)
+        assert.deepStrictEqual(shape((await saved()).waves).filter((w) => typeof w !== 'string'), [{ Regs: [first[3], first[0]], collapsed: false }]);
+        // collapsed: its rows hide
+        await page.locator('#monitor .row.group .caret').click();
+        assert.ok(!(await names()).includes(first[3]));
+        // the name column, wider
+        const handle = await page.locator('#monitor .head .colsize').first().boundingBox();
+        await drag({ ...handle, x: handle.x - 28 }, { ...handle, x: handle.x + 72, y: handle.y + handle.height / 2 });
+        const { waves, waveColumns } = await saved();
+        assert.strictEqual(waveColumns[0], 280);
+        // reopened, as it was
+        await post({ command: 'showcircuit', circuit: { devices: {}, connectors: [] }, opts: {} });
+        await post({ command: 'showcircuit', circuit, opts: { view: { waves, waveColumns } } });
+        await until(() => document.querySelectorAll('#monitor .row').length > 3);
+        assert.strictEqual(await page.evaluate(() => document.querySelector('#monitor .grid').style.getPropertyValue('--name-w')), '280px');
+        // the toolbar saves the layout to a file; a file read back finds its signals by
+        // name (a new synthesis numbers cells anew) and says what it didn't find
+        await page.locator('#monitor [name=export]').click();
+        assert.deepStrictEqual(shape((await lastPosted('savewaves')).config.waves), shape(waves));
+        const lost = { ...waves.find((w) => typeof w.name === 'string'), path: 'dev999' };
+        await post({ command: 'wavesconfig', config: { waves: [lost, { ...lost, name: 'nope' }] } });
+        await until(() => /1 signal of the layout not found/.test(document.querySelector('#monitor .status').textContent));
+        assert.deepStrictEqual(await names(), [lost.name]);
+    });
+
     it('the waveforms keep drawing after a reset that crossed a request', async function () {
         await post({ command: 'showcircuit', circuit: { devices: {}, connectors: [] }, opts: {} });
         const view = await show('04_counter');

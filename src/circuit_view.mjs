@@ -8,7 +8,7 @@ import * as readline from 'readline';
 import * as base64 from 'base64-arraybuffer';
 import { hdlstudio_bin } from './hdlstudio_bin.mjs';
 import { WebviewMsgQueue } from './webview_msg_queue.mjs';
-import { write_txt_file } from './utils.mjs';
+import { get_dirname_uri, read_txt_file, write_txt_file } from './utils.mjs';
 
 const config = () => vscode.workspace.getConfiguration('hdl-studio');
 const waveColors = () => config().get('waveform.colors');
@@ -111,6 +111,10 @@ export class CircuitView {
                 return;
             case 'settheme':
                 return config().update('theme', msg.theme, vscode.ConfigurationTarget.Global);
+            case 'savewaves':
+                return this.#saveWaves(msg.config);
+            case 'loadwaves':
+                return this.#loadWaves();
             case 'saveimg-error':
                 return vscode.window.showErrorMessage(
                     `Unable to save image ${msg.uri}: ${msg.message}`);
@@ -132,6 +136,35 @@ export class CircuitView {
                 return;
         }
         this.#document.processCommand(msg);
+    }
+    // The waveform monitor's layout (signals, groups, columns) as a file.
+    async #saveWaves(config) {
+        const name = this.#document.uri.path.split('/').pop().replace(/\.[^.]*$/, '');
+        const dir = get_dirname_uri(this.#document.uri);
+        const uri = await vscode.window.showSaveDialog({
+            defaultUri: dir && vscode.Uri.joinPath(dir, `${name}.waves.json`),
+            filters: { 'Waveform layout': ['json'] },
+        });
+        if (uri)
+            await write_txt_file(uri, JSON.stringify({ hdlstudio: 'waves', ...config }, null, 2) + '\n');
+    }
+    async #loadWaves() {
+        const [uri] = await vscode.window.showOpenDialog({
+            defaultUri: get_dirname_uri(this.#document.uri),
+            filters: { 'Waveform layout': ['json'] },
+        }) ?? [];
+        if (!uri)
+            return;
+        let config;
+        try {
+            config = JSON.parse(await read_txt_file(uri));
+        }
+        catch (e) {
+            return vscode.window.showErrorMessage(`Unable to read ${uri.fsPath}: ${e.message}`);
+        }
+        if (!Array.isArray(config?.waves))
+            return vscode.window.showErrorMessage(`${uri.fsPath} isn't a waveform layout`);
+        this.post({ command: 'wavesconfig', config });
     }
     #showCircuit(opts) {
         this.post({

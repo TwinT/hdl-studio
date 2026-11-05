@@ -2,7 +2,9 @@
 // VaporView: names, the value under the pointer, the waveform, and a time
 // ruler. The engine records the watched outputs (`watch`); after each
 // update this asks for the window it shows (`wave`, one entry per pixel
-// column) and draws it.
+// column) and draws it. Rows can be dragged into another order and into
+// groups (one level, coloured, collapsible); the whole arrangement is the
+// `config` saved with the project or in a file.
 
 import { formatTimeAt } from '../../src/time_units.mjs';
 import { read, show } from './values.ts';
@@ -29,14 +31,32 @@ export const defaultColors: WaveColors = {
 // (null: any change).
 export interface Pause { label: string; values: string[] | null }
 
+export interface GroupSpec { group: string; color: string; collapsed?: boolean; items: WatchSpec[] }
+export type WaveItem = WatchSpec | GroupSpec;
+// What the project (`view.waves`, `view.waveColumns`) and a layout file keep.
+export interface WaveConfig { waves: WaveItem[]; columns?: number[] }
+
 interface Watch extends WatchSpec {
     id: number;
     base: string;
     pause?: Pause;
     triggerId?: number;
-    name_: HTMLDivElement; value_: HTMLDivElement; canvas: HTMLCanvasElement;
+    group?: Group;
+    row: HTMLDivElement; name_: HTMLDivElement; value_: HTMLDivElement; canvas: HTMLCanvasElement;
     data?: Win;
 }
+
+interface Group { group: string; color: string; collapsed: boolean; items: Watch[]; row: HTMLDivElement; name_: HTMLDivElement }
+type Item = Watch | Group;
+const isGroup = (i: Item): i is Group => 'items' in i;
+
+// Where a dragged row goes: into `parent` (a group, or the top level), before `before` (or last).
+interface Drop { parent?: Group; before?: Item; y: number }
+
+// Group colours, readable on light and dark backgrounds.
+const groupColors = ['#3794ff', '#4ec9b0', '#e5c07b', '#ff8c42', '#c586c0', '#ff79c6', '#56c126', '#a0a0a0'];
+
+const div = (className: string) => Object.assign(document.createElement('div'), { className });
 
 // What the engine returns for one watch (crates/hdlstudio/src/wave.rs).
 interface Win { start: string | null; first: number | null; changes: ([number, string] | [number, string, number])[] }
@@ -47,8 +67,11 @@ export interface MonitorHooks {
     // a trigger pauses the simulation; returns its id
     trigger(path: string, port: string, values: string[] | null): number;
     untrigger(id: number): void;
-    // the user changed a row (format, pause, removed it)
+    // the user changed a row (format, pause, order, group, removed it) or a column
     changed(): void;
+    // the toolbar's buttons: the layout to a file, or from one
+    exportLayout(): void;
+    importLayout(): void;
 }
 
 const ROW = 24;
@@ -76,6 +99,9 @@ export class Monitor {
     #badge: HTMLButtonElement; // PAUSED or RUNNING
     #running = false; // the simulation
     #watches = new Map<number, Watch>();
+    #items: Item[] = []; // in order, groups holding theirs
+    #cols = [180, 90]; // the name and value columns' widths
+    #dropLine: HTMLDivElement;
     #ids = 0;
     #start = 0;
     #ppt = PPT; // pixels per tick
@@ -98,8 +124,11 @@ export class Monitor {
             <button name="fit" class="codicon codicon-screen-full" title="Show everything recorded"></button>
             <button name="follow" class="codicon codicon-debug-continue" title=""></button>
             <button name="badge" class="badge"></button>
-            <span class="range"></span><span class="status"></span></div>
-            <div class="grid"><div class="head">Signal</div><div class="head">Value</div><canvas class="ruler"></canvas></div>`;
+            <span class="range"></span><span class="status"></span>
+            <button name="export" class="codicon codicon-save" title="Save the waveform layout to a file…"></button>
+            <button name="import" class="codicon codicon-folder-opened" title="Open a waveform layout file…"></button></div>
+            <div class="grid"><div class="head">Signal<div class="colsize"></div></div><div class="head">Value<div class="colsize"></div></div>
+            <canvas class="ruler"></canvas><div class="dropline" hidden></div></div>`;
         parent.appendChild(this.root);
         const $ = <T extends Element>(q: string) => this.root.querySelector(q) as T;
         this.#grid = $('.grid');
@@ -113,6 +142,20 @@ export class Monitor {
         this.#followBtn.addEventListener('click', () => this.#setFollow(!this.#follow));
         this.#badge = $('[name=badge]');
         this.#badge.addEventListener('click', () => this.#setFollow(!this.#follow));
+        $('[name=export]').addEventListener('click', () => this.#hooks.exportLayout());
+        $('[name=import]').addEventListener('click', () => this.#hooks.importLayout());
+        this.#dropLine = $('.dropline');
+        this.root.querySelectorAll<HTMLElement>('.colsize').forEach((h, i) => h.addEventListener('pointerdown', (e) => {
+            h.setPointerCapture(e.pointerId);
+            const x0 = e.clientX, w0 = this.#cols[i];
+            const move = (ev: PointerEvent) => {
+                this.#cols[i] = Math.max(40, Math.round(w0 + ev.clientX - x0));
+                this.#applyCols();
+            };
+            h.addEventListener('pointermove', move);
+            h.addEventListener('pointerup', () => { h.removeEventListener('pointermove', move); this.#hooks.changed(); }, { once: true });
+        }));
+        this.#applyCols();
         const gutter = $<HTMLElement>('.gutter');
         gutter.addEventListener('pointerdown', (e) => {
             gutter.setPointerCapture(e.pointerId);
@@ -121,14 +164,47 @@ export class Monitor {
             gutter.addEventListener('pointermove', move);
             gutter.addEventListener('pointerup', () => gutter.removeEventListener('pointermove', move), { once: true });
         });
-        new ResizeObserver(() => this.#resize()).observe(this.#grid);
+        // the waveform column's width (the view's, or a column resized)
+        new ResizeObserver(() => this.#resize()).observe(this.#ruler);
         this.#waveEvents();
         this.#setFollow(true);
         this.#show();
     }
 
-    get specs(): WatchSpec[] {
-        return [...this.#watches.values()].map(({ path, port, name, bits, base, pause }) => ({ path, port, name, bits, base, pause }));
+    get config(): WaveConfig {
+        const spec = ({ path, port, name, bits, base, pause }: Watch): WatchSpec => ({ path, port, name, bits, base, pause });
+        return {
+            waves: this.#items.map((i) => isGroup(i) ? { group: i.group, color: i.color, collapsed: i.collapsed, items: i.items.map(spec) } : spec(i)),
+            columns: [...this.#cols],
+        };
+    }
+
+    // Replaces what the monitor shows with `config`; `resolve` finds each
+    // signal in this circuit. Returns how many it didn't find.
+    load(config: WaveConfig, resolve: (s: WatchSpec) => WatchSpec | undefined) {
+        this.clear();
+        if (config.columns?.length === 2) this.#cols = config.columns.map((c) => Math.max(40, Number(c) || 0));
+        this.#applyCols();
+        let missing = 0;
+        const add = (s: WatchSpec, g?: Group) => {
+            const r = resolve(s);
+            if (r) this.add(r, g);
+            else missing++;
+        };
+        for (const i of config.waves ?? []) {
+            if (!('items' in i)) add(i);
+            else {
+                const g = this.#newGroup(i.group, i.color, !!i.collapsed);
+                this.#items.push(g);
+                for (const s of i.items) add(s, g);
+            }
+        }
+        this.#render();
+        return missing;
+    }
+
+    say(text: string) {
+        this.#status.textContent = text;
     }
 
     setColors(c: Partial<WaveColors> | undefined) {
@@ -144,24 +220,22 @@ export class Monitor {
         this.#drawAll();
     }
 
-    add(spec: WatchSpec) {
+    // A signal, last (in `group`, if given).
+    add(spec: WatchSpec, group?: Group) {
         if ([...this.#watches.values()].some((w) => w.path === spec.path && w.port === spec.port)) return;
         const id = ++this.#ids;
-        const name_ = document.createElement('div');
-        name_.className = 'name';
-        const value_ = document.createElement('div');
-        value_.className = 'value';
-        const canvas = document.createElement('canvas');
-        this.#grid.append(name_, value_, canvas);
-        const w: Watch = { ...spec, id, base: spec.base ?? 'hex', pause: undefined, name_, value_, canvas };
+        const name_ = div('name'), value_ = div('value'), canvas = document.createElement('canvas');
+        const row = div('row');
+        row.append(name_, value_, canvas);
+        const w: Watch = { ...spec, id, base: spec.base ?? 'hex', pause: undefined, group, row, name_, value_, canvas };
         this.#watches.set(id, w);
+        (group?.items ?? this.#items).push(w);
         this.#label(w);
-        for (const e of [name_, value_, canvas])
-            e.addEventListener('contextmenu', (ev) => { ev.preventDefault(); this.#openMenu(w, (ev as MouseEvent).clientX, (ev as MouseEvent).clientY); });
+        row.addEventListener('contextmenu', (ev) => { ev.preventDefault(); this.#openMenu(w, ev.clientX, ev.clientY); });
+        this.#dragRow(w);
         this.#hooks.send({ op: 'watch', id, path: spec.path, port: spec.port });
         if (spec.pause) this.#setPause(w, spec.pause);
-        this.#show();
-        this.#restripe();
+        this.#render();
         this.#resize();
     }
 
@@ -170,16 +244,18 @@ export class Monitor {
         if (!w) return;
         this.#setPause(w, undefined);
         this.#hooks.send({ op: 'unwatch', id });
-        w.name_.remove();
-        w.value_.remove();
-        w.canvas.remove();
+        w.row.remove();
+        const list = w.group?.items ?? this.#items;
+        list.splice(list.indexOf(w), 1);
         this.#watches.delete(id);
-        this.#restripe();
-        this.#show();
+        this.#render();
     }
 
     clear() {
         for (const id of [...this.#watches.keys()]) this.remove(id);
+        for (const g of this.#items) g.row.remove(); // the groups left
+        this.#items = [];
+        this.#show();
     }
 
     // After the engine loaded the circuit again (a reset): watch again, from
@@ -217,14 +293,191 @@ export class Monitor {
     }
 
     #show() {
-        this.root.style.display = this.#watches.size ? '' : 'none';
+        this.root.style.display = this.#watches.size || this.#items.length ? '' : 'none';
     }
-    // Surfer's banding: three rows on, three off.
-    #restripe() {
-        [...this.#watches.values()].forEach((w, i) => {
-            for (const e of [w.name_, w.value_, w.canvas]) e.classList.toggle('alt', Math.floor(i / 3) % 2 === 1);
+
+    // The rows in the order of the items; a collapsed group's are hidden.
+    // Surfer's banding: three signals on, three off.
+    #render() {
+        let n = 0;
+        for (const i of this.#items) {
+            const ws = isGroup(i) ? i.items : [i];
+            if (isGroup(i)) {
+                this.#grid.append(i.row);
+                this.#labelGroup(i);
+            }
+            for (const w of ws) {
+                w.row.hidden = !!w.group?.collapsed;
+                w.row.classList.toggle('member', !!w.group);
+                w.row.style.setProperty('--group-color', w.group?.color ?? 'transparent');
+                if (!w.row.hidden) w.row.classList.toggle('alt', Math.floor(n++ / 3) % 2 === 1);
+                this.#grid.append(w.row);
+            }
+        }
+        this.#show();
+        this.#drawAll();
+    }
+
+    #newGroup(name: string, color: string, collapsed = false): Group {
+        const name_ = div('name'), row = div('row group');
+        row.append(name_, div('value'), div(''));
+        const g: Group = { group: name, color, collapsed, items: [], row, name_ };
+        row.addEventListener('contextmenu', (ev) => { ev.preventDefault(); this.#groupMenu(g, ev.clientX, ev.clientY); });
+        this.#dragRow(g);
+        return g;
+    }
+    #labelGroup(g: Group) {
+        g.row.style.setProperty('--group-color', g.color);
+        const caret = document.createElement('button');
+        caret.className = `caret codicon codicon-chevron-${g.collapsed ? 'right' : 'down'}`;
+        caret.title = g.collapsed ? 'Expand' : 'Collapse';
+        caret.addEventListener('click', () => this.#collapse(g, !g.collapsed));
+        const text = document.createElement('span');
+        text.textContent = g.group + (g.collapsed ? ` (${g.items.length})` : '');
+        text.addEventListener('dblclick', () => this.#rename(g));
+        const more = document.createElement('button');
+        more.className = 'codicon codicon-ellipsis';
+        more.title = 'Colour, rename, ungroup…';
+        more.addEventListener('click', (e) => { const r = more.getBoundingClientRect(); e.stopPropagation(); this.#groupMenu(g, r.left, r.bottom); });
+        g.name_.replaceChildren(caret, text, more);
+        g.name_.title = g.group;
+    }
+    #collapse(g: Group, on: boolean) {
+        g.collapsed = on;
+        this.#render();
+        this.#hooks.changed();
+    }
+    // The group's name becomes a text field: Enter (or leaving it) renames, Escape doesn't.
+    #rename(g: Group) {
+        const input = document.createElement('input');
+        input.value = g.group;
+        let done = false;
+        const end = (ok: boolean) => {
+            if (done) return;
+            done = true;
+            if (ok && input.value.trim()) g.group = input.value.trim();
+            this.#labelGroup(g);
+            if (ok) this.#hooks.changed();
+        };
+        input.addEventListener('keydown', (e) => {
+            e.stopPropagation();
+            if (e.key === 'Enter' || e.key === 'Escape') end(e.key === 'Enter');
+        });
+        input.addEventListener('blur', () => end(true));
+        input.addEventListener('pointerdown', (e) => e.stopPropagation()); // not a drag
+        g.name_.querySelector('span')!.replaceWith(input);
+        input.focus();
+        input.select();
+    }
+    // A new group in `w`'s place, holding it; its name is edited at once.
+    #group(w: Watch) {
+        const n = this.#items.filter(isGroup).length;
+        const g = this.#newGroup(`Group ${n + 1}`, groupColors[n % groupColors.length]);
+        const at = this.#items.indexOf(w.group ?? w);
+        this.#items.splice(w.group ? at + 1 : at, 0, g);
+        this.#move(w, { parent: g, y: 0 });
+        this.#hooks.changed();
+        this.#rename(g);
+    }
+    #groupMenu(g: Group, x: number, y: number) {
+        popupMenu(x, y, ({ menu, item, head, close }) => {
+            head('Colour');
+            const swatches = div('swatches');
+            for (const c of groupColors) {
+                const b = document.createElement('button');
+                b.style.background = c;
+                b.title = c;
+                b.classList.toggle('on', c === g.color);
+                b.addEventListener('click', () => { g.color = c; this.#render(); this.#hooks.changed(); close(); });
+                swatches.append(b);
+            }
+            menu.append(swatches);
+            item('Rename', false, () => this.#rename(g));
+            item(g.collapsed ? 'Expand' : 'Collapse', false, () => this.#collapse(g, !g.collapsed));
+            menu.append(document.createElement('hr'));
+            item('Ungroup', false, () => {
+                for (const w of g.items) w.group = undefined;
+                this.#items.splice(this.#items.indexOf(g), 1, ...g.items);
+                g.row.remove();
+                this.#render();
+                this.#hooks.changed();
+            });
+            item('Remove the group and its signals', false, () => {
+                for (const w of [...g.items]) this.remove(w.id);
+                this.#items.splice(this.#items.indexOf(g), 1);
+                g.row.remove();
+                this.#render();
+                this.#hooks.changed();
+            });
         });
     }
+
+    // A row dragged by its name goes where it's dropped: among others, or
+    // into a group (onto its header). A group only moves among the top level.
+    #dragRow(item: Item) {
+        const name = item.name_;
+        name.addEventListener('pointerdown', (e) => {
+            if (e.button !== 0 || (e.target as Element).closest('button, input')) return;
+            const y0 = e.clientY;
+            let drop: Drop | undefined;
+            const move = (ev: PointerEvent) => {
+                if (!drop && Math.abs(ev.clientY - y0) < 4) return;
+                item.row.classList.add('dragging');
+                drop = this.#dropAt(ev.clientY, item);
+                const g = this.#grid.getBoundingClientRect();
+                this.#dropLine.style.top = `${drop.y - g.top + this.#grid.scrollTop - 1}px`;
+                this.#dropLine.hidden = false;
+            };
+            const up = () => {
+                window.removeEventListener('pointermove', move);
+                window.removeEventListener('pointerup', up);
+                window.removeEventListener('pointercancel', up);
+                item.row.classList.remove('dragging');
+                this.#dropLine.hidden = true;
+                if (drop) {
+                    this.#move(item, drop);
+                    this.#hooks.changed();
+                }
+            };
+            window.addEventListener('pointermove', move);
+            window.addEventListener('pointerup', up);
+            window.addEventListener('pointercancel', up);
+        });
+    }
+    #dropAt(y: number, item: Item): Drop {
+        const rows: { item: Item, parent?: Group, r: DOMRect }[] = [];
+        for (const i of this.#items) {
+            if (i === item) continue;
+            rows.push({ item: i, r: i.row.getBoundingClientRect() });
+            if (isGroup(i) && !i.collapsed)
+                for (const w of i.items) if (w !== item) rows.push({ item: w, parent: i, r: w.row.getBoundingClientRect() });
+        }
+        for (const { item: i, parent, r } of rows) {
+            if (isGroup(i) && !isGroup(item) && y >= r.top + r.height / 4 && y < r.bottom)
+                return { parent: i, before: i.items.find((w) => w !== item), y: r.bottom };
+            if (y < r.top + r.height / 2) {
+                if (isGroup(item) && parent) return { before: parent, y: parent.row.getBoundingClientRect().top };
+                return { parent, before: i, y: r.top };
+            }
+        }
+        const last = rows.at(-1)?.r;
+        return { y: last ? last.bottom : this.#ruler.getBoundingClientRect().bottom };
+    }
+    #move(item: Item, { parent, before }: Drop) {
+        const from = isGroup(item) ? this.#items : item.group?.items ?? this.#items;
+        from.splice(from.indexOf(item), 1);
+        const to = parent?.items ?? this.#items;
+        const at = before ? to.indexOf(before as Watch) : -1;
+        to.splice(at < 0 ? to.length : at, 0, item as Watch);
+        if (!isGroup(item)) item.group = parent;
+        this.#render();
+    }
+
+    #applyCols() {
+        this.#grid.style.setProperty('--name-w', `${this.#cols[0]}px`);
+        this.#grid.style.setProperty('--value-w', `${this.#cols[1]}px`);
+    }
+
     #label(w: Watch) {
         w.name_.replaceChildren();
         if (w.pause) {
@@ -371,6 +624,11 @@ export class Monitor {
                 menu.append(input);
             }
             item('never', !w.pause, () => { this.#setPause(w, undefined); this.#hooks.changed(); });
+            head('Group');
+            item('New group', false, () => this.#group(w));
+            const moved = (d: Drop) => () => { this.#move(w, d); this.#hooks.changed(); };
+            for (const g of this.#items.filter(isGroup)) if (g !== w.group) item(`Move to ${g.group}`, false, moved({ parent: g, y: 0 }));
+            if (w.group) item('Out of the group', false, moved({ before: this.#items[this.#items.indexOf(w.group) + 1], y: 0 }));
             menu.append(document.createElement('hr'));
             item('Remove', false, () => { this.remove(w.id); this.#hooks.changed(); });
         });
@@ -490,6 +748,7 @@ export class Monitor {
             c.beginPath(); c.moveTo(x, 0); c.lineTo(x, H); c.stroke();
         }
         const d = w.data;
+        const signal = w.group?.color ?? col.signal;
         if (d) {
             const x = (t: number) => Math.min(W, Math.max(0, (t - this.#start) * this.#ppt));
             const hy = 4, ly = H - 4, my = H / 2;
@@ -506,11 +765,11 @@ export class Monitor {
                 let a = x(t0);
                 const b = x(end);
                 const undef = /[xz]/.test(v), highz = /^z+$/.test(v);
-                const color = highz ? col.highImpedance : undef ? col.undefined : col.signal;
+                const color = highz ? col.highImpedance : undef ? col.undefined : signal;
                 if (dense !== undefined) {
                     // several changes in one pixel column
                     const e = Math.max(x(dense), a + 1);
-                    c.fillStyle = col.signal;
+                    c.fillStyle = signal;
                     c.globalAlpha = 0.6;
                     c.fillRect(a, hy, e - a, ly - hy);
                     c.globalAlpha = 1;
