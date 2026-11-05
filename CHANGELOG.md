@@ -5,6 +5,39 @@ All notable changes to HDL Studio will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] - 2026-11-05
+
+### Added
+- A time cursor in the waveform monitor: a click or a drag on the waveforms
+  pauses the simulation and shows the whole circuit (schematic, Control panel,
+  memories, FSMs) as it was at that time. The follow button, or anything that
+  changes the run, goes back to the present. The engine replays the run from
+  checkpoints, so it keeps no history of every wire.
+- Space runs and pauses the simulation; with the cursor in the past, it goes
+  back to the present and runs.
+- Themes for the circuit view: Dracula (the default), Classic, VS Code,
+  Solarized Light and Dark, Nord, Night Owl and Gruvbox Dark, in the
+  `hdl-studio.theme` setting and the schematic's right-click menu. The
+  waveforms take the theme's colours; `hdl-studio.waveform.colors` overrides
+  them key by key.
+- Waveform signals can be selected (click, Ctrl+click, Shift+click), dragged
+  into another order, and put in groups that have a colour and collapse.
+  The Signal and Value columns can be resized.
+- The waveform layout (signals, groups, columns) is saved with the project and
+  can be saved to or opened from a `.waves.json` file. Signals are found by
+  name, so a layout survives a new synthesis.
+
+### Changed
+- Wires at 0 are grey; red is kept for x (drivers in conflict, or no value yet).
+- Dragging over the waveforms with the middle button (or Alt) scrolls them; a
+  plain click or drag moves the time cursor.
+- A wire's "add to the waveform" button stays put while the pointer is near
+  it, so it can be reached.
+
+### Fixed
+- The `soc` example project didn't list `in_port.sv` and `out_port.sv`, so
+  synthesizing it failed with "unknown module 'in_port'".
+
 ## [1.2.0] - 2026-10-20
 
 ### Changed

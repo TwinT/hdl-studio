@@ -2,7 +2,7 @@
     "name": "hdl-studio",
     "displayName": "HDL Studio",
     "description": "Synthesize Verilog/SystemVerilog with Yosys and simulate the circuit on an interactive schematic, with waveforms and Lua scripting.",
-    "version": "1.2.0",
+    "version": "1.3.0",
     "license": "See LICENSE",
     "publisher": "TwinT",
     "repository": {
@@ -381,12 +381,35 @@
                 "hdl-studio.theme": {
                     "type": "string",
                     "default": "dracula",
-                    "enum": ["classic", "vscode", "solarized-light", "solarized-dark", "dracula", "nord", "night-owl", "gruvbox-dark"],
-                    "enumItemLabels": ["Classic", "VS Code", "Solarized Light", "Solarized Dark", "Dracula", "Nord", "Night Owl", "Gruvbox Dark"],
+                    "enum": [
+                        "classic",
+                        "vscode",
+                        "solarized-light",
+                        "solarized-dark",
+                        "dracula",
+                        "nord",
+                        "night-owl",
+                        "gruvbox-dark"
+                    ],
+                    "enumItemLabels": [
+                        "Classic",
+                        "VS Code",
+                        "Solarized Light",
+                        "Solarized Dark",
+                        "Dracula",
+                        "Nord",
+                        "Night Owl",
+                        "Gruvbox Dark"
+                    ],
                     "enumDescriptions": [
                         "White paper; the waveforms in Surfer's dark theme.",
                         "The colours of the VS Code theme.",
-                        "", "", "", "", "", ""
+                        "",
+                        "",
+                        "",
+                        "",
+                        "",
+                        ""
                     ],
                     "markdownDescription": "Colours of the circuit view: the schematic and the waveform monitor (also in the schematic's right-click menu)."
                 },
