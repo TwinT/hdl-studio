@@ -9,6 +9,10 @@
 //! - subcircuits add neither delay nor events, so the hierarchy is
 //!   flattened: a net goes from its real driver straight to every cell that
 //!   reads it, in the original propagation order.
+//!
+//! A run is deterministic: what came from outside (inputs, memory words
+//! written by hand, clock periods) is logged with its tick, so a
+//! `checkpoint` of the simulation `replay_to`s any later tick.
 // Portions Copyright (c) 2018 Marek Materzok, BSD-2-Clause (see NOTICE).
 
 mod cells;
@@ -25,6 +29,7 @@ type NetId = u32;
 /// already ran this tick): it only keeps its tick in the queue.
 const PHANTOM: CellId = CellId::MAX;
 
+#[derive(Clone)]
 struct SimCell {
     op: Op,
     inputs: Vec<NetId>,
@@ -45,6 +50,7 @@ struct Sched {
 
 const NONE: u64 = u64::MAX;
 
+#[derive(Clone)]
 struct Net {
     value: LogicVec,
     /// Cells to queue when the value changes, in order.
@@ -82,6 +88,7 @@ pub enum Event {
     },
 }
 
+#[derive(Clone)]
 struct Monitor {
     net: NetId,
     triggers: Option<Vec<LogicVec>>,
@@ -90,7 +97,7 @@ struct Monitor {
 }
 
 /// Names in one (sub)circuit instance, for scripts.
-#[derive(Default)]
+#[derive(Clone, Default)]
 struct Labels {
     /// Connector name to the net it carries.
     wires: HashMap<String, NetId>,
@@ -122,6 +129,7 @@ impl std::ops::Index<usize> for Args<'_> {
     }
 }
 
+#[derive(Clone)]
 struct Entry {
     cell: CellId,
     /// Where the inputs to run on start in the tick's `copies`; `NONE`:
@@ -130,7 +138,7 @@ struct Entry {
 }
 
 /// The cells queued for one tick, and the input copies some of them run on.
-#[derive(Default)]
+#[derive(Clone, Default)]
 struct TickQueue {
     entries: Vec<Entry>,
     copies: Vec<LogicVec>,
@@ -139,12 +147,22 @@ struct TickQueue {
 const NO_COPY: u32 = u32::MAX;
 
 /// A cell output, by hierarchical path ("dev3/dev12") and port.
+#[derive(Clone)]
 pub struct Probe {
     pub path: String,
     pub port: String,
     net: NetId,
 }
 
+/// What changed the simulation from outside, at a tick.
+#[derive(Clone)]
+enum Stimulus {
+    Input(CellId, LogicVec),
+    Memory(CellId, usize, LogicVec),
+    Propagation(CellId, u64),
+}
+
+#[derive(Clone)]
 pub struct Sim {
     cells: Vec<SimCell>,
     sched: Vec<Sched>,
@@ -175,6 +193,11 @@ pub struct Sim {
     alarm_queue: BTreeMap<u64, Vec<(u64, bool)>>,
     events: Vec<Event>,
     stop: bool,
+    // ponytail: grows for as long as the run; truncate it before the oldest
+    // checkpoint kept if long scripted runs make it big
+    log: Vec<(u64, Stimulus)>,
+    /// In a checkpoint: how much of the live run's log it has applied.
+    replayed: usize,
 }
 
 impl Sim {
@@ -301,7 +324,7 @@ impl Sim {
     /// delay (a Clock's half period) affects the simulation.
     pub fn set_propagation(&mut self, path: &str, propagation: u64) -> Result<(), String> {
         let &c = self.cell_ids.get(path).ok_or_else(|| format!("no cell {path}"))?;
-        self.sched[c as usize].propagation = propagation;
+        self.stimulate(Stimulus::Propagation(c, propagation));
         Ok(())
     }
 
@@ -309,13 +332,84 @@ impl Sim {
     /// runs again.
     pub fn write_memory(&mut self, path: &str, addr: usize, value: LogicVec) -> Result<(), String> {
         let &c = self.cell_ids.get(path).ok_or_else(|| format!("no cell {path}"))?;
-        let Op::Memory(m) = &mut self.cells[c as usize].op else { return Err(format!("{path} isn't a memory")) };
+        let Op::Memory(m) = &self.cells[c as usize].op else { return Err(format!("{path} isn't a memory")) };
         if addr >= m.mem.len() || value.bits() != m.mem.bits() {
             return Err(format!("bad memory write to {path}"));
         }
-        m.mem.set(addr, value);
-        self.enqueue(c);
+        self.stimulate(Stimulus::Memory(c, addr, value));
         Ok(())
+    }
+
+    fn stimulate(&mut self, s: Stimulus) {
+        self.apply(&s);
+        self.log.push((self.tick, s));
+    }
+
+    fn apply(&mut self, s: &Stimulus) {
+        match *s {
+            Stimulus::Input(c, ref v) => self.set_net(self.cells[c as usize].outputs[0], v.clone()),
+            Stimulus::Memory(c, addr, ref v) => {
+                if let Op::Memory(m) = &mut self.cells[c as usize].op {
+                    m.mem.set(addr, v.clone());
+                }
+                self.enqueue(c);
+            }
+            Stimulus::Propagation(c, p) => self.sched[c as usize].propagation = p,
+        }
+    }
+
+    /// A copy of the simulation now, without its monitors and alarms, to
+    /// `replay_to` a later tick of this run.
+    pub fn checkpoint(&mut self) -> Sim {
+        let log = std::mem::take(&mut self.log);
+        let mut c = self.clone();
+        self.log = log;
+        c.replayed = self.log.len();
+        (c.monitors, c.checks, c.alarms, c.alarm_queue, c.events) = Default::default();
+        c
+    }
+
+    /// Takes a checkpoint of `live` (or one already replayed, no further
+    /// than `tick`) to where `live` was at `tick`: the events before it run,
+    /// what `live` got from outside up to it applied.
+    pub fn replay_to(&mut self, live: &Sim, tick: u64) -> Result<(), String> {
+        while let Some((k, s)) = live.log.get(self.replayed).filter(|(k, _)| *k <= tick) {
+            self.run_before(*k)?;
+            self.apply(s);
+            self.replayed += 1;
+        }
+        self.run_before(tick)?;
+        self.events.clear();
+        Ok(())
+    }
+
+    fn run_before(&mut self, tick: u64) -> Result<(), String> {
+        while self.next_event_tick().is_some_and(|k| k < tick) {
+            self.update_gates_next()?;
+        }
+        self.skip_to(tick);
+        Ok(())
+    }
+
+    /// The memory words that differ from `other`'s (the same circuit), with
+    /// their values here.
+    pub fn memory_diff(&self, other: &Sim) -> Vec<(String, usize, LogicVec)> {
+        let mut diff = vec![];
+        for (i, (a, b)) in self.cells.iter().zip(&other.cells).enumerate() {
+            if let (Op::Memory(a), Op::Memory(b)) = (&a.op, &b.op) {
+                for addr in (0..a.mem.len()).filter(|&k| a.mem.get(k) != b.mem.get(k)) {
+                    diff.push((self.cell_paths[i].clone(), addr, a.mem.get(addr).clone()));
+                }
+            }
+        }
+        diff
+    }
+
+    /// Every FSM's state, by path.
+    pub fn fsm_states(&self) -> Vec<(String, i64)> {
+        let fsms = self.cells.iter().zip(&self.cell_paths);
+        fsms.filter_map(|(c, path)| if let Op::Fsm(f) = &c.op { Some((path.clone(), f.state())) } else { None })
+            .collect()
     }
 
     /// After a step: monitored values and alarms.
@@ -347,7 +441,7 @@ impl Sim {
         if self.nets[net as usize].value.bits() != v.bits() {
             return Err("setInput: wrong number of bits".into());
         }
-        self.set_net(net, v);
+        self.stimulate(Stimulus::Input(c, v));
         Ok(())
     }
 
@@ -800,6 +894,8 @@ mod build {
             alarm_queue: BTreeMap::new(),
             events: vec![],
             stop: false,
+            log: vec![],
+            replayed: 0,
         };
         // the worker queues every cell as it gets it
         for c in 0..sim.cells.len() {

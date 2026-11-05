@@ -16,6 +16,9 @@
 //!   watch {id, path, port}   unwatch {id}   (record an output's changes)
 //!   wave {id, watches: [id], from, to, bins}   (acked with their windows,
 //!   see wave.rs, by watch id, and the tick)
+//!   inspect {id, tick}   (the values sent are the run's at `tick`, replayed
+//!   from a checkpoint, until `tick` null or anything that changes the run;
+//!   acked with the tick shown, null for the present)
 //! Events (`ev`), each with the `session` of the last load:
 //!   update {tick, pending, changes: [[path, port, value]],
 //!           mems: [[path, addr, value]], states: [[path, state]]}
@@ -42,6 +45,9 @@ const SLICE: Duration = Duration::from_millis(10);
 /// Monitor ids of the watches (the client's are below, Lua's above).
 const WATCH: u64 = 1 << 61;
 const UPDATE: Duration = Duration::from_millis(25);
+/// Running time between checkpoints, and how many are kept.
+const CHECKPOINT: Duration = Duration::from_secs(1);
+const CHECKPOINTS: usize = 32;
 
 enum Mode {
     Stopped,
@@ -69,6 +75,16 @@ struct Server {
     mems: Vec<Value>,
     states: Vec<Value>,
     watches: HashMap<u64, Wave>,
+    /// The run at earlier ticks, the first at tick 0.
+    // ponytail: past CHECKPOINTS every other goes, so the replay a jump back
+    // costs grows with the run (the replays' states cap it for a cursor
+    // dragged back over a stretch it saw)
+    checkpoints: Vec<Sim>,
+    /// States the last replays went through, while inspecting.
+    replays: Vec<Sim>,
+    running_since_checkpoint: Duration,
+    /// What the values sent show while the run is looked at in the past.
+    inspect: Option<Sim>,
     last_update: Instant,
     dirty: bool,
     out: std::io::BufWriter<std::io::Stdout>,
@@ -97,9 +113,12 @@ impl Server {
     fn update(&mut self) {
         let shared = self.sim.clone();
         let mut b = shared.borrow_mut();
-        let Some(sim) = b.as_mut() else { return };
+        let Some(live) = b.as_mut() else { return };
         let mut probes: Vec<usize> = std::mem::take(&mut self.resend);
-        for net in sim.take_changed() {
+        let changed = live.take_changed();
+        let tick = live.tick();
+        let sim = self.inspect.as_ref().unwrap_or(live);
+        for net in changed {
             probes.extend(
                 self.probes_by_net
                     .get(&net)
@@ -114,7 +133,7 @@ impl Server {
             .iter()
             .map(|&p| json!([sim.probes[p].path, sim.probes[p].port, bin(sim.value(&sim.probes[p]))]))
             .collect();
-        let (tick, pending) = (sim.tick(), sim.has_pending_events());
+        let pending = live.has_pending_events();
         let ev = json!({
             "ev": "update", "tick": tick, "pending": pending, "changes": changes,
             "mems": std::mem::take(&mut self.mems), "states": std::mem::take(&mut self.states),
@@ -176,6 +195,65 @@ impl Server {
             };
             self.send(ev);
         }
+    }
+
+    /// Shows the run at `tick` (`None`, or the present: as it is).
+    fn inspect(&mut self, tick: Option<u64>) -> Result<Option<u64>, String> {
+        let shared = self.sim.clone();
+        let mut b = shared.borrow_mut();
+        let live = b.as_mut().ok_or("no circuit loaded")?;
+        let tick = tick.filter(|&t| t < live.tick());
+        if tick.is_none() && self.inspect.is_none() {
+            return Ok(None);
+        }
+        let shown = match tick {
+            None => None,
+            Some(t) => {
+                // from the latest before `t`: a checkpoint, a replay's state, the tick shown
+                let from = self.checkpoints.iter().chain(&self.replays).chain(&self.inspect).filter(|c| c.tick() <= t);
+                let mut r = from.max_by_key(|c| c.tick()).ok_or("no checkpoint")?.clone();
+                // a long one keeps states on the way, for a cursor dragged back
+                let step = (t - r.tick()) / 8;
+                if step > 1000 {
+                    for _ in 1..8 {
+                        let k = r.tick() + step;
+                        r.replay_to(live, k)?;
+                        self.replays.push(r.clone());
+                    }
+                    let n = self.replays.len();
+                    self.replays.drain(..n.saturating_sub(CHECKPOINTS));
+                }
+                r.replay_to(live, t)?;
+                Some(r)
+            }
+        };
+        // what the view shows changes from the old to the new: memory words, FSM states, every value
+        let (old, new) = (self.inspect.as_ref().unwrap_or(live), shown.as_ref().unwrap_or(live));
+        self.mems.extend(new.memory_diff(old).into_iter().map(|(path, addr, v)| json!([path, addr, bin(&v)])));
+        let states = new.fsm_states().into_iter().filter(|(path, _)| self.observed.contains(&graph_of(path)));
+        self.states.extend(states.map(|(path, state)| json!([path, state])));
+        self.inspect = shown;
+        if self.inspect.is_none() {
+            self.replays.clear();
+        }
+        self.resend.extend((0..self.probe_graph.len()).filter(|&p| self.observed.contains(&self.probe_graph[p])));
+        drop(b);
+        self.update();
+        Ok(tick)
+    }
+
+    fn checkpoint(&mut self) {
+        if let Some(sim) = self.sim.borrow_mut().as_mut() {
+            self.checkpoints.push(sim.checkpoint());
+        }
+        if self.checkpoints.len() > CHECKPOINTS {
+            let mut i = 0;
+            self.checkpoints.retain(|_| {
+                i += 1;
+                i == 1 || i % 2 == 0
+            });
+        }
+        self.running_since_checkpoint = Duration::ZERO;
     }
 
     fn step(&mut self, next: bool) -> Result<usize, String> {
@@ -244,7 +322,13 @@ impl Server {
                 s.send(json!({"ev": "ack", "id": id, "result": result}));
             }
         };
-        match str_("op")? {
+        let op = str_("op")?;
+        if self.inspect.is_some()
+            && matches!(op, "step" | "start" | "start_fast" | "set_input" | "mem_write" | "lua_run")
+        {
+            self.inspect(None)?;
+        }
+        match op {
             "load" => {
                 let circuit: Circuit =
                     serde_json::from_value(req["circuit"].clone()).map_err(|e| format!("bad circuit: {e}"))?;
@@ -263,6 +347,10 @@ impl Server {
                 self.mems.clear();
                 self.states.clear();
                 self.watches.clear();
+                self.inspect = None;
+                self.replays.clear();
+                self.checkpoints.clear();
+                self.checkpoint();
                 ack(self, Value::Null);
             }
             "step" => {
@@ -387,6 +475,10 @@ impl Server {
                 let tick = self.with(|s| Ok(s.tick()))?;
                 ack(self, json!({"tick": tick, "waves": waves}));
             }
+            "inspect" => {
+                let shown = self.inspect(req["tick"].as_u64())?;
+                ack(self, json!(shown));
+            }
             "lua_run" => {
                 let (name, script) = (str_("name")?, str_("script")?);
                 let label = req["label"].as_str().unwrap_or(name);
@@ -428,6 +520,10 @@ pub fn serve() -> Result<(), String> {
         mems: vec![],
         states: vec![],
         watches: HashMap::new(),
+        checkpoints: vec![],
+        replays: vec![],
+        running_since_checkpoint: Duration::ZERO,
+        inspect: None,
         last_update: Instant::now(),
         dirty: false,
         out: std::io::BufWriter::new(std::io::stdout()),
@@ -448,10 +544,15 @@ pub fn serve() -> Result<(), String> {
             }
         }
         if !matches!(s.mode, Mode::Stopped) && Instant::now() >= next_slice {
-            next_slice = Instant::now() + SLICE;
+            let start = Instant::now();
+            next_slice = start + SLICE;
             if let Err(e) = s.run_slice() {
                 s.mode = Mode::Stopped;
                 s.send(json!({"ev": "error", "message": e}));
+            }
+            s.running_since_checkpoint += start.elapsed();
+            if s.running_since_checkpoint >= CHECKPOINT {
+                s.checkpoint();
             }
             // flat out runs slice after slice while there is something to do
             if matches!(s.mode, Mode::Fast) && s.sim.borrow().as_ref().is_some_and(Sim::has_pending_events) {
