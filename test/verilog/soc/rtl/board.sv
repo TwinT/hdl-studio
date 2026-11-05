@@ -10,7 +10,8 @@ module board (
     logic [31:0] col_data;
     logic        row_strobe;
 
-    soc #(.ROWS(16), .COLS(32), .SCAN_DIV(1)) sys (.clk, .rst, .row_idx, .col_data, .row_strobe);
+    soc #(.ROWS(16), .COLS(32), .SCAN_DIV(1)) sys (.clk, .rst, .row_idx, .col_data, .row_strobe,
+                                              .port_in('0), .port_out());
 
     led_panel #(.ROWS(16), .COLS(32)) panel (.clk, .rst, .row_idx, .col_data, .row_strobe, .matrix);
 

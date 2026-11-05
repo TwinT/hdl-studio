@@ -480,3 +480,24 @@ describe('time units', function () {
             assert.ok(close(parseTime(formatTime(t)), t), formatTime(t));
     });
 });
+
+// A project synthesizes what it lists, not its folder: a module used but not
+// listed fails only in the extension ("unknown module").
+describe('Example projects (.hdls)', function () {
+    this.timeout(120000);
+    const walk = (d) => fs.readdirSync(d, { withFileTypes: true })
+        .flatMap((e) => e.isDirectory() ? walk(path.join(d, e.name)) : e.name.endsWith('.hdls') ? [path.join(d, e.name)] : []);
+    for (const p of walk(verilogDir)) {
+        it(`${path.relative(verilogDir, p)} lists every source it needs`, async function () {
+            const { slangAvailable, synthesize } = await import('./designs.mjs');
+            if (!slangAvailable()) this.skip();
+            const project = JSON.parse(fs.readFileSync(p, 'utf8'));
+            const files = project.sources.filter((s) => !s.deleted).map((s) => s.relpath);
+            try {
+                synthesize({ dir: path.dirname(p), files, top: project.options?.top || undefined });
+            } catch (e) {
+                assert.fail(String(e.stdout ?? '') + String(e.stderr ?? e.message));
+            }
+        });
+    }
+});
