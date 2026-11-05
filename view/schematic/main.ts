@@ -109,6 +109,16 @@ class App {
         new MutationObserver(() => this.#applyTheme()).observe(document.body, { attributes: true, attributeFilter: ['class'] });
         engineChannel.listen((ev) => { if (ev.session === this.#session) this.#engineEvent(ev); });
         window.addEventListener('message', (e) => this.#message(e.data));
+        // Space: run or pause (from the past: back to the present, running)
+        window.addEventListener('keydown', (e) => {
+            if (e.code !== 'Space' || e.repeat || !this.circuit || this.#lua.active
+                || (e.target as Element).closest?.('input, textarea, select, [contenteditable]')) return;
+            e.preventDefault();
+            if (this.running) return this.pauseSim();
+            this.#leavePast();
+            this.#monitor.follow();
+            this.startSim();
+        });
         for (const t of ['touchstart', 'mousedown', 'click'])
             window.addEventListener(t, () => vscode.postMessage({ command: 'focus' }), { capture: true, passive: true });
         this.updateRunStates();
@@ -298,7 +308,7 @@ class App {
         let b = document.getElementById('pastbanner');
         if (tick === undefined) return b?.remove();
         if (!b) document.getElementById('paper')!.append(b = Object.assign(document.createElement('div'), { id: 'pastbanner' }));
-        b.textContent = `t = ${this.#monitor.timeOf(tick)}  ·  Space: back to the present${this.#resume ? ' and run' : ''}`;
+        b.textContent = `t = ${this.#monitor.timeOf(tick)}  ·  Space: back to the present and run`;
     }
 
     startSim() {
@@ -438,7 +448,7 @@ class App {
                 item('Open a waveform layout…', false, () => vscode.postMessage({ command: 'loadwaves' }));
                 head('Theme');
                 for (const [name, t] of Object.entries(themes))
-                    item(t.label, (this.#theme.name ?? 'classic') === name, () => vscode.postMessage({ command: 'settheme', theme: name }));
+                    item(t.label, (this.#theme.name ?? 'dracula') === name, () => vscode.postMessage({ command: 'settheme', theme: name }));
             });
         });
         return s;

@@ -225,6 +225,8 @@ describe('schematic webview on the engine', function () {
 
     it('draws in the theme picked in its menu', async function () {
         await show('04_counter');
+        // Dracula unless one is picked
+        await until(() => getComputedStyle(document.getElementById('paper')).backgroundColor === 'rgb(40, 42, 54)');
         const svg = await page.evaluate(() => document.querySelector('svg.schematic').getBoundingClientRect().toJSON());
         await page.mouse.click(svg.x + svg.width - 20, svg.y + 20, { button: 'right' });
         await page.locator('.wavemenu button', { hasText: 'Solarized Dark' }).click();
@@ -257,9 +259,13 @@ describe('schematic webview on the engine', function () {
         await page.mouse.dblclick(mids[0].x, mids[0].y);
         assert.strictEqual(await zoom(), before, 'a double-click on a wire zoomed');
         // the others through the button shown on a hovered wire
+        // (it stays put while the pointer wanders near it, to be reached)
+        const tool = () => page.evaluate(() => document.querySelector('.wiretool rect').getBoundingClientRect().toJSON());
         for (const m of mids.slice(1)) {
             await page.mouse.move(m.x, m.y);
-            const r = await page.evaluate(() => document.querySelector('.wiretool rect').getBoundingClientRect().toJSON());
+            const r = await tool();
+            await page.mouse.move(m.x + 15, m.y - 4, { steps: 3 });
+            assert.deepStrictEqual(await tool(), r);
             await page.mouse.move(r.x + r.width / 2, r.y + r.height / 2, { steps: 3 });
             await page.mouse.click(r.x + r.width / 2, r.y + r.height / 2);
         }
@@ -280,7 +286,7 @@ describe('schematic webview on the engine', function () {
         const shown = (await posted('iopanel:update')).filter((m) => m.id === count).at(-1).value;
         assert.strictEqual(shown, '0101');
         assert.match(await page.evaluate(() => document.querySelector('#monitor .status').textContent), /count equals 5 at/);
-        // something was drawn, in the signal colour (Surfer's green)
+        // something was drawn, in the signal colour (Dracula's green)
         const colours = await page.evaluate(() => {
             const c = document.querySelector('#monitor .grid canvas:not(.ruler)');
             const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
@@ -288,7 +294,7 @@ describe('schematic webview on the engine', function () {
             for (let i = 0; i < d.length; i += 4) if (d[i + 3]) seen.add(`${d[i]},${d[i + 1]},${d[i + 2]}`);
             return [...seen];
         });
-        assert.ok(colours.includes('86,193,38'), colours.slice(0, 20).join(' '));
+        assert.ok(colours.includes('80,250,123'), colours.slice(0, 20).join(' '));
         // the trigger put the cursor where it stopped, which the toolbar says
         const following = () => page.evaluate(() => document.querySelector('#monitor [name=follow]').classList.contains('on'));
         const badge = () => page.evaluate(() => {
@@ -323,10 +329,11 @@ describe('schematic webview on the engine', function () {
         await until((id) => document.querySelector(`.cell[data-id="${id}"] .numvalue`).textContent
                             === [...document.querySelectorAll('#monitor .row')].find((r) => r.querySelector('.name > span:not(.pause)')?.textContent === 'count').querySelector('.value').textContent, count);
         assert.notStrictEqual(await valueAt(), earlier);
-        // Space: the present, running again
+        // Space: the present, running again; Space again pauses
         await page.keyboard.press('Space');
         assert.deepStrictEqual([await following(), await running(), await page.evaluate(() => !!document.getElementById('pastbanner'))], [true, true, false]);
-        await post({ command: 'pausesim' });
+        await page.keyboard.press('Space');
+        assert.deepStrictEqual([await following(), await running()], [true, false]);
     });
 
     it('keeps what the project saves: waveforms, zoom, clock period, a layout', async function () {
@@ -434,6 +441,40 @@ describe('schematic webview on the engine', function () {
         await post({ command: 'wavesconfig', config: { waves: [lost, { ...lost, name: 'nope' }] } });
         await until(() => /1 signal of the layout not found/.test(document.querySelector('#monitor .status').textContent));
         assert.deepStrictEqual(await names(), [lost.name]);
+    });
+
+    it('selects several waveforms, to group or move them together', async function () {
+        await post({ command: 'showcircuit', circuit: { devices: {}, connectors: [] }, opts: {} });
+        await show('04_counter');
+        await page.evaluate(() => { for (const h of document.querySelectorAll('.wirehit')) h.dispatchEvent(new MouseEvent('dblclick', { bubbles: true })); });
+        const names = () => page.evaluate(() => [...document.querySelectorAll('#monitor .row:not([hidden]) .name > span')].map((n) => n.textContent));
+        const selected = () => page.evaluate(() => [...document.querySelectorAll('#monitor .row.selected .name > span')].map((n) => n.textContent));
+        const row = (name) => page.locator('#monitor .row:not(.group) .name > span', { hasText: new RegExp(`^${name.replace(/\$/g, '\\$')}$`) });
+        const first = await names();
+        // a click, Ctrl+click, Shift+click
+        await row(first[0]).click();
+        await row(first[2]).click({ modifiers: ['Control'] });
+        assert.deepStrictEqual(await selected(), [first[0], first[2]]);
+        await row(first[3]).click({ modifiers: ['Shift'] });
+        assert.deepStrictEqual(await selected(), [first[2], first[3]]);
+        // dragged together to the top, the text not selected along
+        const from = await row(first[2]).boundingBox(), to = await row(first[0]).boundingBox();
+        await page.mouse.move(from.x + 5, from.y + from.height / 2);
+        await page.mouse.down();
+        await page.mouse.move(to.x + 5, to.y - 2, { steps: 6 });
+        await page.mouse.up();
+        assert.deepStrictEqual((await names()).slice(0, 4), [first[2], first[3], first[0], first[1]]);
+        assert.strictEqual(await page.evaluate(() => getSelection().toString()), '');
+        // grouped from the menu
+        await row(first[2]).click({ button: 'right' });
+        await page.locator('.wavemenu button', { hasText: 'Group the 2 signals' }).click();
+        await page.keyboard.type('Pair');
+        await page.keyboard.press('Enter');
+        const waves = (await lastPosted('viewstate')).state.waves;
+        assert.deepStrictEqual(waves.filter((w) => w.items).map((g) => [g.group, g.items.map((i) => i.name)]), [['Pair', [first[2], first[3]]]]);
+        // Escape clears the selection
+        await page.keyboard.press('Escape');
+        assert.deepStrictEqual(await selected(), []);
     });
 
     it('the waveforms keep drawing after a reset that crossed a request', async function () {

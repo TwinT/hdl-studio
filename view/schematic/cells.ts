@@ -28,7 +28,7 @@ const SVG = 'http://www.w3.org/2000/svg';
 export const FONT = 'verdana, sans-serif';
 
 // The theme's colours (themes.ts sets the variables).
-export const C = { fill: 'var(--sch-fill)', ink: 'var(--sch-ink)', lead: 'var(--sch-lead)', lamp: 'var(--sch-lamp)', hl: 'var(--sch-hl)' };
+export const C = { fill: 'var(--sch-fill)', ink: 'var(--sch-ink)', lead: 'var(--sch-lead)', hl: 'var(--sch-hl)' };
 
 // A colour that may be a variable: presentation attributes aren't sure to
 // take var(), so it goes in the style.
@@ -469,10 +469,9 @@ export function draw(d: Device, s: Shape, top: boolean, hooks: CellHooks): CellV
                 face.addEventListener('click', () => hooks.setInput(cur === '1' ? '0' : '1'));
             }
         } else if (mode === 1) {
-            const led = el('circle', { cx: 15, cy: 15, r: 10.5, fill: C.lamp }, body);
+            const led = el('circle', { cx: 15, cy: 15, r: 10.5, fill: levelColor.undef }, body);
             update = (value) => {
-                const l = level(value('in'));
-                paint(led, 'fill', l === 'high' || l === 'low' || l === 'highz' ? levelColor[l] : C.lamp);
+                paint(led, 'fill', levelColor[level(value('in'))]);
             };
         } else if (isInput(d)) {
             const div = foreign(g, 5, 5, s.w - 10, s.h - 10, 'valinput');

@@ -48,6 +48,11 @@ body {
     color: var(--wave-fg);
     font-family: var(--vscode-font-family, sans-serif);
     font-size: 12px;
+    user-select: none; /* rows are dragged and selected, not their text */
+}
+
+#monitor input {
+    user-select: text;
 }
 
 #monitor .gutter {
@@ -238,6 +243,10 @@ body {
 
 #monitor .grid .row.alt {
     background: var(--wave-alt);
+}
+
+#monitor .grid .row.selected {
+    background: color-mix(in srgb, var(--wave-fg) 18%, transparent);
 }
 
 #monitor button {

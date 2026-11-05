@@ -148,15 +148,15 @@ that produced it:
   | Colour | Value |
   |---|---|
   | green | all ones |
-  | salmon | all zeros |
+  | grey | all zeros |
   | blue | a defined mix of 0s and 1s |
   | orange | high impedance (z) |
-  | grey | undefined (x) |
+  | red | undefined (x): drivers in conflict, or no value yet (before a reset) |
 
-  (in the *Classic* theme; the others have their own shades of these).
-- **Theme:** right-click the background and pick one — *Classic*, *VS Code* (its
-  colours), *Solarized Light*, *Solarized Dark*, *Dracula*, *Nord*, *Night Owl*,
-  *Gruvbox Dark*. The waveforms take its colours too.
+  (each theme has its own shades of these).
+- **Theme:** right-click the background and pick one — *Dracula* (the default),
+  *Classic* (white paper), *VS Code* (its colours), *Solarized Light*, *Solarized Dark*,
+  *Nord*, *Night Owl*, *Gruvbox Dark*. The waveforms take its colours too.
 
 ### Simulation
 
@@ -185,19 +185,23 @@ monitor under the schematic.
   ruler in the project's time units.
 - **Time cursor:** click (or drag) on the waveforms to put the cursor at a time. The
   simulation pauses and the whole circuit — schematic, *Control* panel, memories, FSMs —
-  shows the values it had then; drag the cursor to move through the run. `Space` (or the
-  follow button) goes back to the present and runs again if it was running; so does
-  anything that changes the run (*Start*, a step, an input).
+  shows the values it had then; drag the cursor to move through the run. The follow
+  button goes back to the present (running again if it was), and so does anything that
+  changes the run (*Start*, a step, an input).
+- **`Space`** runs and pauses the simulation; with the cursor in the past, it goes back
+  to the present and runs.
 - Scroll with the wheel (`Shift` + wheel, or sideways) or by dragging with the middle
   button (or `Alt` + drag); `Ctrl` + wheel zooms.
 - Right-click a signal (or its `…` button) to change its number format, remove it, or
   **pause the simulation** when it rises, falls, changes, becomes x or equals a value.
   Press *Start*: the simulation runs until that happens, the cursor marks the moment and
   the monitor says why it paused; `Space` goes on.
-- **Arrange:** drag a signal by its name to reorder it. *New group* in a signal's menu
-  puts it in a group (named in place); drag others onto the group's header. Groups have a
-  colour (their signals are drawn in it) and collapse with their arrow. Drag the edges of
-  the *Signal* and *Value* headers to resize the columns.
+- **Arrange:** click a signal's name to select it (`Ctrl`+click adds, `Shift`+click a
+  range, `Esc` clears) and drag it, or the selection, to reorder. *New group* (*Group the
+  N signals*) in the menu puts them in a group, named in place; drag others onto the
+  group's header. Groups have a colour (their signals are drawn in it) and collapse with
+  their arrow. The menu's format and *Remove* apply to the whole selection. Drag the
+  edges of the *Signal* and *Value* headers to resize the columns.
 - The monitor's arrangement is saved with the project; the 💾/📂 buttons save it to or
   open it from a `.waves.json` file (also *Open a waveform layout…* in the schematic's
   menu), to share or keep several. Signals are found by name, so a layout survives a
@@ -305,7 +309,7 @@ Values given to `sim` can be vecs, booleans, integers or strings like `"8hff"`.
 | Setting | Default | |
 |---|---|---|
 | `hdl-studio.yosysPath` | `""` (use `PATH`) | Path to the `yosys` executable. |
-| `hdl-studio.theme` | `classic` | Colours of the circuit view: `classic`, `vscode`, `solarized-light`, `solarized-dark`, `dracula`, `nord`, `night-owl`, `gruvbox-dark`. |
+| `hdl-studio.theme` | `dracula` | Colours of the circuit view: `dracula`, `classic`, `vscode`, `solarized-light`, `solarized-dark`, `nord`, `night-owl`, `gruvbox-dark`. |
 | `hdl-studio.waveform.colors` | `{}` (the theme's) | Waveform colours as CSS colours, over the theme's: `background`, `altBackground`, `foreground`, `grid`, `signal`, `undefined`, `highImpedance`, `cursor`, `fillOpacity`. Any key can be left out. |
 
 The simulation speed is global and remembered between sessions.

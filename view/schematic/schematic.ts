@@ -63,6 +63,7 @@ export class Schematic {
     // the "add to the waveform" button shown on a hovered wire
     #tool: SVGGElement;
     #toolWire?: Wire;
+    #toolAt?: { x: number, y: number }; // where it was shown (screen)
     #toolHide = 0;
     #shapes = new Map<string, Shape>();
     #cells = new Map<string, CellView>();
@@ -263,11 +264,15 @@ export class Schematic {
     // same size at any zoom.
     #showTool(w: Wire | undefined, e?: PointerEvent) {
         clearTimeout(this.#toolHide);
-        this.#toolWire = w;
         if (!w || !e) {
+            this.#toolWire = this.#toolAt = undefined;
             this.#tool.setAttribute('visibility', 'hidden');
             return;
         }
+        // it stays put while the pointer is near, so it can be reached
+        if (w === this.#toolWire && this.#toolAt && Math.hypot(e.clientX - this.#toolAt.x, e.clientY - this.#toolAt.y) < 40) return;
+        this.#toolWire = w;
+        this.#toolAt = { x: e.clientX, y: e.clientY };
         const r = this.svg.getBoundingClientRect(), t = this.#t;
         const p = nearest(w.pts, { x: (e.clientX - r.left - t.x) / t.k, y: (e.clientY - r.top - t.y) / t.k });
         this.#tool.setAttribute('transform', `translate(${p.x},${p.y}) scale(${1 / t.k})`);
@@ -275,7 +280,7 @@ export class Schematic {
     }
     #hideTool() {
         clearTimeout(this.#toolHide);
-        this.#toolHide = window.setTimeout(() => this.#showTool(undefined), 400);
+        this.#toolHide = window.setTimeout(() => this.#showTool(undefined), 800);
     }
 
     // Moving a cell drops the routes of its wires (they go straight then).

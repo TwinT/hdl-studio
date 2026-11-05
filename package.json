@@ -380,7 +380,7 @@
                 },
                 "hdl-studio.theme": {
                     "type": "string",
-                    "default": "classic",
+                    "default": "dracula",
                     "enum": ["classic", "vscode", "solarized-light", "solarized-dark", "dracula", "nord", "night-owl", "gruvbox-dark"],
                     "enumItemLabels": ["Classic", "VS Code", "Solarized Light", "Solarized Dark", "Dracula", "Nord", "Night Owl", "Gruvbox Dark"],
                     "enumDescriptions": [

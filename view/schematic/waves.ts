@@ -2,11 +2,12 @@
 // VaporView: names, the value under the pointer, the waveform, and a time
 // ruler. The engine records the watched outputs (`watch`); after each
 // update this asks for the window it shows (`wave`, one entry per pixel
-// column) and draws it. Rows can be dragged into another order and into
-// groups (one level, coloured, collapsible); the whole arrangement is the
+// column) and draws it. Rows are selected (Ctrl/Shift for several) and
+// dragged into another order and into groups (one level, coloured,
+// collapsible), or grouped from their menu; the whole arrangement is the
 // `config` saved with the project or in a file. A click or a drag on the
 // waveforms puts the time cursor there: the view stops following and the
-// app shows the circuit at that tick, until Space or "follow".
+// app shows the circuit at that tick, until "follow" (or Space, which runs).
 
 import { formatTimeAt } from '../../src/time_units.mjs';
 import { read, show } from './values.ts';
@@ -104,6 +105,8 @@ export class Monitor {
     #running = false; // the simulation
     #watches = new Map<number, Watch>();
     #items: Item[] = []; // in order, groups holding theirs
+    #selected = new Set<Watch>();
+    #anchor?: Watch; // where a Shift+click range starts
     #cols = [180, 90]; // the name and value columns' widths
     #dropLine: HTMLDivElement;
     #ids = 0;
@@ -171,11 +174,8 @@ export class Monitor {
         // the waveform column's width (the view's, or a column resized)
         new ResizeObserver(() => this.#resize()).observe(this.#ruler);
         this.#waveEvents();
-        // Space: back to the present (and running, if it was)
         window.addEventListener('keydown', (e) => {
-            if (e.code !== 'Space' || e.repeat || this.#follow || (e.target as Element).closest?.('input, textarea, select, [contenteditable]')) return;
-            e.preventDefault();
-            this.#setFollow(true);
+            if (e.key === 'Escape' && !(e.target as Element).closest?.('input')) this.#select(undefined);
         });
         this.#setFollow(true);
         this.#show();
@@ -258,6 +258,7 @@ export class Monitor {
         const list = w.group?.items ?? this.#items;
         list.splice(list.indexOf(w), 1);
         this.#watches.delete(id);
+        this.#selected.delete(w);
         this.#render();
     }
 
@@ -331,6 +332,7 @@ export class Monitor {
                 w.row.classList.toggle('member', !!w.group);
                 w.row.style.setProperty('--group-color', w.group?.color ?? 'transparent');
                 if (!w.row.hidden) w.row.classList.toggle('alt', Math.floor(n++ / 3) % 2 === 1);
+                w.row.classList.toggle('selected', this.#selected.has(w));
                 this.#grid.append(w.row);
             }
         }
@@ -389,13 +391,39 @@ export class Monitor {
         input.focus();
         input.select();
     }
-    // A new group in `w`'s place, holding it; its name is edited at once.
-    #group(w: Watch) {
+    // Every signal, in order (a collapsed group's too).
+    #order() {
+        return this.#items.flatMap((i) => isGroup(i) ? i.items : [i]);
+    }
+    #selection() {
+        return this.#order().filter((w) => this.#selected.has(w));
+    }
+    // A click on a row: it alone, Ctrl/Cmd toggles it, Shift selects from
+    // the last one clicked; none clears.
+    #select(w: Watch | undefined, e?: { ctrlKey: boolean, metaKey: boolean, shiftKey: boolean }) {
+        const shown = this.#order().filter((x) => !x.row.hidden);
+        const a = this.#anchor ? shown.indexOf(this.#anchor) : -1;
+        if (!w) this.#selected.clear();
+        else if (e?.shiftKey && a >= 0) {
+            const b = shown.indexOf(w);
+            this.#selected = new Set(shown.slice(Math.min(a, b), Math.max(a, b) + 1));
+        } else if (e && (e.ctrlKey || e.metaKey)) {
+            if (!this.#selected.delete(w)) this.#selected.add(w);
+            this.#anchor = w;
+        } else {
+            this.#selected = new Set([w]);
+            this.#anchor = w;
+        }
+        for (const x of this.#watches.values()) x.row.classList.toggle('selected', this.#selected.has(x));
+    }
+
+    // A new group where the first of `ws` is, holding them; its name is edited at once.
+    #group(ws: Watch[]) {
         const n = this.#items.filter(isGroup).length;
         const g = this.#newGroup(`Group ${n + 1}`, groupColors[n % groupColors.length]);
-        const at = this.#items.indexOf(w.group ?? w);
-        this.#items.splice(w.group ? at + 1 : at, 0, g);
-        this.#move(w, { parent: g, y: 0 });
+        const at = this.#items.indexOf(ws[0].group ?? ws[0]);
+        this.#items.splice(ws[0].group ? at + 1 : at, 0, g);
+        this.#move(ws, { parent: g, y: 0 });
         this.#hooks.changed();
         this.#rename(g);
     }
@@ -433,63 +461,73 @@ export class Monitor {
     }
 
     // A row dragged by its name goes where it's dropped: among others, or
-    // into a group (onto its header). A group only moves among the top level.
+    // into a group (onto its header), with the other selected ones. A group
+    // only moves among the top level. A click (no drag) selects.
     #dragRow(item: Item) {
         const name = item.name_;
         name.addEventListener('pointerdown', (e) => {
             if (e.button !== 0 || (e.target as Element).closest('button, input')) return;
             const y0 = e.clientY;
             let drop: Drop | undefined;
+            let moving: Item[] = [];
             const move = (ev: PointerEvent) => {
-                if (!drop && Math.abs(ev.clientY - y0) < 4) return;
-                item.row.classList.add('dragging');
-                drop = this.#dropAt(ev.clientY, item);
+                if (!drop) {
+                    if (Math.abs(ev.clientY - y0) < 4) return;
+                    if (!isGroup(item) && !this.#selected.has(item)) this.#select(item);
+                    moving = isGroup(item) ? [item] : this.#selection();
+                    for (const i of moving) i.row.classList.add('dragging');
+                }
+                drop = this.#dropAt(ev.clientY, new Set(moving));
                 const g = this.#grid.getBoundingClientRect();
                 this.#dropLine.style.top = `${drop.y - g.top + this.#grid.scrollTop - 1}px`;
                 this.#dropLine.hidden = false;
             };
-            const up = () => {
+            const up = (ev: PointerEvent) => {
                 window.removeEventListener('pointermove', move);
                 window.removeEventListener('pointerup', up);
                 window.removeEventListener('pointercancel', up);
-                item.row.classList.remove('dragging');
+                for (const i of moving) i.row.classList.remove('dragging');
                 this.#dropLine.hidden = true;
                 if (drop) {
-                    this.#move(item, drop);
+                    this.#move(moving, drop);
                     this.#hooks.changed();
-                }
+                } else if (ev.type === 'pointerup') this.#select(isGroup(item) ? undefined : item, ev);
             };
             window.addEventListener('pointermove', move);
             window.addEventListener('pointerup', up);
             window.addEventListener('pointercancel', up);
         });
     }
-    #dropAt(y: number, item: Item): Drop {
+    #dropAt(y: number, moving: Set<Item>): Drop {
+        const group = [...moving].some(isGroup);
         const rows: { item: Item, parent?: Group, r: DOMRect }[] = [];
         for (const i of this.#items) {
-            if (i === item) continue;
+            if (moving.has(i)) continue;
             rows.push({ item: i, r: i.row.getBoundingClientRect() });
             if (isGroup(i) && !i.collapsed)
-                for (const w of i.items) if (w !== item) rows.push({ item: w, parent: i, r: w.row.getBoundingClientRect() });
+                for (const w of i.items) if (!moving.has(w)) rows.push({ item: w, parent: i, r: w.row.getBoundingClientRect() });
         }
         for (const { item: i, parent, r } of rows) {
-            if (isGroup(i) && !isGroup(item) && y >= r.top + r.height / 4 && y < r.bottom)
-                return { parent: i, before: i.items.find((w) => w !== item), y: r.bottom };
+            if (isGroup(i) && !group && y >= r.top + r.height / 4 && y < r.bottom)
+                return { parent: i, before: i.items.find((w) => !moving.has(w)), y: r.bottom };
             if (y < r.top + r.height / 2) {
-                if (isGroup(item) && parent) return { before: parent, y: parent.row.getBoundingClientRect().top };
+                if (group && parent) return { before: parent, y: parent.row.getBoundingClientRect().top };
                 return { parent, before: i, y: r.top };
             }
         }
         const last = rows.at(-1)?.r;
         return { y: last ? last.bottom : this.#ruler.getBoundingClientRect().bottom };
     }
-    #move(item: Item, { parent, before }: Drop) {
-        const from = isGroup(item) ? this.#items : item.group?.items ?? this.#items;
-        from.splice(from.indexOf(item), 1);
+    // `items` (in order) into `parent`, before `before` (none of them).
+    #move(items: Item[], { parent, before }: Drop) {
+        for (const i of items) {
+            const from = isGroup(i) ? this.#items : i.group?.items ?? this.#items;
+            from.splice(from.indexOf(i), 1);
+        }
         const to = parent?.items ?? this.#items;
         const at = before ? to.indexOf(before as Watch) : -1;
-        to.splice(at < 0 ? to.length : at, 0, item as Watch);
-        if (!isGroup(item)) item.group = parent;
+        to.splice(at < 0 ? to.length : at, 0, ...items as Watch[]);
+        for (const i of items) if (!isGroup(i)) i.group = parent;
         this.#render();
     }
 
@@ -555,7 +593,7 @@ export class Monitor {
         b.hidden = !paused && !this.#running;
         b.className = `badge ${paused ? 'paused' : 'running'}`;
         b.textContent = paused ? 'PAUSED' : 'RUNNING';
-        b.title = paused ? 'The waveforms stopped following the simulation: click here or press Space to follow it again'
+        b.title = paused ? 'The waveforms stopped following the simulation: click here to follow it again (Space also runs it)'
             : 'The waveforms follow the running simulation: click here to stop';
     }
 
@@ -564,7 +602,7 @@ export class Monitor {
         this.#followBtn.classList.toggle('on', on);
         this.#showBadge();
         this.#followBtn.title = on ? 'Following the simulation: click to stop (a click on the waveforms puts the cursor there)'
-            : 'Follow the simulation again (Space)';
+            : 'Follow the simulation again (Space also runs it)';
         if (on) {
             this.#status.textContent = '';
             if (this.#cursor !== undefined) {
@@ -628,12 +666,29 @@ export class Monitor {
         }, { passive: false });
     }
 
+    // The menu of a row, or of the selection it's in.
     #openMenu(w: Watch, x: number, y: number) {
+        if (!this.#selected.has(w)) this.#select(w);
+        const ws = this.#selection(), many = ws.length > 1, buses = ws.filter((v) => v.bits > 1);
         popupMenu(x, y, ({ menu, item, head, close }) => {
-            if (w.bits > 1) {
+            if (buses.length) {
                 head('Format');
                 for (const [b, l] of [['hex', 'hexadecimal'], ['dec', 'decimal'], ['dec2c', 'signed decimal'], ['oct', 'octal'], ['bin', 'binary']])
-                    item(l, w.base === b, () => { w.base = b; this.#drawAll(); this.#hooks.changed(); });
+                    item(l, buses.every((v) => v.base === b), () => { for (const v of buses) v.base = b; this.#drawAll(); this.#hooks.changed(); });
+            }
+            head('Group');
+            item(many ? `Group the ${ws.length} signals` : 'New group', false, () => this.#group(ws));
+            const moved = (d: Drop) => () => { this.#move(ws, d); this.#hooks.changed(); };
+            for (const g of this.#items.filter(isGroup)) if (ws.some((v) => v.group !== g)) item(`Move to ${g.group}`, false, moved({ parent: g, y: 0 }));
+            if (ws.some((v) => v.group)) item('Out of the group', false, () => {
+                // each right after its group
+                for (const v of ws) if (v.group) this.#move([v], { before: this.#items[this.#items.indexOf(v.group) + 1], y: 0 });
+                this.#hooks.changed();
+            });
+            menu.append(document.createElement('hr'));
+            if (many) {
+                item(`Remove the ${ws.length} signals`, false, () => { for (const v of ws) this.remove(v.id); this.#hooks.changed(); });
+                return;
             }
             head('Pause the simulation when it…');
             const pauses: Pause[] = w.bits === 1 ? bitPauses : [{ label: 'changes', values: null }];
@@ -654,11 +709,6 @@ export class Monitor {
                 menu.append(input);
             }
             item('never', !w.pause, () => { this.#setPause(w, undefined); this.#hooks.changed(); });
-            head('Group');
-            item('New group', false, () => this.#group(w));
-            const moved = (d: Drop) => () => { this.#move(w, d); this.#hooks.changed(); };
-            for (const g of this.#items.filter(isGroup)) if (g !== w.group) item(`Move to ${g.group}`, false, moved({ parent: g, y: 0 }));
-            if (w.group) item('Out of the group', false, moved({ before: this.#items[this.#items.indexOf(w.group) + 1], y: 0 }));
             menu.append(document.createElement('hr'));
             item('Remove', false, () => { this.remove(w.id); this.#hooks.changed(); });
         });

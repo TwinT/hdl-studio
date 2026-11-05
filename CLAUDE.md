@@ -86,20 +86,23 @@ SVG drawn by hand, laid out by `elkjs`, simulated by the engine through the host
   pointer, else at the cursor or the view's right edge), waveform, and a ruler in the
   project's time units (`timescale` comes with `showcircuit` and on change). Each
   signal is a `.row` (CSS subgrid of the name/value/wave columns, resizable): rows
-  are dragged by the name, into groups (one level, colour, collapsed). `config`
+  are selected (click, Ctrl/Shift+click; the menu acts on the selection) and dragged
+  by the name, into groups (one level, colour, collapsed). `config`
   (`{waves: [spec | {group, color, collapsed, items}], columns}`) is saved as the
   document's `view.waves`/`view.waveColumns` and to `.waves.json` files
   (`savewaves`/`loadwaves`/`wavesconfig`, dialogs in `circuit_view.mjs`); `main.ts`
   `#resolve` finds a saved signal at its path, else by its name (a new synthesis
   renumbers cells). A click/drag on the waves or ruler sets the cursor: `main.ts`
   `#cursor` pauses (remembering whether it ran), sends `inspect` (one in flight,
-  latest wins) and shows `#pastbanner`; Space/follow clear it and run again;
-  `#leavePast` runs first in everything that changes the run. Middle/Alt-drag
+  latest wins) and shows `#pastbanner`; follow clears it and runs again if it ran;
+  `#leavePast` runs first in everything that changes the run. Space (`main.ts`) is
+  run/pause, from the past back to the present, running. Middle/Alt-drag
   scrolls, Ctrl+wheel zooms. A row's menu (right-click or "…") picks the number
   format, a pause condition (an engine `monitor` with `stop`, triggers null = any
   change; firing puts the cursor there and Space goes on) and its group.
-- Themes (`themes.ts`, setting `hdl-studio.theme`, also in the schematic's
-  right-click menu → `settheme`): a palette per theme set as `--sch-*` variables on
+- Themes (`themes.ts`, setting `hdl-studio.theme`, Dracula by default, also in the
+  schematic's right-click menu → `settheme`): wires green 1, grey 0, blue bus, orange
+  z, red x (a collision is an x). A palette per theme set as `--sch-*` variables on
   `:root`; the drawing uses `var(...)` colours (`cells.ts` `C`, `values.ts`
   `levelColor`), which `el()`/`paint()` put in the style, not in presentation
   attributes. The waveforms get concrete colours (the theme's, `var()`s resolved,
