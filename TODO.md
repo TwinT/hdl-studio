@@ -11,6 +11,70 @@ Done items leave this list; git history keeps them.
       cells and their wires included).
 - [ ] `sim.registerdisplay` (custom number formats) in Lua: the formats live
       in the view, so it needs a protocol between the engine and the view.
+- [ ] Simulation tiers, picked per circuit view: the engine as now
+      ("didactic": 4 states, per-cell delays, every net live) plus fast ones
+      for big, interactive runs (a game on the LED matrix). Measured on
+      carpincho-V (2026-11-06): the engine 35.5k cycles/s (`bench` on
+      `carpinchoV/carpincho/demos/carpincho`), Verilator 5.042 ~3.8M cycles/s
+      (`program_tb`, `--binary --timing -O3`, one thread; its SoC has no LED
+      panel), ~100x.
+      - Shape: a fast model behind the same `hdlstudio serve` protocol, so
+        the view, the Control panel, Lua, monitors/alarms and the waveforms
+        of watched signals keep working. `serve` drives a backend
+        (inputs, outputs/nets, step to the next clock edge, run N cycles,
+        memory read/write); the engine is one. The other: a Verilator model
+        built into a shared library with a small generated C ABI (ports and
+        public signals by name), loaded by `serve` (`libloading`). A
+        separate C++ process would have to redo Lua, waves and monitors.
+      - Tiers: "fast" = every net visible (Verilator `--public-flat-rw`, or
+        yosys's CXXRTL on the synthesized netlist, whose nets are the
+        schematic's), the schematic stays live; "very fast" = only the top's
+        ports and watched signals, `--threads`, the schematic shows the I/O
+        live and the rest when paused (or not at all).
+      - Verilate the sources (best model) for "very fast": the I/O widgets
+        map by port name. Mapping every schematic net needs the netlist
+        (yosys `write_verilog`/CXXRTL after the same passes).
+      - What a fast tier loses (to show in the view): x/z (2 states; an
+        unreset register is 0 or random, `--x-initial`), per-cell delays
+        (cycle-accurate only: glitches, zero-delay loops), limited inout;
+        the time cursor unless replay uses Verilator's `--savable`
+        save/restore; ticks only advance edge to edge (the timescale and
+        the clocks' periods still say when).
+      - Build: Verilator and a C++ compiler as optional dependencies, like
+        yosys; seconds to minutes of C++, so cache the model per sources
+        hash; switching tiers reloads the circuit (like Reset).
+- [ ] Detachable waveforms: the monitor in its own VS Code panel, to put
+      beside the circuit, in another editor group, or in a new window on a
+      second monitor ("Move into New Window"). Docked in the circuit view
+      stays the default; a toolbar button detaches it and closing the panel
+      docks it back.
+      - A `WebviewPanel` (an editor tab: it can go to another window) with
+        its own bundle around `Monitor` (`waves.ts` already takes a root and
+        hooks). A `WebviewView` in VS Code's bottom panel is the other option
+        (like a terminal, following the active circuit view as the Control
+        panel does), but it can't move to another window.
+      - The host (`src/circuit_view.mjs`) relays between the two webviews
+        and the engine: the engine's events (`tick`, wave windows, a fired
+        monitor) go to both; the monitor's requests (`watch`, `wave`,
+        `monitor`...) to the engine; its cursor to the circuit view (the
+        `inspect` is the circuit view's, `#cursor`); run state, Space,
+        follow, theme, timescale both ways; `viewstate` saves `view.waves`
+        as now.
+      - What lives in `main.ts` and the panel needs: `#resolve` (a saved
+        signal by path, else by name: needs the circuit or a request to the
+        circuit view), adding a wire's waveform from the schematic (its
+        button), the pause dot (`#triggers`).
+      - One panel per circuit view (titled with the document), closed with it.
+- [ ] Keyboard → inputs: map keys to PushButtons/Buttons (held while the key
+      is down), for playing anything on the circuit. Per project, saved in
+      `view`.
+- [ ] A framebuffer display: a `Memory` shown as an image (width, height,
+      bits per pixel, palette), drawn on a canvas from the memory writes
+      `update` already carries (carpinchoV's `vram`/`pixel` examples). The
+      `LEDMatrix` is 1 bit per LED and SVG, too small and slow for a game.
+      Doom itself also needs the hardware: RV32IM, megabytes of RAM and ~10+
+      MIPS (carpincho-V is RV32I, microcoded, 4 KiB); a raycaster
+      (Wolfenstein-style) on the matrix is a nearer first demo.
 
 ## Improvements 🛠️
 - [ ] Simulator speed: the `board` runs at ~39k clock cycles/s. The cost is
@@ -42,8 +106,7 @@ Done items leave this list; git history keeps them.
         next edit.
 - [ ] The waveform monitor: its history is capped at 1M changes per signal
       (the oldest quarter goes), which a clock fills in seconds at flat-out
-      speed; groups are one level deep, coloured per group (not per signal),
-      with no multiple selection.
+      speed; groups are one level deep, coloured per group (not per signal).
 - [ ] The time cursor (`inspect`): a first jump back on a long flat-out run
       replays up to a checkpoint's spacing (~1 s of running at first, more
       once they're thinned); the stimulus log grows for the whole run.
@@ -55,10 +118,53 @@ Done items leave this list; git history keeps them.
 - [ ] If the engine process dies, the host starts a new one on the next
       request, but the view doesn't load the circuit into it again ("no
       circuit loaded" until the circuit is shown again).
+- [ ] Waveforms: the time cursor (and the hover line) stops at each group's
+      header row, and that strip of the waves column ignores the pointer: a
+      click/drag there doesn't set the cursor, hover shows nothing, the wheel
+      doesn't scroll or zoom. With several groups the column is cut into bands.
+      - Cause (`view/schematic/waves.ts`): `#newGroup` gives the header an empty
+        `div('')` as its wave cell, not a canvas. The lines are drawn per canvas
+        (`#drawAll` → `#draw(w)` → `#lines`, for watches only), and
+        `#waveEvents` reacts only when `e.target` is a canvas (`over`).
+      - Fix: give `Group` a `canvas` like `Watch`'s; `#newGroup` appends it,
+        `#resize` sizes it (`ROW` high, like the rows), `#drawAll` draws it
+        (the group's tinted background, the grid, `#lines`). `#waveEvents`
+        then covers it as is. Keep `#dragRow`/the header's menu on the name.
+      - Test: in `test/schematic.spec.mjs`'s "arranges the waveforms" (groups
+        exist there), click a header's wave cell and check that the cursor moved
+        (the `inspect` request, or the ruler's time label).
+- [ ] A subcircuit's window covers the waveforms, and it has to be moved and
+      resized again every time it opens.
+      - Cause: the waveform monitor is docked at the bottom of the circuit view
+        (`#monitor`, 30% high, its gutter resizes it), while subcircuit and FSM
+        windows (`view/schematic/dialog.ts`) float over the whole webview:
+        `Dialog.fit` sizes them up to 90% of `innerWidth`/`innerHeight` and
+        `center` centres them there, so a big subcircuit opens over the waves.
+        Their position and size aren't kept (`main.ts` `#open`).
+      - Alternatives, cheapest first (they combine):
+        - fit, centre and bound the drag to the schematic's area (above the
+          monitor), not the window: windows open clear of the waves and can
+          still be dragged over them;
+        - remember each window's position and size per subcircuit path (in
+          `view`, with the layout), so it opens where it was left; maybe
+          which ones were open;
+        - collapse a window to its title bar (double-click on it) and a
+          button to tile the open windows over the schematic's area;
+        - subcircuits as tabs or a split pane of the circuit view instead of
+          floating windows;
+        - the waveforms in their own panel (the detachable waveforms in Next
+          Features), which frees the whole circuit view for windows.
 
 ## Release
-- [ ] Publish 1.0.0 to the Marketplace (`vsce login TwinT`, then `vsce publish
-      --packagePath <the linux-x64 vsix>`) and create the GitHub Release (`gh auth
-      login`). The vsix is per platform (`vsce package --target linux-x64`; arm64
-      needs the engine built there or cross-compiled). The `v0.6.1` tag was never
-      pushed.
+- [ ] GitHub Releases: none exist (`gh release list` is empty); the tags
+      `v0.5.0`, `v0.7.0` and `v1.0.1`…`v1.3.0` are on GitHub. `make release`
+      could end with `gh release create v$(VERSION) $(VSIX) --notes …` (the
+      CHANGELOG section).
+- [ ] The Marketplace upload is by hand (`make release` publishes to Open VSX
+      only). `vsce publish --packagePath $(VSIX)` with a PAT in the keyring (as
+      `ovsx_pat` is) would automate it.
+- [ ] Only `linux-x64` is built (`vsce package --target linux-x64`): the vsix
+      ships the native engine, so arm64/macOS/Windows need it built there or
+      cross-compiled, one vsix per target.
+- [ ] Local tags never pushed: `v0.2.0`, `v0.3.0`, `v0.4.0`, `v0.4.1`,
+      `v0.6.1`. Push them or delete them.
