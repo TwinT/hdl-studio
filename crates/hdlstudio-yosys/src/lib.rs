@@ -263,12 +263,13 @@ const DFFS: &[&str] = &[
 ];
 
 /// Gate-level flip-flops (simcells.v): name prefix, control ports, data ports.
-// The original builds this from a Map in which `$_DFF_` and `$_DFFE_`
-// appear twice, so the later entries (with `arst`) win and plain `$_DFF_P_`
-// / `$_DFFE_PP_` are "Invalid cell type". Kept that way.
+/// `$_DFF_`/`$_DFFE_` come with and without an async reset (`$_DFF_P_`,
+/// `$_DFF_PN0_`); the polarity characters tell which.
 const TECHMAP_DFF_KINDS: &[(&str, &[&str], &[&str])] = &[
     ("$_SR_", &["set", "clr"], &["out"]),
+    ("$_DFF_", &["clk"], &["in", "out"]),
     ("$_DFF_", &["clk", "arst"], &["in", "out"]),
+    ("$_DFFE_", &["clk", "en"], &["in", "out"]),
     ("$_DFFE_", &["clk", "arst", "en"], &["in", "out"]),
     ("$_DFFSR_", &["clk", "set", "clr"], &["in", "out"]),
     ("$_DFFSRE_", &["clk", "set", "clr", "en"], &["in", "out"]),

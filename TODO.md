@@ -104,8 +104,6 @@ Done items leave this list; git history keeps them.
       of up to 64 bits.
 - [ ] Converter quirks kept on purpose when it was ported (output identical
       to the previous converter's); fix each in its own commit:
-      - gate-level `$_DFF_P_`/`$_DFFE_PP_` are "Invalid cell type" (the table
-        lists `$_DFF_`/`$_DFFE_` twice and the async-reset entries win);
       - binary muxes never go sparse below 7 select bits (the
         `mapping.size < 2**(bits-1)` test compares with an object);
       - the sparse-mux pass checks `groups` on the OrReduce instead of its
