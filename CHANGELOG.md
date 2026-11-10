@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- A `case` that uses fewer than half the values of its selector becomes a sparse
+  multiplexer (an input per value used, plus the default) instead of one with an
+  input for every value. In the `micro` and `soc` examples, `store_unit`'s two
+  8-input multiplexers now have 3 inputs each.
+
 ### Fixed
 - Gate-level flip-flops without an asynchronous reset (`$_DFF_P_`, `$_DFFE_PP_`...)
   were "Invalid cell type".

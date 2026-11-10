@@ -407,9 +407,9 @@ fn make_binary_muxes(m: &mut Model, id: &str) -> bool {
     if bits > 9 {
         return false;
     }
-    // the original also goes sparse when fewer than 2**(dev.bits-1) values are
-    // mapped, but `dev.bits` is an object there, so that test is always false.
-    let sparse = bits > 6;
+    // sparse: a wide select, or one that uses fewer than half its values
+    // (a full mux would draw mostly copies of the default input)
+    let sparse = bits > 6 || w.mapping.len() < 1 << (bits - 1);
     let outs = m.output_port(id, "out");
     let mut dev = m.devices[id].clone();
     m.remove_device(id);
