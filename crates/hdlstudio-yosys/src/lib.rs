@@ -1172,7 +1172,8 @@ impl Conv<'_> {
                     for (i, c) in sl(s, wr * k, wr * (k + 1)).into_iter().enumerate() {
                         v[i] = c;
                     }
-                    if v.iter().all(|&c| c != 0) {
+                    // (a ROM has no write ports to be transparent to)
+                    if !v.is_empty() && v.iter().all(|&c| c != 0) {
                         Some(PortMask::All(true))
                     } else if v.iter().any(|&c| c != 0) {
                         Some(PortMask::Each(v.iter().map(|&c| c != 0).collect()))

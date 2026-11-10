@@ -104,8 +104,6 @@ Done items leave this list; git history keeps them.
       of up to 64 bits.
 - [ ] Converter quirks kept on purpose when it was ported (output identical
       to the previous converter's); fix each in its own commit:
-      - a ROM (`$mem_v2` with no write ports) gets `transparent`/`collision`
-        `true` on its read ports;
       - with several top-level modules the top is picked by name order.
 - [ ] The schematic, what it doesn't do or does differently:
       - a moved cell's wires are routed around the cells near both ends
