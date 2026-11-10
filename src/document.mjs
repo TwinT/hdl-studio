@@ -43,7 +43,18 @@ export class Document {
 
     #doc_id
 
+    // whether the sources changed since the circuit was synthesized from them
+    #stale = false
+    #staleTimer
+    #staleCheck = 0 // the latest check (an older one that ends later loses)
+    #saveTimer
+    #synthesizing = false
+    #synthAgain // a synthesis asked for while one runs: it runs next, once
+    #listeners
+
     // Events
+    staleChanged
+    #staleChanged
     sourcesUpdated // fired for all updates
     synthOptionUpdated
     #synthOptionUpdated // not fired for updates from synthesis panel
@@ -80,9 +91,61 @@ export class Document {
         this.iopanelMessage = this.#iopanelMessage.event;
         this.#runStatesUpdated = new vscode.EventEmitter();
         this.runStatesUpdated = this.#runStatesUpdated.event;
+        this.#staleChanged = new vscode.EventEmitter();
+        this.staleChanged = this.#staleChanged.event;
+
+        const isSource = (uri) => this.#sources.findByURI(uri) && path.extname(uri.path) != '.lua';
+        this.#listeners = [
+            vscode.workspace.onDidChangeTextDocument((e) => {
+                if (e.contentChanges.length && isSource(e.document.uri))
+                    this.checkStale();
+            }),
+            vscode.workspace.onDidSaveTextDocument((doc) => {
+                if (isSource(doc.uri))
+                    this.#saved();
+            }),
+            this.sourcesUpdated(() => this.checkStale(0)),
+            this.circuitUpdated(() => this.checkStale(0)),
+        ];
+        this.checkStale(0);
     }
     dispose() {
+        clearTimeout(this.#staleTimer);
+        clearTimeout(this.#saveTimer);
+        for (const l of this.#listeners)
+            l.dispose();
         this.#sources.dispose();
+    }
+
+    get stale() {
+        return this.#stale;
+    }
+    // A moment after an edit (or at once): compare the sources with the
+    // synthesis. A view coming back to the front asks too (a file changed
+    // outside VS Code fires nothing).
+    checkStale(delay = 300) {
+        clearTimeout(this.#staleTimer);
+        this.#staleTimer = setTimeout(async () => {
+            const check = ++this.#staleCheck;
+            const synthesized = Object.keys(this.#circuit.devices ?? {}).length > 0;
+            const stale = synthesized && await this.#sources.changedSinceSynthesis();
+            if (check !== this.#staleCheck || stale === this.#stale)
+                return;
+            this.#stale = stale;
+            this.#staleChanged.fire(stale);
+        }, delay);
+    }
+    // A source saved: with hdl-studio.synthesizeOnSave, synthesize if it
+    // changed (once for a Save All).
+    #saved() {
+        this.checkStale(0);
+        if (!vscode.workspace.getConfiguration('hdl-studio').get('synthesizeOnSave'))
+            return;
+        clearTimeout(this.#saveTimer);
+        this.#saveTimer = setTimeout(async () => {
+            if (await this.#sources.changedSinceSynthesis())
+                this.doSynth({ quiet: true });
+        }, 200);
     }
 
     // Properties
@@ -295,11 +358,18 @@ export class Document {
             this.#sources.refresh();
         }, 'Remove source');
     }
-    #circuitEdit(after, label, new_circuit) {
+    // `sources`: { before, after } (Sources#toBackup) for a synthesis, whose
+    // undo also brings back what the sources were synthesized from.
+    #circuitEdit(after, label, new_circuit, sources) {
         const before = this.#circuit;
         this.#circuit = after;
-        const changed = this.#createEdit(before, after, label, (circuit) => {
-            this.#circuit = circuit;
+        const changed = this.#createEdit({ circuit: before, sources: sources?.before },
+                                         { circuit: after, sources: sources?.after }, label, (state) => {
+            this.#circuit = state.circuit;
+            if (state.sources) {
+                this.#sources.load(this.#sources.doc_uri, state.sources);
+                this.#sources.refresh();
+            }
             this.#last_circuit_changed = undefined;
             this.#circuitUpdated.fire({ run: false, keep: !new_circuit });
         });
@@ -309,7 +379,25 @@ export class Document {
         }
         this.#last_circuit_changed = after;
     }
-    async doSynth() {
+    // `quiet`: see Sources#doSynth.
+    async doSynth(opts = {}) {
+        if (this.#synthesizing) {
+            this.#synthAgain = opts;
+            return;
+        }
+        this.#synthesizing = true;
+        try {
+            return await this.#synthesize(opts);
+        } finally {
+            this.#synthesizing = false;
+            const again = this.#synthAgain;
+            this.#synthAgain = undefined;
+            if (again)
+                this.doSynth(again);
+        }
+    }
+    async #synthesize({ quiet = false }) {
+        const sources = { before: this.#sources.toBackup() };
         // Load a snapshot of the options up front
         const res = await this.#sources.doSynth({
             optimize: this.#synth_options.opt,
@@ -319,12 +407,13 @@ export class Document {
             top: this.#synth_options.top || undefined,
             lint: false,
             transform: this.#synth_options.transform,
-        });
+        }, { quiet });
         if (!res)
             return;
+        sources.after = this.#sources.toBackup();
         // The side panel should receive focus when we do synthesis
         // but it should already have focus so we don't need to do anything.
-        this.#circuitEdit(keep_layout(this.#circuit, res.output), 'Synthesis', true);
+        this.#circuitEdit(keep_layout(this.#circuit, res.output), 'Synthesis', true, sources);
         for (const w of res.warnings ?? [])
             vscode.window.showWarningMessage(`Synthesis: ${w}. Set "Top" in the Synthesis panel to show another one.`);
         this.tick = 0;

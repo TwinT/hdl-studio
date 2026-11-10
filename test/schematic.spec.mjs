@@ -279,6 +279,27 @@ describe('schematic webview on the engine', function () {
         assert.deepStrictEqual(await shown(), [names, true]);
     });
 
+    it('says when the sources changed since the synthesis, with a button for another', async function () {
+        await show('04_counter');
+        const circuit = (await lastPosted('autolayout')).circuit;
+        const banner = () => page.evaluate(() => document.getElementById('stalebanner')?.textContent ?? null);
+        assert.strictEqual(await banner(), null);
+        await post({ command: 'stale', value: true });
+        await until(() => document.getElementById('stalebanner'));
+        assert.match(await banner(), /sources changed/);
+        await page.locator('#stalebanner button', { hasText: 'Synthesize' }).click();
+        assert.ok(await lastPosted('do-synth'));
+        // the host's answer: a new circuit, not stale
+        await post({ command: 'showcircuit', circuit, opts: { stale: false } });
+        await until(() => !document.getElementById('stalebanner'));
+        // a project opened stale says so at once
+        await post({ command: 'showcircuit', circuit: { devices: {}, connectors: [] }, opts: {} });
+        await post({ command: 'showcircuit', circuit, opts: { stale: true } });
+        await until(() => document.getElementById('stalebanner'));
+        await post({ command: 'stale', value: false });
+        await until(() => !document.getElementById('stalebanner'));
+    });
+
     it('records waveforms, and a trigger stops the simulation', async function () {
         await post({ command: 'pausesim' }); // a run from tick 0, watched from the start
         const view = await show('04_counter');

@@ -83,6 +83,7 @@ class App {
     #monitor: Monitor;
     #theme: { name?: string, waveColors?: any } = {};
     #labels = true; // the names of internal cells and of wires (setting hdl-studio.labels)
+    #stale = false; // the sources changed since this circuit was synthesized
     #names?: Map<string, { path: string, port: string }>; // watchable outputs by name
     // while the waveform cursor shows the circuit at an earlier tick: whether
     // to run again once it goes
@@ -148,12 +149,16 @@ class App {
                 this.#theme = { name: m.opts.theme, waveColors: m.opts.waveColors };
                 this.#applyTheme();
                 if ('labels' in m.opts) this.#showLabels(m.opts.labels);
+                if ('stale' in m.opts) this.#stale = !!m.opts.stale;
                 return this.#show(m.circuit, m.opts);
             case 'timescale': return this.#monitor.setTimescale(m.value, parseTime);
             case 'theme':
                 this.#theme = { name: m.theme, waveColors: m.waveColors };
                 return this.#applyTheme();
             case 'labels': return this.#showLabels(m.value);
+            case 'stale':
+                this.#stale = !!m.value;
+                return this.#staleBanner();
             case 'setspeed':
                 this.#speed = m.speed;
                 if (this.#running) {
@@ -332,6 +337,17 @@ class App {
         this.#inspectNext = undefined;
         if (next !== undefined) this.#inspect(next);
     }
+    // The circuit is older than its sources: say so, with a way to update it.
+    #staleBanner() {
+        let b = document.getElementById('stalebanner');
+        if (!this.#stale || !this.circuit) return b?.remove();
+        if (b) return;
+        b = Object.assign(document.createElement('div'), { id: 'stalebanner', textContent: 'The sources changed since this synthesis ' });
+        const synth = Object.assign(document.createElement('button'), { textContent: 'Synthesize' });
+        synth.addEventListener('click', () => vscode.postMessage({ command: 'do-synth' }));
+        b.append(synth);
+        document.getElementById('paper')!.append(b);
+    }
     #banner(tick: number | undefined) {
         let b = document.getElementById('pastbanner');
         if (tick === undefined) return b?.remove();
@@ -409,6 +425,7 @@ class App {
                     this.#send({ op: 'set_param', path: id, name: 'propagation', value: d.propagation ?? 100 });
             for (const [g, v] of this.#views) this.#rebuild(g, v);
             this.#ioView();
+            this.#staleBanner();
             return;
         }
         this.#closeAll();
@@ -446,6 +463,7 @@ class App {
         else if (!old && opts.view?.zoom) top.transform = opts.view.zoom;
         else top.home();
         this.#ioView();
+        this.#staleBanner();
         if (run) this.startSim();
         this.updateRunStates();
     }

@@ -328,6 +328,27 @@ export class Sources {
         }
         return data;
     }
+    // Whether the sources differ from what the circuit was synthesized from: a
+    // source edited (in an editor, or on disk), added or removed since. Lua
+    // scripts aren't synthesized.
+    async changedSinceSynthesis() {
+        const docs = new Map(vscode.workspace.textDocuments.map((d) => [d.uri.toString(), d]));
+        for (const [uri_str, info] of this.entries()) {
+            if (path.extname(info.uri.path) == '.lua')
+                continue;
+            if (info.deleted || !info.sha512)
+                return true;
+            let content;
+            try {
+                content = docs.get(uri_str)?.getText() ?? await read_txt_file(info.uri);
+            } catch {
+                return true;
+            }
+            if (hash_sha512(content) != info.sha512)
+                return true;
+        }
+        return false;
+    }
     async topModuleCandidates() {
         const docs = {};
         for (const doc of vscode.workspace.textDocuments)
@@ -375,7 +396,9 @@ export class Sources {
             collection.set(uri, list);
         this.#problemUris = [...byUri.values()].map(([uri]) => uri);
     }
-    async doSynth(opts) {
+    // `quiet`: no notification for errors the Problems panel shows (a
+    // synthesis on save).
+    async doSynth(opts, { quiet = false } = {}) {
         const basenames_map = this.#basenamesMap();
         if (!basenames_map)
             return;
@@ -392,20 +415,22 @@ export class Sources {
                 const error = e.error;
                 if (error === undefined) {
                     console.error(e);
-                    await vscode.window.showErrorMessage(`Unknown synthesis error.`);
+                    vscode.window.showErrorMessage(`Unknown synthesis error.`);
                     return;
                 }
                 this.#showProblems(e.diagnostics ?? []);
                 // the first error in the sources says more than yosys's last line
                 const errors = (e.diagnostics ?? []).filter((d) => d.severity === 'error');
                 if (errors.length) {
+                    if (quiet)
+                        return;
                     const [d] = errors;
                     const more = errors.length > 1 ? ` (and ${errors.length - 1} more)` : '';
                     vscode.window.showErrorMessage(`Synthesis failed: ${d.file}:${d.line}: ${d.message}${more}`, 'Show Problems')
                         .then((b) => b && vscode.commands.executeCommand('workbench.actions.view.problems'));
                     return;
                 }
-                await vscode.window.showErrorMessage(`Synthesis error: ${error}`);
+                vscode.window.showErrorMessage(`Synthesis error: ${error}`);
                 return;
             }
             this.#showProblems(res.diagnostics ?? []);

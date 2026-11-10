@@ -114,6 +114,12 @@
                 "category": "HDL Studio"
             },
             {
+                "command": "hdl-studio.synthesize",
+                "title": "Synthesize",
+                "icon": "$(run)",
+                "category": "HDL Studio"
+            },
+            {
                 "command": "hdl-studio.newJSON",
                 "title": "New Circuit",
                 "icon": "$(new-file)",
@@ -222,6 +228,10 @@
                 {
                     "command": "hdl-studio.start",
                     "when": "false"
+                },
+                {
+                    "command": "hdl-studio.synthesize",
+                    "when": "hdl-studio.view_isactive"
                 },
                 {
                     "command": "hdl-studio.addFiles",
@@ -412,6 +422,11 @@
                         ""
                     ],
                     "markdownDescription": "Colours of the circuit view: the schematic and the waveform monitor (also in the schematic's right-click menu)."
+                },
+                "hdl-studio.synthesizeOnSave": {
+                    "type": "boolean",
+                    "default": false,
+                    "markdownDescription": "Synthesize again when a source of an open circuit is saved and it changed since the last synthesis. Errors go to the Problems panel without a notification."
                 },
                 "hdl-studio.labels": {
                     "type": "boolean",

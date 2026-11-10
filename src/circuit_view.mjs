@@ -44,6 +44,13 @@ export class CircuitView {
         // the waveform monitor shows time in the project's units; the colours are the user's
         const timescale_listener = this.#document.synthOptionUpdated(() =>
             this.post({ command: 'timescale', value: this.#document.synth_options.timescale }));
+        // the sources changed since the synthesis (Document#checkStale); back
+        // in front, check again: a file edited outside VS Code says nothing
+        const stale_listener = this.#document.staleChanged((value) => this.post({ command: 'stale', value }));
+        const front_listener = this.#panel.onDidChangeViewState(() => {
+            if (this.#panel.active)
+                this.#document.checkStale(0);
+        });
         const colors_listener = vscode.workspace.onDidChangeConfiguration((e) => {
             if (e.affectsConfiguration('hdl-studio.theme') || e.affectsConfiguration('hdl-studio.waveform'))
                 this.post({ command: 'theme', theme: config().get('theme'), waveColors: waveColors() });
@@ -53,6 +60,8 @@ export class CircuitView {
         this.onDidDispose(() => {
             circuit_listener.dispose();
             timescale_listener.dispose();
+            stale_listener.dispose();
+            front_listener.dispose();
             colors_listener.dispose();
             this.#disposed = true;
             this.#engine?.kill();
@@ -193,6 +202,7 @@ export class CircuitView {
                     timescale: this.#document.synth_options.timescale,
                     theme: config().get('theme'),
                     labels: config().get('labels'),
+                    stale: this.#document.stale,
                     waveColors: waveColors(),
                     view: this.#document.viewState,
                     speed: this.#studio.speedOf(this.#document) }

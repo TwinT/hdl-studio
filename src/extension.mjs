@@ -54,9 +54,11 @@ async function expandSources(uris, recursive) {
     return result;
 }
 
+// The returned object is for the tests (test/suite): the active project.
 export function activate(context) {
     set_hdlstudio_root(context.extensionPath);
-    new HdlStudio(context);
+    const studio = new HdlStudio(context);
+    return { get document() { return studio.document; } };
 }
 
 export function deactivate() {
@@ -200,6 +202,9 @@ class HdlStudio {
                                             () => this.postPanelMessage({
                                                 command: 'startsim' })));
         context.subscriptions.push(
+            vscode.commands.registerCommand('hdl-studio.synthesize',
+                                            () => this.doSynth()));
+        context.subscriptions.push(
             vscode.commands.registerCommand('hdl-studio.newJSON',
                                             () => this.#newJSON(this.doc_uri, false)));
         context.subscriptions.push(
@@ -270,6 +275,9 @@ class HdlStudio {
         this.#filesView.dispose();
     }
 
+    get document() {
+        return this.#document;
+    }
     get doc_id() {
         if (this.#document)
             return this.#document.doc_id;

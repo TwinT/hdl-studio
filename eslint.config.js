@@ -23,7 +23,8 @@ const browserGlobals = ro([
 ]);
 
 const mochaGlobals = ro([
-    'describe', 'it', 'before', 'after', 'beforeEach', 'afterEach', 'suite', 'test'
+    'describe', 'it', 'before', 'after', 'beforeEach', 'afterEach', 'suite', 'test',
+    'suiteSetup', 'suiteTeardown'
 ]);
 
 const rules = {

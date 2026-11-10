@@ -183,7 +183,11 @@ build: the engine is a native process.
   mouse events), Lua. Needs yosys with read_slang and Playwright's Chromium (`npx
   playwright install chromium`; skips without). The same harness shape is handy for
   looking at the view by hand.
-- `test:vscode` (`node test/runTest.js`) — `@vscode/test-electron` mocha suite.
+- `test:vscode` (`node test/runTest.js`) — `@vscode/test-electron` mocha suite
+  (`test/suite/*.test.js`, tdd UI) on the built extension (`dist/`: `npm run compile`
+  first). `synthesis.test.js` opens a real project and synthesizes it (needs yosys):
+  Problems, stale, synthesize on save; `activate` returns `{ document }` (the active
+  project) for it.
 - Rust tests: `crates/*/tests` (golden converter output, vector fixtures, cell
   semantics the random stimulus rarely reaches: z operands, alarms on busy ticks).
 - Lint: ESLint flat config (`eslint.config.js`), all rules `warn`, plus `tsc`,
@@ -207,6 +211,17 @@ vscode-free so tests can import it) → `yosys -s script.ys` → `convert_yosys_
 has `read_slang` (`SLANG_PROBES`: built in, or the `slang` plugin, which the script
 then loads with `plugin -i slang`; OSS CAD Suite ships it as a plugin); without it,
 `read_verilog -sv`. The tests (`test/designs.mjs` `slangSupport`) ask the same way.
+
+A stale circuit (`Document#checkStale`, 300 ms after an edit of a source, at once
+on a save, a source list change, a new circuit, the view coming to the front):
+`Sources#changedSinceSynthesis` compares each source's text (the open editor's,
+else the file) with the sha512 kept from the synthesis; a source added (no
+sha512) or removed (`deleted`) counts. `staleChanged` → the view's
+`#stalebanner` (`stale` message, also in `showcircuit` opts) with a Synthesize
+button. `hdl-studio.synthesizeOnSave`: a save of a changed source synthesizes
+(`quiet`: errors only in Problems). `Document#doSynth` runs one synthesis at a
+time (another asked for meanwhile runs after, once), and a synthesis edit's undo
+restores the sources' hashes too.
 
 Problems panel (`src/diagnostics.mjs`, vscode-free; `Sources#showProblems`, one
 `DiagnosticCollection` in which each project replaces its own): `log_diagnostics`

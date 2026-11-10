@@ -121,7 +121,10 @@ and the top module's inputs and outputs).
 
 ### Synthesis
 
-Press **Synthesize** in the *Synthesis* panel. Its options are saved with the project:
+Press **Synthesize** in the *Synthesis* panel (or run *HDL Studio: Synthesize*). Once
+you edit a source (or add or remove one), the circuit view says the circuit is out of
+date, with a button to synthesize again; with `hdl-studio.synthesizeOnSave` saving a
+source does it. The options are saved with the project:
 
 | Option | What it does |
 |---|---|
@@ -331,6 +334,7 @@ the rest of `io` isn't there, and `os` has only `os.time`, `os.clock`, `os.date`
 |---|---|---|
 | `hdl-studio.yosysPath` | `""` (use `PATH`) | Path to the `yosys` executable. |
 | `hdl-studio.theme` | `dracula` | Colours of the circuit view: `dracula`, `classic`, `vscode`, `solarized-light`, `solarized-dark`, `nord`, `night-owl`, `gruvbox-dark`. |
+| `hdl-studio.synthesizeOnSave` | `false` | Synthesize again when a source that changed is saved (errors go to the Problems panel, without a notification). |
 | `hdl-studio.labels` | `true` | Names of the cells and wires in the circuit view (inputs, outputs and port labels always show). |
 | `hdl-studio.waveform.colors` | `{}` (the theme's) | Waveform colours as CSS colours, over the theme's: `background`, `altBackground`, `foreground`, `grid`, `signal`, `undefined`, `highImpedance`, `cursor`, `fillOpacity`. Any key can be left out. |
 

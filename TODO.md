@@ -10,10 +10,6 @@ Done items leave this list; git history keeps them.
       (unassigned, unused, inferred latch) doesn't run inside yosys, and yosys's
       `check` flags every tri-state bus; wires have no `src` through
       read_slang, so these need a place found another way (the declaration).
-- [ ] A stale circuit: after a source is edited the view keeps simulating
-      the old synthesis and says nothing. `sources.mjs` keeps each source's
-      sha512: mark the circuit out of date (Control panel, the Synthesize
-      button), and an option to synthesize on save.
 - [ ] Source → schematic: a click (or the cursor) in a source highlights the
       cells whose `source_positions` cover that line; today only the other
       way (`#marker` → `showmarker`).

@@ -14,6 +14,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   combinational block that doesn't assign a signal in every case (not an
   `always_latch`). A failed synthesis names the first error instead of "Design
   elaboration failed".
+- The circuit view says when the sources changed since the circuit was
+  synthesized (edited, added or removed), with a button to synthesize again.
+- `hdl-studio.synthesizeOnSave`: saving a source that changed synthesizes again.
+- *HDL Studio: Synthesize* in the command palette.
+
+### Fixed
+- Undoing a synthesis now also brings back what the sources were synthesized
+  from, so source highlighting matches the circuit shown.
+- Pressing Synthesize again while a synthesis runs no longer starts a second one
+  alongside (it runs once the first ends).
 
 ## [1.4.0] - 2026-11-10
 

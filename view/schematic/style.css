@@ -35,6 +35,31 @@ body {
     pointer-events: none;
 }
 
+#stalebanner {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    z-index: 5;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 3px 4px 3px 10px;
+    border-radius: 4px;
+    background: var(--vscode-statusBarItem-warningBackground, #c19c00);
+    color: var(--vscode-statusBarItem-warningForeground, #000);
+    font: 12px var(--vscode-font-family, sans-serif);
+}
+
+#stalebanner button {
+    font: inherit;
+    padding: 1px 8px;
+    border: none;
+    border-radius: 3px;
+    cursor: pointer;
+    color: var(--vscode-button-foreground, #fff);
+    background: var(--vscode-button-background, #0e639c);
+}
+
 /* the waveform monitor, under the schematic (colours from the
    hdl-studio.waveform.colors setting, Surfer's dark theme by default) */
 #monitor {
