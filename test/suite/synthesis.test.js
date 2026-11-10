@@ -157,4 +157,25 @@ suite('Synthesis in VS Code', function () {
         assert.deepStrictEqual(await show(at(/^\s+always_ff/) + 1), { lit: 1 });
         await vscode.commands.executeCommand('undo');
     });
+
+    test('Show in Circuit: a source outside the project folder, deep in the hierarchy', async function () {
+        // ruleta.hdls lists ../soc/rtl/...: the CPU's ALU is inside board → soc → core
+        const verilog = path.join(__dirname, '..', 'verilog');
+        const project = vscode.Uri.file(path.join(verilog, 'ruleta', 'ruleta.hdls'));
+        await vscode.commands.executeCommand('workbench.action.closeAllEditors');
+        await vscode.commands.executeCommand('vscode.openWith', project, 'hdl-studio.circuitView', vscode.ViewColumn.One);
+        const ext = vscode.extensions.getExtension('TwinT.hdl-studio');
+        const doc = await until(() => ext.exports?.document?.uri.toString() === project.toString() && ext.exports.document, 'the project');
+        if (await doc.sources.changedSinceSynthesis()) {
+            await vscode.commands.executeCommand('hdl-studio.synthesize');
+            await until(async () => !(await doc.sources.changedSinceSynthesis()), 'its synthesis', 60000);
+        }
+        const alu = vscode.Uri.file(path.join(verilog, 'soc', 'rtl', 'core', 'alu.sv'));
+        const editor = await vscode.window.showTextDocument(alu, { viewColumn: vscode.ViewColumn.Two });
+        const line = editor.document.getText().split('\n').findIndex((l) => /^\s+result = a \+ b;/.test(l));
+        editor.selection = new vscode.Selection(line, 0, line, 0);
+        const shown = await vscode.commands.executeCommand('hdl-studio.showInCircuit');
+        assert.ok(shown?.lit >= 1, JSON.stringify(shown));
+        await vscode.commands.executeCommand('workbench.action.revertAndCloseActiveEditor');
+    });
 });
