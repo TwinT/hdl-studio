@@ -61,6 +61,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   8-input multiplexers now have 3 inputs each.
 
 ### Fixed
+- *FSM as circuit element* (and *FSM transform*) found no state machine with an
+  asynchronous reset (`always_ff @(posedge clk or posedge rst)`), like the `alu`
+  example's: yosys-slang writes that reset as an asynchronous load, which Yosys's
+  FSM detection skips. And with *Optimize*, none at all with an enable.
 - yosys-slang as a Yosys plugin (how the OSS CAD Suite ships it) wasn't used:
   SystemVerilog went through Yosys's own `read_verilog -sv`, which rejects packages
   and interfaces. HDL Studio now loads the plugin.

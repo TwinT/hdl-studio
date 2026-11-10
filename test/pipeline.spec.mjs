@@ -640,6 +640,24 @@ describe('Lua test scripts (the Testing view)', function () {
     });
 });
 
+describe('FSM as a circuit element', function () {
+    this.timeout(120000);
+    // alu's fsm.sv: an enum state, `always_ff @(posedge clk or posedge rst)`;
+    // read_slang writes that reset as an async load, which fsm_detect didn't
+    // take, so no FSM was ever found
+    it('finds the state machine with an async reset, optimized or not', async function () {
+        const { slangAvailable, designs, synthesize, convert } = await import('./designs.mjs');
+        if (!slangAvailable()) this.skip();
+        const d = designs.find((d) => d.name === 'alu');
+        for (const optimize of [false, true]) {
+            const c = JSON.parse(convert(synthesize(d, { fsm: 'nomap', optimize })));
+            const fsms = [c, ...Object.values(c.subcircuits ?? {})].flatMap((g) => Object.values(g.devices)).filter((x) => x.type === 'FSM');
+            assert.strictEqual(fsms.length, 1, `optimize: ${optimize}`);
+            assert.ok(fsms[0].trans_table.length > 3, JSON.stringify(fsms[0]).slice(0, 200));
+        }
+    });
+});
+
 describe('techmap on the multi-file designs', function () {
     this.timeout(180000);
     // the board once failed with "Invalid cell type: $fa": yosys left the

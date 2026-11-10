@@ -94,9 +94,19 @@ export function build_yosys_script(files, opts = {}) {
     // value like 0, 1 and x), and a net with more than one driver - the norm for a
     // shared bus - gets merged via a synthesized TriMerge device.
     cmds.push('tribuf');
-    cmds.push(opts.optimize ? 'opt' : 'opt_clean');
+    const fsm = opts.fsm && opts.fsm !== 'no';
+    // With FSMs, as yosys's synth does: no enable or sync reset merged into
+    // the flip-flops before `fsm`, or fsm_detect doesn't see a state register.
+    cmds.push(opts.optimize ? (fsm ? 'opt -nodffe -nosdff' : 'opt') : 'opt_clean');
 
-    if (opts.fsm && opts.fsm !== 'no') {
+    if (fsm) {
+        // read_slang writes an async reset as an async load ($aldff), which
+        // fsm_detect doesn't take for a state register (an enum state with
+        // `always_ff @(posedge clk or posedge rst)` was never found): opt_dff
+        // makes a constant async load an async reset ($adff) (`opt` above
+        // already did).
+        if (!opts.optimize)
+            cmds.push('opt_dff -nodffe -nosdff');
         const fsmexpand = opts.fsmexpand ? ' -expand' : '';
         cmds.push(opts.fsm === 'nomap' ? `fsm -nomap${fsmexpand}` : `fsm${fsmexpand}`);
     }

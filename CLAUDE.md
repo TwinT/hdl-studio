@@ -286,6 +286,13 @@ the tops without outputs (`select A:top o:* %m %d`; read_slang marks every
 elaborated top). Keeping every top's would leave dead cells and hold back *opt*
 in most examples.
 
+### FSM detection
+With an FSM option, `build_yosys_script` runs `opt -nodffe -nosdff` (with *opt*) or
+`opt_dff -nodffe -nosdff` before `fsm`, as yosys's `synth` does: read_slang writes
+an async reset as an async load (`$aldff`), which `fsm_detect` skips until opt_dff
+turns a constant one into `$adff`, and an enable or sync reset merged into the
+state register hides it too. Without FSM options the script is unchanged.
+
 ### techmap gotcha
 Bare `techmap` also lowers flip-flops/latches/memories to gate-level primitives
 (`$_DFF_P_`...) the converter can't convert → `Invalid cell type`.
