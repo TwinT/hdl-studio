@@ -209,9 +209,11 @@ describe('Synthesis pipeline (yosys -> yosys2hdlstudio)', function () {
     // useSlang:true - the real extension always does when yosys has slang
     // support (see src/requests.mjs's slang_available()), so this path
     // matters even though nothing else here covers it.
-    it('converts bmux_regfile.sv ($bmux) via the read_slang frontend', function () {
+    it('converts bmux_regfile.sv ($bmux) via the read_slang frontend', async function () {
+        const { slangSupport } = await import('./designs.mjs');
+        if (!slangSupport()) this.skip();
         const output = synth(path.join(verilogDir, 'bmux_regfile', 'bmux_regfile.sv'),
-                              { useSlang: true, top: 'bmux_regfile' });
+                              { useSlang: slangSupport(), top: 'bmux_regfile' });
         const muxes = Object.values(output.devices).filter((d) => d.type === 'Mux' && d.bits.sel > 1);
         assert.strictEqual(muxes.length, 1, 'expected exactly one wide (binary-select) Mux device');
         assert.strictEqual(muxes[0].bits.sel, 2);
@@ -234,8 +236,10 @@ describe('Synthesis pipeline (yosys -> yosys2hdlstudio)', function () {
     // then picked whichever now-orphaned leaf module happened to sort last.
     // Fixed by keeping the requested top's contents alive across the opt
     // passes (see build_yosys_script's `if (opts.top)` block).
-    it('keeps datapath.sv as top even though it has no output ports', function () {
-        const output = synthDir(path.join(verilogDir, 'micro'), { useSlang: true, top: 'datapath' });
+    it('keeps datapath.sv as top even though it has no output ports', async function () {
+        const { slangSupport } = await import('./designs.mjs');
+        if (!slangSupport()) this.skip();
+        const output = synthDir(path.join(verilogDir, 'micro'), { useSlang: slangSupport(), top: 'datapath' });
         for (const name of ['alu', 'branch_unit', 'control_unit', 'decoder', 'ir',
                              'load_unit', 'memory', 'pc', 'register_file', 'store_unit']) {
             const sub = Object.keys(output.subcircuits || {}).find((k) => k.startsWith(name + '$datapath.'));
@@ -484,8 +488,8 @@ describe('time units', function () {
 describe('the top found by yosys (no Top option)', function () {
     // read_slang without --top marks every module nobody instantiates `top`
     it('several: shows the biggest, says which, and drops the other', async function () {
-        const { slangAvailable } = await import('./designs.mjs');
-        if (!slangAvailable()) this.skip();
+        const { slangSupport } = await import('./designs.mjs');
+        if (!slangSupport()) this.skip();
         const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'hdl-test-'));
         try {
             fs.writeFileSync(path.join(tmp, 'two_tops.sv'), `
@@ -495,7 +499,7 @@ describe('the top found by yosys (no Top option)', function () {
                 module counter (input logic clk, rst, output logic [3:0] q);
                     always_ff @(posedge clk) q <= rst ? 4'd0 : q + 4'd1;
                 endmodule`);
-            fs.writeFileSync(path.join(tmp, 'synth.ys'), build_yosys_script({ 'two_tops.sv': '' }, { useSlang: true }) + '\njson -o out.json');
+            fs.writeFileSync(path.join(tmp, 'synth.ys'), build_yosys_script({ 'two_tops.sv': '' }, { useSlang: slangSupport() }) + '\njson -o out.json');
             execFileSync('yosys', ['-q', '-s', 'synth.ys'], { cwd: tmp, stdio: 'pipe' });
             const warnings = [];
             const c = convert_yosys_json(fs.readFileSync(path.join(tmp, 'out.json'), 'utf8'), {}, true, warnings);

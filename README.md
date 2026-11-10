@@ -26,10 +26,11 @@ what the synthesizer actually built.
 
 ## Requirements
 
-- **Yosys** on the `PATH` (or set `hdl-studio.yosysPath`). With the
-  [yosys-slang](https://github.com/povik/yosys-slang) plugin HDL Studio uses it
-  automatically and gets full SystemVerilog (packages, interfaces, any file order);
-  without it, Yosys's own `read_verilog -sv` is used.
+- **Yosys** on the `PATH` (or set `hdl-studio.yosysPath`). With
+  [yosys-slang](https://github.com/povik/yosys-slang), built in or as the `slang` plugin
+  (the [OSS CAD Suite](https://github.com/YosysHQ/oss-cad-suite-build) has it), HDL
+  Studio uses it automatically and gets full SystemVerilog (packages, interfaces, any
+  file order); without it, Yosys's own `read_verilog -sv` is used.
   The [`twint/sd`](https://hub.docker.com/r/twint/sd) dev container has both; see
   [hdl_studio_test](https://github.com/TwinT/hdl_studio_test) for a ready-made setup.
 - **Linux x64.** The simulator is a native binary shipped inside the extension, so
@@ -331,8 +332,10 @@ The simulation speed is global and remembered between sessions.
 - **Nothing happens on Synthesize / "yosys not found".** Check that `yosys` runs in a
   terminal, or set `hdl-studio.yosysPath`. Yosys's errors are in the *HDL Studio (Yosys)*
   output channel.
-- **SystemVerilog constructs are rejected** (packages, interfaces, `import`). Install the
-  yosys-slang plugin; plain `read_verilog -sv` supports only part of SystemVerilog.
+- **SystemVerilog constructs are rejected** (packages, interfaces, `import`). Install
+  yosys-slang (the OSS CAD Suite has it); plain `read_verilog -sv` supports only part of
+  SystemVerilog. The first lines of the *HDL Studio (Yosys)* output channel show
+  whether `read_slang` was used.
 - **`$readmemh` can't find its file.** Add the data file to the project; a bare file name
   (`"memory.hex"`) is found even if the file is in a subfolder.
 - **A huge or slow netlist.** Size indices with `$clog2(N)` instead of using `int`:

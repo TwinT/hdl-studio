@@ -26,6 +26,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   8-input multiplexers now have 3 inputs each.
 
 ### Fixed
+- yosys-slang as a Yosys plugin (how the OSS CAD Suite ships it) wasn't used:
+  SystemVerilog went through Yosys's own `read_verilog -sv`, which rejects packages
+  and interfaces. HDL Studio now loads the plugin.
 - Without the *Top* option, a top-level module with no outputs (like the `micro`
   example's `datapath`, whose effect is its registers and memory) was shown
   empty: yosys removed every cell as unused.

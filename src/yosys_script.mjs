@@ -32,9 +32,22 @@ export function data_file_paths(name) {
     return [name, base];
 }
 
+// How a yosys gets read_slang (yosys-slang): built in, or as the `slang`
+// plugin, which yosys doesn't load by itself (OSS CAD Suite ships it as
+// share/yosys/plugins/slang.so). The yosys arguments that check each way: a
+// yosys without it says "No such command" (or, for the plugin, fails).
+export const SLANG_PROBES = [
+    ['builtin', ['-p', 'help read_slang']],
+    ['plugin', ['-m', 'slang', '-p', 'help read_slang']],
+];
+export const slang_missing = (stdout) => stdout.includes('No such command');
+
+// `opts.useSlang`: false, 'builtin' (or true) or 'plugin'.
 export function build_yosys_script(files, opts = {}) {
     const cmds = ['design -reset'];
 
+    if (opts.useSlang === 'plugin')
+        cmds.push('plugin -i slang');
     if (opts.useSlang) {
         // slang elaborates the whole design as a unit, so unlike read_verilog it
         // doesn't care what order the files are given in (packages/interfaces

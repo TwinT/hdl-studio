@@ -6,7 +6,7 @@ import * as child_process from 'child_process';
 import * as fs from 'fs';
 import * as os from 'os';
 import { promisify } from 'util';
-import { build_yosys_script, isHdlFile, data_file_paths } from './yosys_script.mjs';
+import { build_yosys_script, isHdlFile, data_file_paths, SLANG_PROBES, slang_missing } from './yosys_script.mjs';
 import { convert_yosys_json } from './hdlstudio_bin.mjs';
 
 const execFile = promisify(child_process.execFile);
@@ -20,13 +20,17 @@ function yosysLog() {
     return _outputChannel;
 }
 
-async function slang_available(yosysBin) {
-    try {
-        const { stdout } = await execFile(yosysBin, ['-p', 'help read_slang'], { maxBuffer });
-        return !stdout.includes('No such command');
-    } catch {
-        return false;
+// 'builtin', 'plugin' or false (see SLANG_PROBES)
+async function slang_support(yosysBin) {
+    for (const [how, args] of SLANG_PROBES) {
+        try {
+            const { stdout } = await execFile(yosysBin, args, { maxBuffer });
+            if (!slang_missing(stdout)) return how;
+        } catch {
+            // no such plugin (a missing yosys is reported by the synthesis)
+        }
     }
+    return false;
 }
 
 const rand_prefix = 'hdls-IxU5De4QZDxUgn43Zwj1-_';
@@ -49,7 +53,7 @@ export async function run_yosys(files, options) {
     // Resolve yosys binary: use setting if defined, otherwise rely on PATH
     const config = vscode.workspace.getConfiguration('hdl-studio');
     const yosysBin = config.get('yosysPath') || 'yosys';
-    const useSlang = await slang_available(yosysBin);
+    const useSlang = await slang_support(yosysBin);
 
     // Write source files to a temp directory
     const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'hdl-studio-'));

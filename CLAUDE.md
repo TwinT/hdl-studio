@@ -193,7 +193,10 @@ build: the engine is a native process.
 (`src/requests.mjs`) → `build_yosys_script(files, opts)` (`src/yosys_script.mjs`,
 vscode-free so tests can import it) → `yosys -s script.ys` → `convert_yosys_json`
 (`src/hdlstudio_bin.mjs`) → `hdlstudio yosys2hdlstudio`: inout split, convert,
-`io_ui`, and transform if `transform` is on.
+`io_ui`, and transform if `transform` is on. `run_yosys` first asks yosys how it
+has `read_slang` (`SLANG_PROBES`: built in, or the `slang` plugin, which the script
+then loads with `plugin -i slang`; OSS CAD Suite ships it as a plugin); without it,
+`read_verilog -sv`. The tests (`test/designs.mjs` `slangSupport`) ask the same way.
 
 Options live in `document.mjs` `default_synth_options`, edited in the Synthesis
 panel (Synthesis/Diagram tabs):

@@ -10,7 +10,7 @@ import os from 'os';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { execFileSync } from 'child_process';
-import { build_yosys_script, isHdlFile } from '../src/yosys_script.mjs';
+import { build_yosys_script, isHdlFile, SLANG_PROBES, slang_missing } from '../src/yosys_script.mjs';
 import { set_hdlstudio_root, hdlstudio_bin } from '../src/hdlstudio_bin.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -18,13 +18,22 @@ const root = path.resolve(__dirname, '..');
 const verilog = path.join(root, 'test/verilog');
 set_hdlstudio_root(root);
 
-export function slangAvailable() {
-    try {
-        return !execFileSync('yosys', ['-p', 'help read_slang'], { stdio: 'pipe' }).toString().includes('No such command');
-    } catch {
-        return false;
+// How this yosys gets read_slang, as the extension finds out: 'builtin',
+// 'plugin' or false.
+let slang;
+export function slangSupport() {
+    if (slang !== undefined) return slang;
+    slang = false;
+    for (const [how, args] of SLANG_PROBES) {
+        try {
+            if (!slang_missing(execFileSync('yosys', args, { stdio: 'pipe' }).toString())) return slang = how;
+        } catch {
+            // no such plugin, or no yosys
+        }
     }
+    return slang;
 }
+export const slangAvailable = () => !!slangSupport();
 
 const walk = (d) => fs.readdirSync(d, { withFileTypes: true })
     .flatMap((e) => e.isDirectory() ? walk(path.join(d, e.name)).map((f) => path.join(e.name, f)) : [e.name]);
@@ -56,7 +65,7 @@ export function synthesize(d, opts = {}) {
             fs.copyFileSync(path.join(d.dir, f), path.join(tmp, path.basename(f)));
             if (isHdlFile(f)) files[path.basename(f)] = '';
         }
-        const script = build_yosys_script(files, { useSlang: true, top: d.top, ...opts }) + '\njson -o out.json';
+        const script = build_yosys_script(files, { useSlang: slangSupport(), top: d.top, ...opts }) + '\njson -o out.json';
         fs.writeFileSync(path.join(tmp, 'synth.ys'), script);
         execFileSync('yosys', ['-q', '-s', 'synth.ys'], { cwd: tmp, stdio: 'pipe' });
         return fs.readFileSync(path.join(tmp, 'out.json'));
