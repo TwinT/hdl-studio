@@ -1,4 +1,13 @@
 .vscode*/**
+.github/**
+.cargo/**
+.gitattributes
+.agents/**
+rustfmt.toml
+eslint.config.js
+tsconfig.json
+Makefile
+*.vsix
 .claude/**
 test/**
 .gitignore
@@ -21,5 +30,6 @@ node_modules/
 crates/**
 target/**
 !target/release/hdlstudio
+!target/release/hdlstudio.exe
 Cargo.toml
 Cargo.lock

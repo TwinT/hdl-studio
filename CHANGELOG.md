@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Packages for Windows x64 and for macOS on Apple silicon, besides Linux x64. Each
+  release is also on GitHub, with its packages.
 - Keys for the push buttons and switches: right-click one on the schematic → *Press it
   with a key…*. A push button is high while its key is down, a switch toggles; the
   key shows on the button and is saved with the project.

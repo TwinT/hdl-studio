@@ -1,0 +1,136 @@
+# Every push and pull request: lint and the whole test suite on Linux (with
+# yosys + yosys-slang from OSS CAD Suite, Chromium for the schematic, VS Code
+# for the extension test), and the engine's tests plus a vsix on each platform.
+#
+# A tag vX.Y.Z (`make release` pushes it) also makes the GitHub Release, with
+# the vsixes and the CHANGELOG section, and publishes them:
+# - Visual Studio Marketplace: trusted publishing (repository variable
+#   MARKETPLACE_OIDC = true, after adding a policy for this repository and
+#   workflow at https://marketplace.visualstudio.com/manage/publishers/TwinT),
+#   or a VSCE_PAT secret;
+# - Open VSX: an OVSX_PAT secret.
+# Without them that step is skipped.
+
+name: CI
+
+on:
+  push:
+    branches: [master]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
+
+env:
+  NODE_VERSION: 26
+  # the yosys the tests ran with; a newer one may change the netlists
+  OSS_CAD_SUITE: '2026-11-10'
+
+jobs:
+  test:
+    name: Lint and test (Linux)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+      - uses: Swatinem/rust-cache@v2
+      - run: npm ci
+      - uses: YosysHQ/setup-oss-cad-suite@v4
+        with:
+          version: ${{ env.OSS_CAD_SUITE }}
+          github-token: ${{ github.token }}
+      # OSS CAD Suite has yosys-slang as a plugin: the tests (and the
+      # extension) load it with `plugin -i slang`
+      - run: yosys -m slang -p 'help read_slang' | grep 'read_slang \['
+      - run: npx playwright install --with-deps chromium
+      # the engine and every bundle, as the vsix has them (the VS Code test loads it)
+      - run: npm run compile
+      # lint (eslint, tsc, rustfmt, clippy) runs first, as `pretest`
+      - run: xvfb-run -a npm test
+
+  package:
+    name: vsix ${{ matrix.target }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-latest, target: linux-x64 }
+          - { os: windows-latest, target: win32-x64 }
+          - { os: macos-latest, target: darwin-arm64 }
+    runs-on: ${{ matrix.os }}
+    env:
+      PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: 1 # no schematic test here
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: npm ci
+      # the test job runs these (and the rest) on Linux
+      - if: runner.os != 'Linux'
+        run: cargo test --workspace
+      - if: runner.os != 'Linux'
+        run: npm run test:golden
+      # vscode:prepublish builds the engine and the bundles
+      - run: npx --yes @vscode/vsce@4 package --target ${{ matrix.target }} --out hdl-studio-${{ matrix.target }}.vsix
+      - uses: actions/upload-artifact@v7
+        with:
+          name: vsix-${{ matrix.target }}
+          path: hdl-studio-${{ matrix.target }}.vsix
+          if-no-files-found: error
+
+  release:
+    name: Release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [test, package]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # the GitHub Release
+      id-token: write # Marketplace trusted publishing
+    env:
+      VSCE_PAT: ${{ secrets.VSCE_PAT }}
+      OVSX_PAT: ${{ secrets.OVSX_PAT }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: vsix-*
+          path: vsix
+          merge-multiple: true
+      - name: The tag is package.json's version
+        run: test "$GITHUB_REF_NAME" = "v$(node -p "require('./package.json').version")"
+      - name: Release notes, from the CHANGELOG
+        run: |
+          awk -v h="## [${GITHUB_REF_NAME#v}]" 'index($0, h) == 1 { on = 1; next } on && /^## \[/ { exit } on' CHANGELOG.md > notes.md
+          test -s notes.md
+      - name: GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" vsix/*.vsix --title "$GITHUB_REF_NAME" --notes-file notes.md --verify-tag
+      - name: Visual Studio Marketplace (trusted publishing)
+        if: vars.MARKETPLACE_OIDC == 'true'
+        run: npx --yes @vscode/vsce@4 publish --oidc --packagePath vsix/*.vsix
+      - name: Visual Studio Marketplace (token)
+        if: vars.MARKETPLACE_OIDC != 'true' && env.VSCE_PAT != ''
+        run: npx --yes @vscode/vsce@4 publish --packagePath vsix/*.vsix
+      - name: Open VSX
+        if: env.OVSX_PAT != ''
+        run: for f in vsix/*.vsix; do npx --yes ovsx@1 publish "$f"; done

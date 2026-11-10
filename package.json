@@ -476,7 +476,7 @@
         "watch:webpack": "webpack --watch --mode development",
         "watch-prod": "npm-run-all watch-prod:*",
         "watch-prod:webpack": "webpack --watch --mode production",
-        "lint": "eslint . && tsc",
+        "lint": "eslint . && tsc && cargo fmt --check && cargo clippy --workspace --all-targets --quiet -- -D warnings",
         "pretest": "npm run lint",
         "test": "npm-run-all test:rust test:pipeline test:golden test:schematic test:vscode",
         "test:rust": "cargo test --workspace",

@@ -3,10 +3,12 @@
 #   make bump VERSION=patch   (or minor, major, x.y.z) package.json,
 #                             package-lock.json, Cargo.toml/.lock
 #   (write the CHANGELOG.md section, commit)
-#   make release              test, tag, push, package, publish to Open VSX
-#   upload the .vsix by hand: https://marketplace.visualstudio.com/manage/publishers/TwinT
+#   make release              test, tag, push: CI (.github/workflows/ci.yml) builds a
+#                             vsix per platform, makes the GitHub Release and publishes
+#                             to the Marketplace and Open VSX
 #
-# Open VSX needs a token in OVSX_PAT (https://open-vsx.org/user-settings/tokens), or in the
+# By hand, if CI can't: `make package` (this platform's vsix), `make ovsx`. Open VSX
+# needs a token in OVSX_PAT (https://open-vsx.org/user-settings/tokens), or in the
 # keyring as `name ovsx_pat` (secret-tool).
 
 CURRENT := $(shell node -p "require('./package.json').version")
@@ -51,8 +53,6 @@ token:
 ovsx: token
 	ovsx publish $(VSIX)
 
-# the token first, so a missing one doesn't leave a release half done
-release: token check test tag package ovsx
+release: check test tag
 	@echo
-	@echo "Open VSX: done. Marketplace: upload $(VSIX) at"
-	@echo "  https://marketplace.visualstudio.com/manage/publishers/TwinT"
+	@echo "CI takes it from here: https://github.com/TwinT/hdl-studio/actions"

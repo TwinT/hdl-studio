@@ -33,8 +33,10 @@ what the synthesizer actually built.
   file order); without it, Yosys's own `read_verilog -sv` is used.
   The [`twint/sd`](https://hub.docker.com/r/twint/sd) dev container has both; see
   [hdl_studio_test](https://github.com/TwinT/hdl_studio_test) for a ready-made setup.
-- **Linux x64.** The simulator is a native binary shipped inside the extension, so
-  HDL Studio does not run in the browser (vscode.dev).
+- **Linux x64** (glibc 2.34 or newer: Ubuntu 22.04, Debian 12...), **Windows x64** or
+  **macOS on Apple silicon**. The simulator is a native binary shipped inside the
+  extension, one package per platform, so HDL Studio does not run in the browser
+  (vscode.dev).
 
 ## Quick start
 
@@ -357,6 +359,11 @@ Press `F5` in VS Code to launch an Extension Development Host; after rebuilding,
 workspace in [`crates/`](./crates/) (`hdlstudio`, a native process per circuit view);
 the schematic is TypeScript in [`view/`](./view/); the extension host is
 [`src/`](./src/). Packaging (`vsce package`) produces a per-platform `.vsix`.
+
+CI (GitHub Actions, [`.github/workflows/ci.yml`](./.github/workflows/ci.yml)) runs the
+whole suite on Linux, with yosys and yosys-slang from the OSS CAD Suite, and the engine's
+tests plus a `.vsix` on Linux, Windows and macOS. A `vX.Y.Z` tag (`make release`) makes
+the GitHub Release with those packages and publishes them.
 
 Contributions are welcome — open an issue or a pull request.
 

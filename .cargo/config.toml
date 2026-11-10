@@ -1,0 +1,4 @@
+# The engine on Windows links the C runtime in, so it runs without the
+# Visual C++ Redistributable (mlua's C build follows: cc picks /MT).
+[target.'cfg(all(windows, target_env = "msvc"))']
+rustflags = ["-C", "target-feature=+crt-static"]

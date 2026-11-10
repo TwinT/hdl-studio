@@ -16,8 +16,9 @@ simulator), `hdlstudio` (the binary).
 
 - `npm run compile` builds it (`compile:rust` = `cargo build --release`). The host
   runs `target/release/hdlstudio` (`src/hdlstudio_bin.mjs`, vscode-free; the root is
-  set from `context.extensionPath` in `activate`). The vsix ships it at that path
-  (`!target/release/hdlstudio` in `.vscodeignore`), so a vsix is per platform.
+  set from `context.extensionPath` in `activate`; `.exe` on Windows). The vsix ships it
+  at that path (`.vscodeignore`), so a vsix is per platform: CI builds linux-x64,
+  win32-x64 and darwin-arm64 (`.cargo/config.toml` links the MSVC runtime in).
 - `hdlstudio yosys2hdlstudio [--transform] [--no-io-ui] < yosys.json` prints the
   circuit. `crates/hdlstudio-yosys/tests/golden.json` freezes its output for the
   small examples plus cell-coverage netlists (`BLESS=1 cargo test` rewrites it after
@@ -185,7 +186,15 @@ build: the engine is a native process.
 - `test:vscode` (`node test/runTest.js`) — `@vscode/test-electron` mocha suite.
 - Rust tests: `crates/*/tests` (golden converter output, vector fixtures, cell
   semantics the random stimulus rarely reaches: z operands, alarms on busy ticks).
-- Lint: ESLint flat config (`eslint.config.js`), all rules `warn`, plus `tsc`.
+- Lint: ESLint flat config (`eslint.config.js`), all rules `warn`, plus `tsc`,
+  `cargo fmt --check` and clippy with `-D warnings`.
+- CI (`.github/workflows/ci.yml`): `test` = `npm run compile` + `xvfb-run npm test`
+  on Linux with yosys + yosys-slang from OSS CAD Suite (pinned date in `env`; there
+  slang is a plugin, `plugin -i slang`); `package` = cargo test + `test:golden` +
+  `vsce package --target` per platform; on a `v*` tag, `release` = GitHub Release
+  (CHANGELOG section as notes) + Marketplace (`vsce publish --oidc` if the repo
+  variable `MARKETPLACE_OIDC` is `true`, else a `VSCE_PAT` secret) + Open VSX
+  (`OVSX_PAT`). `make release` = check, test, tag, push.
 
 ## Synthesis flow & options
 

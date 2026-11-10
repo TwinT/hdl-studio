@@ -123,22 +123,16 @@ Done items leave this list; git history keeps them.
 None known.
 
 ## Release
-- [ ] GitHub Releases: none exist (`gh release list` is empty); the tags
-      `v0.5.0`, `v0.7.0` and `v1.0.1`…`v1.3.0` are on GitHub. `make release`
-      could end with `gh release create v$(VERSION) $(VSIX) --notes …` (the
-      CHANGELOG section).
-- [ ] The Marketplace upload is by hand (`make release` publishes to Open VSX
-      only). `vsce publish --packagePath $(VSIX)` with a PAT in the keyring (as
-      `ovsx_pat` is) would automate it.
-- [ ] Only `linux-x64` is built (`vsce package --target linux-x64`): the vsix
-      ships the native engine, so arm64/macOS/Windows need it built there or
-      cross-compiled, one vsix per target. `.vscodeignore` keeps only
-      `target/release/hdlstudio`: a win32 vsix needs `hdlstudio.exe` too.
-- [ ] No CI (there is no `.github/`). GitHub Actions: `cargo test`, clippy,
-      `npm run lint` and `test:golden` (no yosys needed) on every push;
-      `test:pipeline`/`test:schematic` with yosys + yosys-slang (OSS CAD Suite)
-      and Playwright's Chromium. A matrix of runners (linux x64/arm64, macOS,
-      Windows) building one vsix each is the way to the item above.
-- [ ] `cargo clippy` isn't part of `npm run lint`.
-- [ ] Local tags never pushed: `v0.2.0`, `v0.3.0`, `v0.4.0`, `v0.4.1`,
-      `v0.6.1`. Push them or delete them.
+- [ ] CI (`.github/workflows/ci.yml`, 2026-11-10) hasn't run yet: the first
+      push will tell whether OSS CAD Suite's slang plugin, the Windows/macOS
+      engine tests and the three vsixes work as on this machine.
+- [ ] Publishing from CI needs, once: a trusted publishing policy for this
+      repository and `ci.yml` on the Marketplace publisher page, plus the
+      repository variable `MARKETPLACE_OIDC=true` (or a `VSCE_PAT` secret),
+      and an `OVSX_PAT` secret for Open VSX. Without them a tag only makes
+      the GitHub Release.
+- [ ] Other platforms are one matrix line each: linux-arm64
+      (`ubuntu-24.04-arm`), darwin-x64 (`macos-15-intel`), win32-arm64
+      (`windows-11-arm`). Left out on purpose (2026-11-10).
+- [ ] The extension itself (yosys from VS Code, the views) has only been used
+      on Linux; on Windows and macOS CI checks the engine, not the extension.
