@@ -4,13 +4,27 @@ Done items leave this list; git history keeps them.
 
 ## Next Features 🚀
 - [ ] Option for disabling labels on the circuit view.
-- [ ] `LEDMatrix` interactive resize: its size is computed once from rows/cols.
-      The schematic has no resize handles for cells at all; it would need one
-      (and re-running the matrix's layout on resize).
 - [ ] A "tidy up" button that lays the circuit out again with ELK (moved
       cells and their wires included).
-- [ ] `sim.registerdisplay` (custom number formats) in Lua: the formats live
-      in the view, so it needs a protocol between the engine and the view.
+- [ ] Synthesis errors and warnings in the Problems panel, underlined in the
+      sources: today they go to the "HDL Studio (Yosys)" output channel and a
+      notification. A `DiagnosticCollection` fed from yosys-slang's
+      `file:line:col: error|warning:` lines (`FileMap.unmap_string` already
+      gives the real names) and from yosys's own warnings worth teaching:
+      a latch inferred (`proc_dlatch`), several drivers on a net, a wire
+      nothing drives.
+- [ ] A stale circuit: after a source is edited the view keeps simulating
+      the old synthesis and says nothing. `sources.mjs` keeps each source's
+      sha512: mark the circuit out of date (Control panel, the Synthesize
+      button), and an option to synthesize on save.
+- [ ] Source → schematic: a click (or the cursor) in a source highlights the
+      cells whose `source_positions` cover that line; today only the other
+      way (`#marker` → `showmarker`).
+- [ ] Export the waveforms as VCD (GTKWave, Surfer; to hand in, or to compare
+      with iverilog/Verilator): `wave.rs` has every recorded change.
+- [ ] Lua tests in VS Code's Test Explorer: `*_test.lua` scripts that
+      `assert`, run headless with `hdlstudio lua`, pass/fail per script (or
+      per named test). The same CLI grades a whole class's projects.
 - [ ] Simulation tiers, picked per circuit view: the engine as now
       ("didactic": 4 states, per-cell delays, every net live) plus fast ones
       for big, interactive runs (a game on the LED matrix). Measured on
@@ -75,6 +89,12 @@ Done items leave this list; git history keeps them.
       Doom itself also needs the hardware: RV32IM, megabytes of RAM and ~10+
       MIPS (carpincho-V is RV32I, microcoded, 4 KiB); a raycaster
       (Wolfenstein-style) on the matrix is a nearer first demo.
+- [ ] Low priority (little gain for the work):
+      - `LEDMatrix` interactive resize: its size is computed once from
+        rows/cols. The schematic has no resize handles for cells at all; it
+        would need one (and re-running the matrix's layout on resize).
+      - `sim.registerdisplay` (custom number formats) in Lua: the formats live
+        in the view, so it needs a protocol between the engine and the view.
 
 ## Improvements 🛠️
 - [ ] Simulator speed: the `board` runs at ~39k clock cycles/s. The cost is
@@ -111,6 +131,14 @@ Done items leave this list; git history keeps them.
       replays up to a checkpoint's spacing (~1 s of running at first, more
       once they're thinned); the stimulus log grows for the whole run.
 - [ ] The README's screenshots other than the first show the pre-1.0 UI.
+- [ ] Windows (subcircuits, FSMs, memories): collapse one to its title bar
+      (double-click on it), a button to tile the open ones over the
+      schematic's area.
+- [ ] The webviews set no Content-Security-Policy. Nothing from the netlist
+      reaches `innerHTML` today; a CSP (scripts and styles from the extension
+      only) keeps it that way.
+- [ ] `.hdls` files carry no format version: a `version` field, so a later
+      change of the circuit JSON can be migrated on load.
 
 ## Known Bugs 🐛
 - [ ] The techmap option fails on `soc`'s `board`: yosys leaves `$fa`/`$alu`
@@ -165,6 +193,13 @@ Done items leave this list; git history keeps them.
       `ovsx_pat` is) would automate it.
 - [ ] Only `linux-x64` is built (`vsce package --target linux-x64`): the vsix
       ships the native engine, so arm64/macOS/Windows need it built there or
-      cross-compiled, one vsix per target.
+      cross-compiled, one vsix per target. `.vscodeignore` keeps only
+      `target/release/hdlstudio`: a win32 vsix needs `hdlstudio.exe` too.
+- [ ] No CI (there is no `.github/`). GitHub Actions: `cargo test`, clippy,
+      `npm run lint` and `test:golden` (no yosys needed) on every push;
+      `test:pipeline`/`test:schematic` with yosys + yosys-slang (OSS CAD Suite)
+      and Playwright's Chromium. A matrix of runners (linux x64/arm64, macOS,
+      Windows) building one vsix each is the way to the item above.
+- [ ] `cargo clippy` isn't part of `npm run lint`.
 - [ ] Local tags never pushed: `v0.2.0`, `v0.3.0`, `v0.4.0`, `v0.4.1`,
       `v0.6.1`. Push them or delete them.
