@@ -5,7 +5,7 @@ import './style.css';
 import * as imgutils from '../imgutils.mjs';
 import { LuaRunner } from '../lua_runner.ts';
 import { CircuitData, Connector, Device, GraphData, isInput, isOutput, shape } from './cells.ts';
-import { Dialog, popupMenu } from './dialog.ts';
+import { Dialog, popupMenu, type Geometry } from './dialog.ts';
 import { fsmView } from './fsm.ts';
 import { layout } from './layout.ts';
 import { MemContents, memoryEditor } from './memory.ts';
@@ -83,6 +83,7 @@ class App {
     #inspecting = false;
     #inspectNext?: number | null;
     #revivedAt = -Infinity; // when a dead engine's circuit was last loaded again
+    #windows: Record<string, Geometry> = {}; // where each cell's window was left, by path (view.windows)
 
     constructor() {
         this.#lua = new LuaRunner(vscode, engineChannel, this);
@@ -403,6 +404,7 @@ class App {
         // the waveforms of a new circuit start afresh, with the same signals
         // where they still exist; on opening a project, the ones it saved
         const watched: WaveConfig = old ? this.#monitor.config : { waves: opts.view?.waves ?? [], columns: opts.view?.waveColumns };
+        if (!old) this.#windows = { ...opts.view?.windows };
         this.#monitor.clear();
         this.#names = undefined;
         this.circuit = empty(data) ? undefined : data;
@@ -556,6 +558,19 @@ class App {
         return graph;
     }
 
+    // A window for the cell at `key` (a subcircuit's graph, a memory, an FSM):
+    // it opens over the schematic, not the waveforms; where the user leaves
+    // it is saved with the project, as the zoom is.
+    #dialog(title: string, key: string, onClose: () => void) {
+        return new Dialog(title, onClose, {
+            area: () => document.getElementById('paper')!.getBoundingClientRect(),
+            onGeometry: (g) => {
+                this.#windows[key] = g;
+                vscode.postMessage({ command: 'viewstate', state: { windows: this.#windows }, dirty: false });
+            },
+        });
+    }
+
     async #open(prefix: string, id: string) {
         const graph = prefix === '' ? this.circuit! : this.#graphAt(prefix)!;
         const d = graph.devices[id];
@@ -563,7 +578,7 @@ class App {
         if (d.type === 'Subcircuit') {
             const g = path + '/';
             if (this.#views.has(g)) return;
-            const dialog = new Dialog(`${d.celltype} ${d.label ?? ''}`, () => {
+            const dialog = this.#dialog(`${d.celltype} ${d.label ?? ''}`, g, () => {
                 this.#views.get(g)?.schematic.destroy();
                 this.#views.delete(g);
                 this.#send({ op: 'unobserve', graph: g });
@@ -576,7 +591,8 @@ class App {
             if (await this.#layout(s)) this.#autolayout();
             s.render();
             const b = s.bbox();
-            dialog.fit(b.width + 60, b.height + 60);
+            if (this.#windows[g]) dialog.place(this.#windows[g]);
+            else dialog.fit(b.width + 60, b.height + 60);
             s.home({ w: dialog.body.clientWidth, h: dialog.body.clientHeight });
             this.#subcircuitList();
             return;
@@ -596,17 +612,19 @@ class App {
                 this.#leavePast();
                 this.#send({ op: 'mem_write', path, addr: a, value });
             });
-            const dialog = new Dialog(`Memory contents: ${d.label ?? ''}`, () => { ed.close(); this.#extras.delete(path); });
+            const dialog = this.#dialog(`Memory contents: ${d.label ?? ''}`, path, () => { ed.close(); this.#extras.delete(path); });
             dialog.body.appendChild(ed.root);
-            dialog.center();
+            if (this.#windows[path]) dialog.place(this.#windows[path]);
+            else dialog.center();
             this.#extras.set(path, { dialog, update: ed.update, close: ed.close });
         } else if (d.type === 'FSM') {
             const fsm = await fsmView(d);
-            const dialog = new Dialog(`FSM: ${d.label ?? ''}`, () => { this.#extras.delete(path); this.#subcircuitList(); });
+            const dialog = this.#dialog(`FSM: ${d.label ?? ''}`, path, () => { this.#extras.delete(path); this.#subcircuitList(); });
             dialog.body.appendChild(fsm.svg);
             const update = () => fsm.update(this.#fsmStates.get(path) ?? d.init_state, schematic.value(id, 'in'));
             update();
-            dialog.fit(Number(fsm.svg.getAttribute('width')) + 10, Number(fsm.svg.getAttribute('height')) + 10);
+            if (this.#windows[path]) dialog.place(this.#windows[path]);
+            else dialog.fit(Number(fsm.svg.getAttribute('width')) + 10, Number(fsm.svg.getAttribute('height')) + 10);
             this.#extras.set(path, { dialog, update, close: () => {}, svg: fsm.svg, exportId: ++this.#exportIds });
             this.#subcircuitList();
         }

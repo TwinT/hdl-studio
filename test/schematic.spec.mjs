@@ -430,7 +430,7 @@ describe('schematic webview on the engine', function () {
         await page.waitForTimeout(300);
         const strip = await page.evaluate(() => {
             const c = document.querySelector('#monitor .row.group canvas');
-            return c && { ...c.getBoundingClientRect().toJSON(), sized: c.height === 24 * devicePixelRatio };
+            return c && { ...c.getBoundingClientRect().toJSON(), sized: c.height === 24 * window.devicePixelRatio };
         });
         assert.ok(strip?.sized, JSON.stringify(strip));
         await page.mouse.click(strip.x + strip.width / 3, strip.y + strip.height / 2);
@@ -538,6 +538,44 @@ describe('schematic webview on the engine', function () {
         await until(() => window.__posted.some((m) => m.command === 'luastop'));
         const out = (await posted('luaprint')).map((m) => m.messages.join('\t')).join('');
         assert.match(out, /ciclo 20: count=3/);
+    });
+
+    it('opens a subcircuit over the schematic, and where it was left', async function () {
+        await post({ command: 'showcircuit', circuit: { devices: {}, connectors: [] }, opts: {} });
+        await show('soc board');
+        // a waveform, so the monitor takes the bottom of the view
+        await page.evaluate(() => document.querySelector('.wirehit').dispatchEvent(new window.MouseEvent('dblclick', { bubbles: true })));
+        const open = async () => {
+            await page.evaluate(() => [...document.querySelectorAll('.cell')].find((g) => g.querySelector('.open'))
+                .dispatchEvent(new window.MouseEvent('dblclick', { bubbles: true })));
+            await until(() => document.querySelectorAll('.dialog svg .cell').length > 5);
+            return page.evaluate(() => document.querySelector('.dialog').getBoundingClientRect().toJSON());
+        };
+        const first = await open();
+        const monitor = await page.evaluate(() => document.getElementById('monitor').getBoundingClientRect().toJSON());
+        assert.ok(monitor.height > 50 && first.bottom <= monitor.top + 1, JSON.stringify({ first, monitor }));
+        // dragged by its title bar: saved with the project, without marking it modified
+        const bar = await page.locator('.dialog .titlebar span').boundingBox();
+        await page.mouse.move(bar.x + 10, bar.y + bar.height / 2);
+        await page.mouse.down();
+        await page.mouse.move(bar.x + 70, bar.y + bar.height / 2 + 40, { steps: 4 });
+        await page.mouse.up();
+        await until(() => window.__posted.some((m) => m.command === 'viewstate' && m.state.windows));
+        const saved = await lastPosted('viewstate');
+        const [[key, g]] = Object.entries(saved.state.windows);
+        assert.ok(key.endsWith('/') && saved.dirty === false, JSON.stringify(saved));
+        assert.deepStrictEqual([g.left, g.top], [first.x + 60, first.y + 40]);
+        // closed and opened again: where it was left
+        await page.locator('.dialog .titlebar button').click();
+        const again = await open();
+        assert.deepStrictEqual([again.x, again.y, again.width, again.height], [first.x + 60, first.y + 40, first.width, first.height]);
+        // and in the project opened again
+        await post({ command: 'showcircuit', circuit: { devices: {}, connectors: [] }, opts: {} });
+        await post({ command: 'showcircuit', circuit: (await lastPosted('autolayout')).circuit,
+                     opts: { view: { windows: { [key]: { ...g, left: 30, top: 20 } } } } });
+        await until(() => document.querySelectorAll('.cell').length > 3);
+        const reopened = await open();
+        assert.deepStrictEqual([reopened.x, reopened.y], [30, 20]);
     });
 
     it('loads the circuit again when the engine dies', async function () {

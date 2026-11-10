@@ -81,6 +81,10 @@ SVG drawn by hand, laid out by `elkjs`, simulated by the engine through the host
   host protocol, sim controls, control-panel I/O, windows (`dialog.ts`), memory
   editor (`memory.ts`), FSM diagram (`fsm.ts`, the next transition is computed in
   the view), image export (`view/imgutils.mjs`), Lua (`view/lua_runner.ts`).
+- Windows (`dialog.ts`, subcircuits/FSMs/memories): they fit and centre in
+  `#paper` (above the waveforms) and drag anywhere; where the user leaves one (a
+  drag, a resize by its corner) goes to `view.windows[path]` (`main.ts` `#dialog`,
+  saved like the zoom, not an edit) and `place` puts it back on the next open.
 - Layout lives in the circuit: `devices[id].position` and `connectors[i].vertices`
   (ELK's bend points), in the top level and per subcircuit type. Missing positions
   are laid out on load and saved as part of the last edit (`autolayout`); a moved

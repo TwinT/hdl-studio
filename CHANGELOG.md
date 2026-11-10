@@ -16,6 +16,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and a click, drag or wheel there did nothing.
 - If the simulation engine stops (a crash, or killed), the circuit view loads the
   circuit into a new one, back at tick 0, instead of answering "no circuit loaded".
+- Subcircuit, FSM and memory windows open over the schematic, not over the
+  waveforms, and open again where they were left, at the size they were given
+  (saved with the project).
 
 ## [1.3.0] - 2026-11-05
 

@@ -143,27 +143,6 @@ Done items leave this list; git history keeps them.
 ## Known Bugs 🐛
 - [ ] The techmap option fails on `soc`'s `board`: yosys leaves `$fa`/`$alu`
       cells the converter has no cell for ("Invalid cell type: $fa").
-- [ ] A subcircuit's window covers the waveforms, and it has to be moved and
-      resized again every time it opens.
-      - Cause: the waveform monitor is docked at the bottom of the circuit view
-        (`#monitor`, 30% high, its gutter resizes it), while subcircuit and FSM
-        windows (`view/schematic/dialog.ts`) float over the whole webview:
-        `Dialog.fit` sizes them up to 90% of `innerWidth`/`innerHeight` and
-        `center` centres them there, so a big subcircuit opens over the waves.
-        Their position and size aren't kept (`main.ts` `#open`).
-      - Alternatives, cheapest first (they combine):
-        - fit, centre and bound the drag to the schematic's area (above the
-          monitor), not the window: windows open clear of the waves and can
-          still be dragged over them;
-        - remember each window's position and size per subcircuit path (in
-          `view`, with the layout), so it opens where it was left; maybe
-          which ones were open;
-        - collapse a window to its title bar (double-click on it) and a
-          button to tile the open windows over the schematic's area;
-        - subcircuits as tabs or a split pane of the circuit view instead of
-          floating windows;
-        - the waveforms in their own panel (the detachable waveforms in Next
-          Features), which frees the whole circuit view for windows.
 
 ## Release
 - [ ] GitHub Releases: none exist (`gh release list` is empty); the tags
