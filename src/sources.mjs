@@ -64,8 +64,14 @@ class SourceInfo {
     }
 }
 
+// The Problems panel's entries from synthesis: one collection for every
+// project, in which each project replaces its own.
+let problems;
+const problemsCollection = () => problems ??= vscode.languages.createDiagnosticCollection('hdl-studio');
+
 export class Sources {
     #doc_uri
+    #problemUris = [] // where this project's last synthesis put problems
     #doc_dir_uri = false
     // from uri string to source info
     #map = {}
@@ -89,6 +95,7 @@ export class Sources {
     }
     dispose() {
         this.#textDocChanged.dispose();
+        this.#showProblems([]);
     }
     get doc_uri() {
         return this.#doc_uri;
@@ -341,6 +348,33 @@ export class Sources {
         }
         return Array.from(names);
     }
+    // Diagnostics (src/diagnostics.mjs) of the sources by their synthesis names.
+    #showProblems(diagnostics) {
+        const collection = problemsCollection();
+        for (const uri of this.#problemUris)
+            collection.delete(uri);
+        const byUri = new Map();
+        for (const d of diagnostics) {
+            const info = Object.values(this.#map).find((i) => i.name === d.file);
+            if (!info)
+                continue;
+            const line = d.line - 1;
+            const range = d.col === undefined ? new vscode.Range(line, 0, line, 10000)
+                : new vscode.Range(line, d.col - 1, line, (d.end ?? d.col + 1) - 1);
+            const diag = new vscode.Diagnostic(range, d.message, d.severity === 'error' ?
+                vscode.DiagnosticSeverity.Error : vscode.DiagnosticSeverity.Warning);
+            diag.source = d.source;
+            if (d.code)
+                diag.code = d.code;
+            const key = info.uri.toString();
+            if (!byUri.has(key))
+                byUri.set(key, [info.uri, []]);
+            byUri.get(key)[1].push(diag);
+        }
+        for (const [uri, list] of byUri.values())
+            collection.set(uri, list);
+        this.#problemUris = [...byUri.values()].map(([uri]) => uri);
+    }
     async doSynth(opts) {
         const basenames_map = this.#basenamesMap();
         if (!basenames_map)
@@ -361,9 +395,20 @@ export class Sources {
                     await vscode.window.showErrorMessage(`Unknown synthesis error.`);
                     return;
                 }
+                this.#showProblems(e.diagnostics ?? []);
+                // the first error in the sources says more than yosys's last line
+                const errors = (e.diagnostics ?? []).filter((d) => d.severity === 'error');
+                if (errors.length) {
+                    const [d] = errors;
+                    const more = errors.length > 1 ? ` (and ${errors.length - 1} more)` : '';
+                    vscode.window.showErrorMessage(`Synthesis failed: ${d.file}:${d.line}: ${d.message}${more}`, 'Show Problems')
+                        .then((b) => b && vscode.commands.executeCommand('workbench.actions.view.problems'));
+                    return;
+                }
                 await vscode.window.showErrorMessage(`Synthesis error: ${error}`);
                 return;
             }
+            this.#showProblems(res.diagnostics ?? []);
             this.#script_running = {};
             this.#script_not_running = {};
             this.#postLoad();

@@ -525,6 +525,77 @@ describe('the top found by yosys (no Top option)', function () {
     });
 });
 
+describe('synthesis diagnostics (the Problems panel)', function () {
+    it("reads slang's and read_verilog's messages, with the marked range", async function () {
+        const { log_diagnostics } = await import('../src/diagnostics.mjs');
+        const log = [
+            '1. Executing SLANG frontend.',
+            'width.sv:2:14: warning: implicit conversion truncates from 4 to 2 bits [-Wwidth-trunc]',
+            '  assign y = a;',
+            '           ~ ^',
+            'core/alu.sv:7:17: error: expected expression',
+            'Build failed: 1 error, 1 warning',
+            "syntax.sv:2: ERROR: syntax error, unexpected ';'",
+            'ERROR: Design elaboration failed; see full log for details',
+        ].join('\n');
+        assert.deepStrictEqual(log_diagnostics(log), [
+            { file: 'width.sv', line: 2, col: 12, end: 15, severity: 'warning', source: 'slang',
+              message: 'implicit conversion truncates from 4 to 2 bits', code: '-Wwidth-trunc' },
+            { file: 'core/alu.sv', line: 7, col: 17, end: 18, severity: 'error', source: 'slang',
+              message: 'expected expression', code: undefined },
+            { file: 'syntax.sv', line: 2, severity: 'error', source: 'yosys', message: "syntax error, unexpected ';'" },
+        ]);
+    });
+    it("reads read_verilog's refusal of an always_comb that makes a latch", async function () {
+        const { log_diagnostics } = await import('../src/diagnostics.mjs');
+        const [d] = log_diagnostics("ERROR: Latch inferred for signal `\\comb.\\q' from always_comb process `\\comb.$proc$core/latches.sv:12$7'.");
+        assert.deepStrictEqual([d.file, d.line, d.col, d.severity, d.code, d.message.split(' ')[0]], ['core/latches.sv', 12, undefined, 'error', 'latch', 'q']);
+    });
+    // a latch by mistake (a block that doesn't assign q in every case), not
+    // one on purpose (always_latch) nor a loop of gates (an SR latch);
+    // always_comb last: read_verilog refuses it (above)
+    const latches = `module star(input logic en, d, output logic q);
+  always @(*)
+    if (en) q = d;
+endmodule
+module on_purpose(input logic en, d, output logic q);
+  always_latch
+    if (en) q = d;
+endmodule
+module sr(input logic s, r, output logic q, qn);
+  assign q = ~(r | qn);
+  assign qn = ~(s | q);
+endmodule
+module comb(input logic en, d, output logic q);
+  always_comb
+    if (en) q = d;
+endmodule
+`;
+    for (const frontend of ['slang', 'read_verilog']) {
+        it(`finds the latches made by mistake in the netlist (${frontend})`, async function () {
+            const { slangSupport } = await import('./designs.mjs');
+            const { latch_diagnostics } = await import('../src/diagnostics.mjs');
+            const useSlang = frontend === 'slang' && slangSupport();
+            if (frontend === 'slang' && !useSlang) this.skip();
+            const source = useSlang ? latches : latches.slice(0, latches.indexOf('module comb'));
+            const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'hdl-test-'));
+            try {
+                fs.writeFileSync(path.join(tmp, 'latches.sv'), source);
+                for (const opts of [{}, { optimize: true }, { optimize: true, techmap: true }]) {
+                    fs.writeFileSync(path.join(tmp, 'synth.ys'), build_yosys_script({ 'latches.sv': '' }, { useSlang, ...opts }) + '\njson -o out.json');
+                    execFileSync('yosys', ['-q', '-s', 'synth.ys'], { cwd: tmp, stdio: 'pipe' });
+                    const diags = latch_diagnostics(JSON.parse(fs.readFileSync(path.join(tmp, 'out.json'), 'utf8')), { 'latches.sv': source });
+                    // always @(*): its block; always_comb: the `if`
+                    assert.deepStrictEqual(diags.map((d) => [d.line, d.severity, d.message.split(' ')[0]]).sort((a, b) => a[0] - b[0]),
+                                           [[2, 'warning', 'q'], ...(useSlang ? [[15, 'warning', 'q']] : [])], JSON.stringify(opts));
+                }
+            } finally {
+                fs.rmSync(tmp, { recursive: true, force: true });
+            }
+        });
+    }
+});
+
 describe('techmap on the multi-file designs', function () {
     this.timeout(180000);
     // the board once failed with "Invalid cell type: $fa": yosys left the

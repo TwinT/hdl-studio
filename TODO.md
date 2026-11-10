@@ -3,13 +3,13 @@
 Done items leave this list; git history keeps them.
 
 ## Next Features 🚀
-- [ ] Synthesis errors and warnings in the Problems panel, underlined in the
-      sources: today they go to the "HDL Studio (Yosys)" output channel and a
-      notification. A `DiagnosticCollection` fed from yosys-slang's
-      `file:line:col: error|warning:` lines (`FileMap.unmap_string` already
-      gives the real names) and from yosys's own warnings worth teaching:
-      a latch inferred (`proc_dlatch`), several drivers on a net, a wire
-      nothing drives.
+- [ ] More synthesis warnings for the Problems panel: several drivers on a
+      net that aren't all tri-state (the converter merges them into a
+      TriMerge, whose conflict reads as x), an output or a signal nothing
+      drives (its bits are `x` in the netlist). slang's own flow analysis
+      (unassigned, unused, inferred latch) doesn't run inside yosys, and yosys's
+      `check` flags every tri-state bus; wires have no `src` through
+      read_slang, so these need a place found another way (the declaration).
 - [ ] A stale circuit: after a source is edited the view keeps simulating
       the old synthesis and says nothing. `sources.mjs` keeps each source's
       sha512: mark the circuit out of date (Control panel, the Synthesize

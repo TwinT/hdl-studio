@@ -55,8 +55,10 @@ export function build_yosys_script(files, opts = {}) {
         // --allow-toplevel-iface-ports: a top with an interface port (e.g. the
         // alu example's `alu_if.alu alu_io`) is an error in newer yosys-slang;
         // with it the interface is flattened into plain `alu_io.<signal>` ports.
+        // -Wextra: more of slang's warnings (an implicit truncation, `y = a`
+        // with a narrower y), for the Problems panel; quiet on the examples.
         const topArg = opts.top ? ` --top ${opts.top}` : '';
-        cmds.push(`read_slang --best-effort-hierarchy --allow-toplevel-iface-ports ${Object.keys(files).join(' ')}${topArg}`);
+        cmds.push(`read_slang --best-effort-hierarchy --allow-toplevel-iface-ports -Wextra ${Object.keys(files).join(' ')}${topArg}`);
     } else {
         for (const [name, _] of Object.entries(files)) {
             const ext = path.extname(name);

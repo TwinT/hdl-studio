@@ -8,6 +8,7 @@ import * as os from 'os';
 import { promisify } from 'util';
 import { build_yosys_script, isHdlFile, data_file_paths, SLANG_PROBES, slang_missing } from './yosys_script.mjs';
 import { convert_yosys_json } from './hdlstudio_bin.mjs';
+import { log_diagnostics, latch_diagnostics } from './diagnostics.mjs';
 
 const execFile = promisify(child_process.execFile);
 // yosys's log (the board's is 300-400 KB) can outgrow execFile's default 1 MiB
@@ -105,33 +106,39 @@ export async function run_yosys(files, options) {
         log.appendLine(file_map.unmap_string(script));
         log.appendLine('\n--- yosys output ---');
 
+        // the frontends' errors and warnings, for the Problems panel
+        let diagnostics;
         try {
             const { stdout, stderr } = await execFile(yosysBin, ['-s', scriptPath], { cwd: tmpDir, maxBuffer });
-            log.append(file_map.unmap_string((stdout || '') + (stderr || '')));
+            const text = file_map.unmap_string((stdout || '') + (stderr || ''));
+            log.append(text);
+            diagnostics = log_diagnostics(text);
         } catch (e) {
             if (e.code === 'ENOENT') {
                 throw { error: `Yosys binary not found ("${yosysBin}"). Please make sure Yosys is installed and available in your PATH, or configure the "hdl-studio.yosysPath" setting.` };
             }
-            log.append(file_map.unmap_string((e.stdout || '') + (e.stderr || '')));
+            const text = file_map.unmap_string((e.stdout || '') + (e.stderr || ''));
+            log.append(text);
             log.show(true);
             const errMsg = file_map.unmap_string(e.stderr || e.message || String(e));
-            throw { error: errMsg };
+            throw { error: errMsg, diagnostics: log_diagnostics(text) };
         }
 
         try {
             const raw = file_map.unmap_string(fs.readFileSync(outputJson, 'utf8'));
+            diagnostics.push(...latch_diagnostics(JSON.parse(raw), files));
             const warnings = [];
             const output = convert_yosys_json(raw, options, true, warnings);
             for (const w of warnings)
                 log.appendLine(`\nWarning: ${w}`);
-            return { output, warnings };
+            return { output, warnings, diagnostics };
         } catch (e) {
             // Yosys ran fine but the netlist couldn't be converted (e.g. a testbench
             // with no synthesizable top, $display, delays, etc.). Surface the real error.
             log.appendLine('\n--- netlist conversion error ---');
             log.appendLine(e.stack || String(e));
             log.show(true);
-            throw { error: `${e.message || e}. See the "HDL Studio (Yosys)" output panel for the full log.` };
+            throw { error: `${e.message || e}. See the "HDL Studio (Yosys)" output panel for the full log.`, diagnostics };
         }
 
     } finally {

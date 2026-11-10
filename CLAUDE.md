@@ -208,6 +208,16 @@ has `read_slang` (`SLANG_PROBES`: built in, or the `slang` plugin, which the scr
 then loads with `plugin -i slang`; OSS CAD Suite ships it as a plugin); without it,
 `read_verilog -sv`. The tests (`test/designs.mjs` `slangSupport`) ask the same way.
 
+Problems panel (`src/diagnostics.mjs`, vscode-free; `Sources#showProblems`, one
+`DiagnosticCollection` in which each project replaces its own): `log_diagnostics`
+reads the frontends' messages in yosys's log (slang's `file:line:col: error|warning:`
+with the range under its `^~~`, `read_slang -Wextra`; read_verilog's `file:line:
+ERROR`; its refusal of an always_comb latch, placed by the `$proc$file:line$N`
+name), `latch_diagnostics` the netlist's latches by mistake: a latch cell not at an
+`always_latch` (the `src` points at the `always`), or a mux whose output feeds its
+own input (read_slang's incomplete `always_comb`). yosys's `check` isn't used: it
+calls every tri-state bus "multiple conflicting drivers" and an SR latch a loop.
+
 Options live in `document.mjs` `default_synth_options`, edited in the Synthesis
 panel (Synthesis/Diagram tabs):
 - **Yosys passes** (opt, fsm, fsmexpand, techmap, top) — read in `doSynth`. Take

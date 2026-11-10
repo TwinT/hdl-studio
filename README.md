@@ -81,6 +81,8 @@ More examples, each with a Lua test script, are in
 - **I/O widgets** inferred from the top module's ports: clocks, switches, push buttons,
   number fields, lamps, number displays, 7-segment displays and LED matrices.
 - **Source highlighting**: hover a cell or a wire to see the lines of code it came from.
+- **Synthesis errors and warnings in the Problems panel**, underlined in the code,
+  latches made by mistake included.
 - **Lua 5.4 scripting** and a Lua terminal to drive and check the simulation.
 - **Undo/redo** of everything, from re-synthesis to moving a cell.
 - **Image export** to SVG, PNG or JPEG, signal levels included.
@@ -131,7 +133,12 @@ Press **Synthesize** in the *Synthesis* panel. Its options are saved with the pr
 | Simplify diagram | Post-process the netlist into fewer cells, easier to read. On by default. |
 | Zero combinational propagation delay | A combinational path settles in one tick instead of one tick per gate. |
 
-Yosys's script and output go to the *HDL Studio (Yosys)* output channel.
+Errors and warnings go to the **Problems** panel and are underlined in the sources:
+what the SystemVerilog frontend reports (a syntax error, an undeclared name, an
+assignment that silently drops bits), and a **latch made by mistake**, a combinational
+block that doesn't assign a signal in every case (`always_latch` is a latch on
+purpose and isn't reported). Yosys's script and full output go to the *HDL Studio
+(Yosys)* output channel.
 
 With the source open beside the schematic, hovering a cell or wire highlights the code
 that produced it:

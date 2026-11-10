@@ -5,6 +5,16 @@ All notable changes to HDL Studio will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- Synthesis errors and warnings in the Problems panel, underlined in the sources:
+  the SystemVerilog frontend's (a syntax error, an undeclared name, and now also an
+  assignment that drops bits, `-Wextra`) and a latch made by mistake, a
+  combinational block that doesn't assign a signal in every case (not an
+  `always_latch`). A failed synthesis names the first error instead of "Design
+  elaboration failed".
+
 ## [1.4.0] - 2026-11-10
 
 ### Added
