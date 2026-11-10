@@ -123,9 +123,6 @@ Done items leave this list; git history keeps them.
 None known.
 
 ## Release
-- [ ] Publishing from CI is set up (Marketplace trusted publishing,
-      `MARKETPLACE_OIDC`, `OVSX_PAT`, 2026-11-10) but hasn't published yet:
-      the next `v*` tag is its first run.
 - [ ] Other platforms are one matrix line each: linux-arm64
       (`ubuntu-24.04-arm`), darwin-x64 (`macos-15-intel`), win32-arm64
       (`windows-11-arm`). Left out on purpose (2026-11-10).
