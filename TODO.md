@@ -4,8 +4,6 @@ Done items leave this list; git history keeps them.
 
 ## Next Features 🚀
 - [ ] Option for disabling labels on the circuit view.
-- [ ] A "tidy up" button that lays the circuit out again with ELK (moved
-      cells and their wires included).
 - [ ] Synthesis errors and warnings in the Problems panel, underlined in the
       sources: today they go to the "HDL Studio (Yosys)" output channel and a
       notification. A `DiagnosticCollection` fed from yosys-slang's
@@ -106,11 +104,9 @@ Done items leave this list; git history keeps them.
       - a moved cell's wires are routed around the cells near both ends
         (`route.ts`, within 200px; farther detours fall back to an L/Z through
         cells); other wires keep their route even if a moved cell now sits on
-        it (a "tidy up" button would fix both);
+        it ("Reset layout" fixes both, by dropping the hand placement);
       - no wire editing (on purpose: an edited netlist no longer matches the
-        sources);
-      - a number base picked on a NumEntry/NumDisplay is only saved with the
-        next edit.
+        sources).
 - [ ] The waveform monitor: its history is capped at 1M changes per signal
       (the oldest quarter goes), which a clock fills in seconds at flat-out
       speed; groups are one level deep, coloured per group (not per signal).

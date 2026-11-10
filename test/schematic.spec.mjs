@@ -341,7 +341,7 @@ describe('schematic webview on the engine', function () {
         assert.deepStrictEqual([await following(), await running()], [true, false]);
     });
 
-    it('keeps what the project saves: waveforms, zoom, clock period, a layout', async function () {
+    it('keeps what the project saves: waveforms, zoom, clock period, number base, a layout', async function () {
         // as if just opened: no circuit before, so no waveforms carried over
         await post({ command: 'showcircuit', circuit: { devices: {}, connectors: [] }, opts: {} });
         await show('04_counter');
@@ -367,6 +367,15 @@ describe('schematic webview on the engine', function () {
         }, clk);
         const edit = await lastPosted('updatecircuit');
         assert.deepStrictEqual([edit.type, edit.circuit.devices[clk].propagation], ['param', 7]);
+        // so is a display's number base
+        const display = Object.keys(circuit.devices).find((id) => circuit.devices[id].type === 'NumDisplay');
+        await page.evaluate((id) => {
+            const sel = document.querySelector(`.cell[data-id="${id}"] select`);
+            sel.value = 'dec';
+            sel.dispatchEvent(new Event('change'));
+        }, display);
+        const base = await lastPosted('updatecircuit');
+        assert.deepStrictEqual([base.type, base.circuit.devices[display].numbase, base.circuit.devices[clk].propagation], ['param', 'dec', 7]);
         // undoing it keeps simulating: set_param, no load
         await page.evaluate(() => {
             const send = window.__engineSend;
