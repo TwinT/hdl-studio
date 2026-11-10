@@ -9,6 +9,7 @@ import { FilesView } from './files_view.mjs';
 import { LuaTerminal } from './lua_terminal.mjs';
 import { SynthProvider } from './synth_provider.mjs';
 import { StatusProvider } from './status_provider.mjs';
+import { TestExplorer } from './test_explorer.mjs';
 import { read_txt_file, write_txt_file, file_exist } from './utils.mjs';
 import { extension_formats } from '../lib/image_formats.mjs';
 import { set_hdlstudio_root } from './hdlstudio_bin.mjs';
@@ -54,11 +55,13 @@ async function expandSources(uris, recursive) {
     return result;
 }
 
-// The returned object is for the tests (test/suite): the active project.
+// The returned object is for the tests (test/suite): the active project and
+// the Testing view's controller.
 export function activate(context) {
     set_hdlstudio_root(context.extensionPath);
     const studio = new HdlStudio(context);
-    return { get document() { return studio.document; } };
+    const tests = new TestExplorer(studio, context);
+    return { get document() { return studio.document; }, tests };
 }
 
 export function deactivate() {

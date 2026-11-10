@@ -84,4 +84,39 @@ suite('Synthesis in VS Code', function () {
         assert.ok(await text.save());
         await until(() => width() === 6 && !doc.stale, 'a synthesis on save');
     });
+
+    test('Lua tests in the Testing view, run on a circuit synthesized first', async function () {
+        // the counter example and its tests, never synthesized
+        const example = path.join(__dirname, '..', 'verilog', '04_counter');
+        for (const f of ['04_counter.sv', 'counter_test.lua'])
+            fs.copyFileSync(path.join(example, f), path.join(dir, f));
+        const project = vscode.Uri.file(path.join(dir, 'tests.hdls'));
+        fs.writeFileSync(project.fsPath, JSON.stringify({ sources: [{ relpath: '04_counter.sv' }, { relpath: 'counter_test.lua' }] }));
+        await vscode.commands.executeCommand('vscode.openWith', project, 'hdl-studio.circuitView');
+        const { tests } = vscode.extensions.getExtension('TwinT.hdl-studio').exports;
+        const root = await until(() => tests.controller.items.get(project.toString()), 'the project in the Testing view');
+        const file = await until(() => { let f; root.children.forEach((c) => { f = c; }); return f?.children.size === 3 && f; }, 'its tests');
+        assert.strictEqual(file.label, 'counter_test.lua');
+        // run them, recording each outcome
+        const outcomes = {};
+        const create = tests.controller.createTestRun;
+        tests.controller.createTestRun = (request) => {
+            const run = create.call(tests.controller, request);
+            for (const k of ['passed', 'failed', 'errored', 'skipped']) {
+                const report = run[k].bind(run);
+                run[k] = (item, ...rest) => { outcomes[item.label] = k; return report(item, ...rest); };
+            }
+            return run;
+        };
+        try {
+            await tests.profile.runHandler(new vscode.TestRunRequest([root]), new vscode.CancellationTokenSource().token);
+        } finally {
+            tests.controller.createTestRun = create;
+        }
+        assert.deepStrictEqual(outcomes, {
+            'arranca en 0 despues del reset': 'passed',
+            'cuenta cada flanco de subida': 'passed',
+            'vuelve a 0 despues de 15': 'passed',
+        });
+    });
 });

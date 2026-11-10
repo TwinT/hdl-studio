@@ -12,9 +12,10 @@ Done items leave this list; git history keeps them.
       read_slang, so these need a place found another way (the declaration).
 - [ ] Export the waveforms as VCD (GTKWave, Surfer; to hand in, or to compare
       with iverilog/Verilator): `wave.rs` has every recorded change.
-- [ ] Lua tests in VS Code's Test Explorer: `*_test.lua` scripts that
-      `assert`, run headless with `hdlstudio lua`, pass/fail per script (or
-      per named test). The same CLI grades a whole class's projects.
+- [ ] Grading a class: a CLI that synthesizes each student's project from its
+      sources (yosys, `build_yosys_script`) and runs the course's `*_test.lua`
+      on it with `hdlstudio lua --tests`, a table of results. The Testing view
+      lists the tests of open projects only.
 - [ ] Simulation tiers, picked per circuit view: the engine as now
       ("didactic": 4 states, per-cell delays, every net live) plus fast ones
       for big, interactive runs (a game on the LED matrix). Measured on

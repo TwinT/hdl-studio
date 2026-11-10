@@ -55,6 +55,16 @@ simulator), `hdlstudio` (the binary).
   63 bits, a narrow string is zero-extended, the REPL prints expression values,
   `sim.registerdisplay` isn't there, `io` is only `write` (a print) and `os` only
   `time/clock/date/difftime` (`new_runner`: stdin/stdout carry the protocol).
+- Lua tests: `test(name, fn)` is defined in Lua (`new_runner`, so `fn` can
+  yield), per `lua::Tests`: `All` (the view: each in turn, `ok  name` printed),
+  `Collect` (records names), `Only(name)`. `hdlstudio lua --tests [--defaultcomb]`
+  (`main.rs` `lua_tests`): a collecting pass (`{"tests": [...]}`), then the script
+  again per test on a fresh `Sim` (`{"test", "ok", "error", "prints", "tick"}`); no
+  tests or an error outside them → one `"test": null` result; still waiting when
+  the circuit idles or MAX_TICKS → a failure. `src/lua_tests.mjs` (vscode-free:
+  names by regex, `run_lua_tests`), `src/test_explorer.mjs` (TestController:
+  open projects → `*_test.lua` sources → tests; a run calls
+  `Document#freshCircuit`, synthesizing if needed).
 - Waveforms: `watch`/`unwatch` record every end-of-tick change of an output
   (`crates/hdlstudio/src/wave.rs`, up to 1M changes per signal); `wave {from, to,
   bins}` returns a window with one entry per pixel column (several changes in one

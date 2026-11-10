@@ -135,6 +135,14 @@ export class Document {
             this.#staleChanged.fire(stale);
         }, delay);
     }
+    // For the tests: synthesize first if there's no circuit or the sources
+    // changed; whether the circuit is now up to date.
+    async freshCircuit() {
+        const synthesized = () => Object.keys(this.#circuit.devices ?? {}).length > 0;
+        if (!synthesized() || await this.#sources.changedSinceSynthesis())
+            await this.doSynth({ quiet: true });
+        return synthesized() && !await this.#sources.changedSinceSynthesis();
+    }
     // A source saved: with hdl-studio.synthesizeOnSave, synthesize if it
     // changed (once for a Save All).
     #saved() {

@@ -596,6 +596,44 @@ endmodule
     }
 });
 
+describe('Lua test scripts (the Testing view)', function () {
+    this.timeout(60000);
+    it('reads the tests a script declares, and where an error points', async function () {
+        const { lua_test_names, error_line, isLuaTest } = await import('../src/lua_tests.mjs');
+        const text = 'local n = 1\ntest("a b", function () end)\n  test(\'it\\\'s\', f)\n-- test("commented")\nfoo.test("method")\n';
+        assert.deepStrictEqual(lua_test_names(text), [{ name: 'a b', line: 1 }, { name: "it's", line: 2 }]);
+        assert.strictEqual(error_line('counter_test.lua:12: count is 4', 'counter_test.lua'), 12);
+        assert.strictEqual(error_line('other.lua:3: no', 'counter_test.lua'), undefined);
+        assert.deepStrictEqual(['counter_test.lua', 'counter_sim.lua'].map(isLuaTest), [true, false]);
+    });
+    it('runs each test alone on a fresh simulation', async function () {
+        const zlib = await import('zlib');
+        const { run_lua_tests } = await import('../src/lua_tests.mjs');
+        const { circuit } = JSON.parse(zlib.gunzipSync(fs.readFileSync(path.join(__dirname, 'golden/04_counter.t.json.gz'))));
+        const run = async (script, label, opts = {}) => {
+            const results = [];
+            const names = await run_lua_tests({ circuit, script, label, ...opts }, (r) => results.push(r));
+            return { names, results: results.map((r) => [r.test, r.ok, r.error ?? null]) };
+        };
+        // the example: each test resets, so their order doesn't matter
+        const example = fs.readFileSync(path.join(verilogDir, '04_counter/counter_test.lua'), 'utf8');
+        const names = ['arranca en 0 despues del reset', 'cuenta cada flanco de subida', 'vuelve a 0 despues de 15'];
+        assert.deepStrictEqual(await run(example, 'counter_test.lua'), { names, results: names.map((n) => [n, true, null]) });
+        // a failure, names built at run time, one that waits for ever (up to the tick limit)
+        const bad = 'sim.setinput("rst", true)\n' +
+                    'test("fails", function () assert(false, "nope") end)\n' +
+                    'for i = 1, 2 do test("case " .. i, function () end) end\n' +
+                    'test("waits", function () sim.wait(sim.posedge("rst")) end)\n';
+        const r = await run(bad, 'bad_test.lua', { maxTicks: 10000 });
+        assert.deepStrictEqual(r.names, ['fails', 'case 1', 'case 2', 'waits']);
+        assert.deepStrictEqual(r.results.slice(0, 3), [['fails', false, 'bad_test.lua:2: nope'], ['case 1', true, null], ['case 2', true, null]]);
+        assert.match(r.results[3][2], /^still waiting .* at tick \d+: the tick limit \(10000\)/);
+        // no tests: the script is one; an error outside the tests fails it
+        assert.deepStrictEqual(await run('assert(sim.getoutput("count"))', 'plain_test.lua'), { names: [], results: [[null, true, null]] });
+        assert.deepStrictEqual((await run('test("x", function () end)\nerror("setup")', 'x_test.lua')).results, [[null, false, 'x_test.lua:2: setup']]);
+    });
+});
+
 describe('techmap on the multi-file designs', function () {
     this.timeout(180000);
     // the board once failed with "Invalid cell type: $fa": yosys left the

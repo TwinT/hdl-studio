@@ -10,7 +10,7 @@ const ro = (names) => Object.fromEntries(names.map((n) => [n, 'readonly']));
 const nodeGlobals = ro([
     'process', 'console', 'Buffer', 'URL', 'URLSearchParams',
     'setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'setImmediate',
-    'global', 'globalThis', '__dirname', '__filename'
+    'global', 'globalThis', '__dirname', '__filename', 'AbortController'
 ]);
 
 const browserGlobals = ro([

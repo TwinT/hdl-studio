@@ -18,6 +18,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   synthesized (edited, added or removed), with a button to synthesize again.
 - `hdl-studio.synthesizeOnSave`: saving a source that changed synthesizes again.
 - *HDL Studio: Synthesize* in the command palette.
+- Lua tests in VS Code's Testing view: a project's `*_test.lua` scripts and their
+  `test("name", function () ... end)` calls, each run alone on a fresh simulation
+  (synthesized first if the sources changed); a failed `assert` points at its line.
+  `test/verilog/04_counter/counter_test.lua` is an example. Run from the Lua
+  terminal or the scripts panel, the tests run in turn on the same simulation.
+  `hdlstudio lua --tests` runs them headless.
 - Source → schematic: the cells the line under the editor's cursor made light up
   (in a submodule, its instances; inside an open subcircuit window, the cells
   themselves). *Show in Circuit* (the editor's right-click menu) also centres them.

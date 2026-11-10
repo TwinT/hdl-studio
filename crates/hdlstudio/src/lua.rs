@@ -43,6 +43,20 @@ pub enum LuaEvent {
     },
 }
 
+/// What `test(name, fn)`, the global a test script calls, does: in the
+/// circuit view it runs each test in turn on the same simulation (printing
+/// the name of each that passed); headless (`hdlstudio lua --tests`) one
+/// pass collects the names, then each test runs alone on a fresh simulation.
+#[derive(Clone, Debug, Default)]
+pub enum Tests {
+    #[default]
+    All,
+    /// Runs none: records their names.
+    Collect(Rc<RefCell<Vec<String>>>),
+    /// Runs this one.
+    Only(String),
+}
+
 /// Monitor and alarm ids for scripts, apart from the client's.
 const FIRST_ID: u64 = 1 << 62;
 
@@ -86,6 +100,7 @@ pub struct LuaEngine {
     // than this without sim.sleep fails, raise BUDGET if one legitimately does.
     resumed: Rc<Cell<Instant>>,
     budget: Duration,
+    tests: Tests,
 }
 
 const BUDGET: Duration = Duration::from_secs(5);
@@ -295,7 +310,13 @@ impl LuaEngine {
             runners: HashMap::new(),
             resumed: Rc::new(Cell::new(Instant::now())),
             budget: BUDGET,
+            tests: Tests::All,
         }
+    }
+
+    /// How the scripts run from now on treat `test(name, fn)`.
+    pub fn set_tests(&mut self, tests: Tests) {
+        self.tests = tests;
     }
 
     pub fn take_events(&mut self) -> Vec<LuaEvent> {
@@ -567,6 +588,46 @@ impl LuaEngine {
         )
         .set_name("=sim")
         .exec()?;
+        // `test` in Lua, so that a test can sim.sleep: a yield can't cross a
+        // Rust function
+        let (mode, only) = match &self.tests {
+            Tests::All => ("all", None),
+            Tests::Collect(found) => {
+                let found = found.clone();
+                lua.globals().set(
+                    "_test_found",
+                    lua.create_function(move |_, name: String| {
+                        found.borrow_mut().push(name);
+                        Ok(())
+                    })?,
+                )?;
+                ("collect", None)
+            }
+            Tests::Only(name) => ("only", Some(name.clone())),
+        };
+        lua.globals().set("_test_mode", mode)?;
+        lua.globals().set("_test_only", only)?;
+        lua.load(
+            r#"
+            local mode, only, found = _test_mode, _test_only, _test_found
+            _test_mode, _test_only, _test_found = nil, nil, nil
+            function test(name, fn)
+                if type(name) ~= "string" or type(fn) ~= "function" then
+                    error("usage: test(name, function () ... end)", 2)
+                end
+                if mode == "collect" then
+                    found(name)
+                elseif mode == "only" then
+                    if name == only then fn() end
+                else
+                    fn()
+                    print("ok  " .. name)
+                end
+            end
+            "#,
+        )
+        .set_name("=test")
+        .exec()?;
         Ok(Runner { lua, state })
     }
 
@@ -766,5 +827,34 @@ mod tests {
             matches!(&events[..], [LuaEvent::Print { messages, .. }, ..] if messages == &["true", "number", "true"]),
             "{events:?}"
         );
+    }
+
+    #[test]
+    fn test_runs_every_test_collects_their_names_or_runs_one() {
+        let script = "print('setup')\ntest('a', function () print('in a') end)\ntest('b', function () error('no') end)";
+        let printed = |engine: &mut LuaEngine| -> Vec<String> {
+            engine
+                .take_events()
+                .into_iter()
+                .filter_map(|e| match e {
+                    LuaEvent::Print { messages, .. } => Some(messages.join("\t")),
+                    LuaEvent::Error { message, .. } => Some(format!("error {message}")),
+                    _ => None,
+                })
+                .collect()
+        };
+        let mut engine = LuaEngine::new(Rc::new(RefCell::new(None)));
+        engine.run("t", script, false, "t.lua");
+        assert_eq!(printed(&mut engine), ["setup", "in a", "ok  a", "error t.lua:3: no"]);
+        let found = Rc::new(RefCell::new(vec![]));
+        engine.set_tests(Tests::Collect(found.clone()));
+        engine.run("t", script, false, "t.lua");
+        assert_eq!(printed(&mut engine), ["setup"]);
+        assert_eq!(*found.borrow(), ["a", "b"]);
+        engine.set_tests(Tests::Only("b".into()));
+        engine.run("t", script, false, "t.lua");
+        assert_eq!(printed(&mut engine), ["setup", "error t.lua:3: no"]);
+        engine.run("t", "test('a')", false, "t.lua");
+        assert_eq!(printed(&mut engine), ["error t.lua:1: usage: test(name, function () ... end)"]);
     }
 }
