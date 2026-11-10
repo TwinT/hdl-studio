@@ -191,7 +191,8 @@ build: the engine is a native process.
 - CI (`.github/workflows/ci.yml`): `test` = `npm run compile` + `xvfb-run npm test`
   on Linux with yosys + yosys-slang from OSS CAD Suite (pinned date in `env`; there
   slang is a plugin, `plugin -i slang`); `package` = cargo test + `test:golden` +
-  `vsce package --target` per platform; on a `v*` tag, `release` = GitHub Release
+  `vsce package --target` per platform (linux: fails if the engine needs a glibc
+  newer than 2.34, the README's promise); on a `v*` tag, `release` = GitHub Release
   (CHANGELOG section as notes) + Marketplace (`vsce publish --oidc` if the repo
   variable `MARKETPLACE_OIDC` is `true`, else a `VSCE_PAT` secret) + Open VSX
   (`OVSX_PAT`). `make release` = check, test, tag, push.

@@ -88,6 +88,14 @@ jobs:
         run: npm run test:golden
       # vscode:prepublish builds the engine and the bundles
       - run: npx --yes @vscode/vsce@4 package --target ${{ matrix.target }} --out hdl-studio-${{ matrix.target }}.vsix
+      # the README promises glibc 2.34 (Ubuntu 22.04, Debian 12): a newer
+      # runner mustn't raise it unnoticed
+      - name: The engine needs glibc 2.34 at most
+        if: runner.os == 'Linux'
+        run: |
+          need=$(objdump -T target/release/hdlstudio | grep -o 'GLIBC_[0-9.]*' | sort -uV | tail -1)
+          echo "the engine needs $need"
+          test "$(printf '%s\n' "$need" GLIBC_2.34 | sort -V | tail -1)" = GLIBC_2.34
       - uses: actions/upload-artifact@v7
         with:
           name: vsix-${{ matrix.target }}
