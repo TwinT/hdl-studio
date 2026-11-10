@@ -49,7 +49,7 @@ interface Watch extends WatchSpec {
     data?: Win;
 }
 
-interface Group { group: string; color: string; collapsed: boolean; items: Watch[]; row: HTMLDivElement; name_: HTMLDivElement }
+interface Group { group: string; color: string; collapsed: boolean; items: Watch[]; row: HTMLDivElement; name_: HTMLDivElement; canvas: HTMLCanvasElement }
 type Item = Watch | Group;
 const isGroup = (i: Item): i is Group => 'items' in i;
 
@@ -341,9 +341,12 @@ export class Monitor {
     }
 
     #newGroup(name: string, color: string, collapsed = false): Group {
-        const name_ = div('name'), row = div('row group');
-        row.append(name_, div('value'), div(''));
-        const g: Group = { group: name, color, collapsed, items: [], row, name_ };
+        // the header's wave cell is a canvas too, so the cursor, the hover
+        // line and the pointer go across it
+        const name_ = div('name'), row = div('row group'), canvas = document.createElement('canvas');
+        row.append(name_, div('value'), canvas);
+        this.#size(canvas, ROW);
+        const g: Group = { group: name, color, collapsed, items: [], row, name_, canvas };
         row.addEventListener('contextmenu', (ev) => { ev.preventDefault(); this.#groupMenu(g, ev.clientX, ev.clientY); });
         this.#dragRow(g);
         return g;
@@ -560,12 +563,15 @@ export class Monitor {
     #span() {
         return this.#width() / this.#ppt;
     }
+    #size(c: HTMLCanvasElement, h: number) {
+        const dpr = window.devicePixelRatio || 1;
+        c.width = this.#width() * dpr;
+        c.height = h * dpr;
+    }
     #resize() {
-        const dpr = window.devicePixelRatio || 1, W = this.#width();
-        for (const c of [this.#ruler, ...[...this.#watches.values()].map((w) => w.canvas)]) {
-            c.width = W * dpr;
-            c.height = (c === this.#ruler ? 20 : ROW) * dpr;
-        }
+        this.#size(this.#ruler, 20);
+        for (const w of this.#watches.values()) this.#size(w.canvas, ROW);
+        for (const g of this.#items.filter(isGroup)) this.#size(g.canvas, ROW);
         if (this.#follow) this.#start = Math.max(0, this.#tick - this.#span());
         this.#ask();
     }
@@ -771,6 +777,11 @@ export class Monitor {
             w.value_.textContent = v && v !== '…' ? show(w.base, v) : v;
             w.value_.style.color = /^z+$/.test(v) ? this.#colors.highImpedance : /[xz]/.test(v) ? this.#colors.undefined : '';
         }
+        for (const g of this.#items.filter(isGroup)) {
+            const c = this.#clear(g.canvas);
+            this.#gridLines(c, ROW);
+            this.#lines(c, ROW);
+        }
     }
 
     // Labels for times `res` ticks apart.
@@ -824,19 +835,29 @@ export class Monitor {
         }
     }
 
-    #draw(w: Watch) {
-        const c = w.canvas.getContext('2d')!, dpr = window.devicePixelRatio || 1, W = this.#width(), H = ROW;
-        const col = this.#colors;
+    // A row's canvas, empty (the row's background shows through).
+    #clear(canvas: HTMLCanvasElement) {
+        const c = canvas.getContext('2d')!, dpr = window.devicePixelRatio || 1;
         c.setTransform(dpr, 0, 0, dpr, 0, 0);
-        c.clearRect(0, 0, W, H);
-        // grid on the ruler's lines
+        c.clearRect(0, 0, this.#width(), ROW);
+        return c;
+    }
+
+    // The grid, on the ruler's lines.
+    #gridLines(c: CanvasRenderingContext2D, H: number) {
         const st = step(this.#ppt, 90);
-        c.strokeStyle = col.grid;
+        c.strokeStyle = this.#colors.grid;
         c.lineWidth = 1;
         for (let k = Math.ceil(this.#start / st) * st; k <= this.#start + this.#span(); k += st) {
             const x = Math.round((k - this.#start) * this.#ppt) + 0.5;
             c.beginPath(); c.moveTo(x, 0); c.lineTo(x, H); c.stroke();
         }
+    }
+
+    #draw(w: Watch) {
+        const c = this.#clear(w.canvas), W = this.#width(), H = ROW;
+        const col = this.#colors;
+        this.#gridLines(c, H);
         const d = w.data;
         const signal = w.group?.color ?? col.signal;
         if (d) {

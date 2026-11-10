@@ -420,6 +420,19 @@ describe('schematic webview on the engine', function () {
         await drag(await box(first[3]), header, header.height * 0.75);
         // (at its start, under the header)
         assert.deepStrictEqual(shape((await saved()).waves).filter((w) => typeof w !== 'string'), [{ Regs: [first[3], first[0]], collapsed: false }]);
+        // the header's wave cell takes the time cursor like a signal's
+        await post({ command: 'startsim' });
+        await page.waitForTimeout(300);
+        const strip = await page.evaluate(() => {
+            const c = document.querySelector('#monitor .row.group canvas');
+            return c && { ...c.getBoundingClientRect().toJSON(), sized: c.height === 24 * devicePixelRatio };
+        });
+        assert.ok(strip?.sized, JSON.stringify(strip));
+        await page.mouse.click(strip.x + strip.width / 3, strip.y + strip.height / 2);
+        await until(() => !!document.getElementById('pastbanner'));
+        assert.strictEqual(await page.evaluate(() => document.querySelector('#monitor [name=follow]').classList.contains('on')), false);
+        await page.evaluate(() => document.querySelector('#monitor [name=follow]').click());
+        await post({ command: 'pausesim' });
         // collapsed: its rows hide
         await page.locator('#monitor .row.group .caret').click();
         assert.ok(!(await names()).includes(first[3]));

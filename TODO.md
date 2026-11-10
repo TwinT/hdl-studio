@@ -146,21 +146,6 @@ Done items leave this list; git history keeps them.
 - [ ] If the engine process dies, the host starts a new one on the next
       request, but the view doesn't load the circuit into it again ("no
       circuit loaded" until the circuit is shown again).
-- [ ] Waveforms: the time cursor (and the hover line) stops at each group's
-      header row, and that strip of the waves column ignores the pointer: a
-      click/drag there doesn't set the cursor, hover shows nothing, the wheel
-      doesn't scroll or zoom. With several groups the column is cut into bands.
-      - Cause (`view/schematic/waves.ts`): `#newGroup` gives the header an empty
-        `div('')` as its wave cell, not a canvas. The lines are drawn per canvas
-        (`#drawAll` → `#draw(w)` → `#lines`, for watches only), and
-        `#waveEvents` reacts only when `e.target` is a canvas (`over`).
-      - Fix: give `Group` a `canvas` like `Watch`'s; `#newGroup` appends it,
-        `#resize` sizes it (`ROW` high, like the rows), `#drawAll` draws it
-        (the group's tinted background, the grid, `#lines`). `#waveEvents`
-        then covers it as is. Keep `#dragRow`/the header's menu on the name.
-      - Test: in `test/schematic.spec.mjs`'s "arranges the waveforms" (groups
-        exist there), click a header's wave cell and check that the cursor moved
-        (the `inspect` request, or the ruler's time label).
 - [ ] A subcircuit's window covers the waveforms, and it has to be moved and
       resized again every time it opens.
       - Cause: the waveform monitor is docked at the bottom of the circuit view

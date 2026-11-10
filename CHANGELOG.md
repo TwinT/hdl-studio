@@ -12,6 +12,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and VS Code, and `io.read` read from it; `os.exit` ended the engine. Scripts now
   have `io.write`, which prints like `print`, and the clock and calendar of `os`.
 - Synthesis no longer fails when yosys writes more than 1 MiB of log (a big design).
+- The waveform time cursor and the hover line stopped at each group's header,
+  and a click, drag or wheel there did nothing.
 
 ## [1.3.0] - 2026-11-05
 
