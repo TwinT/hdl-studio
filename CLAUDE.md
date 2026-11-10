@@ -213,8 +213,9 @@ latches the last bus value (`test/verilog/12_inout_bus/`,
 Bare `techmap` also lowers flip-flops/latches/memories to gate-level primitives
 (`$_DFF_P_`...) the converter can't convert → `Invalid cell type`.
 `build_yosys_script` excludes them (`select -del t:$dff ... t:$mem_v2`) before
-`techmap`, so only combinational logic is decomposed. (`$fa`/`$alu` still break it
-on `soc`, see TODO.)
+`techmap`, so only combinational logic is decomposed. `$fa`/`$alu` left unmapped
+once broke it on `soc` ("Invalid cell type: $fa"); with yosys 0.68 they map, and
+`test/pipeline.spec.mjs` ("techmap on the multi-file designs") checks it.
 
 ### Wide indices and shift amounts
 yosys keeps an index expression's width: `mem[a]` with a 32-bit `a` gives a 32-bit

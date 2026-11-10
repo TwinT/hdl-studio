@@ -141,8 +141,7 @@ Done items leave this list; git history keeps them.
       change of the circuit JSON can be migrated on load.
 
 ## Known Bugs 🐛
-- [ ] The techmap option fails on `soc`'s `board`: yosys leaves `$fa`/`$alu`
-      cells the converter has no cell for ("Invalid cell type: $fa").
+None known.
 
 ## Release
 - [ ] GitHub Releases: none exist (`gh release list` is empty); the tags

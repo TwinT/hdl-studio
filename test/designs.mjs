@@ -47,7 +47,8 @@ designs.push(
     { name: 'wide_idx', dir: path.join(root, 'test/golden/wide_idx'), top: 'wide_idx', ticks: 20000 },
 );
 
-export function synthesize(d) {
+// `opts`: more synthesis options (techmap, optimize...), as in the project's.
+export function synthesize(d, opts = {}) {
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'hdl-simdiff-'));
     try {
         const files = {};
@@ -56,7 +57,7 @@ export function synthesize(d) {
             fs.copyFileSync(path.join(d.dir, f), path.join(tmp, path.basename(f)));
             if (isHdlFile(f)) files[path.basename(f)] = '';
         }
-        const script = build_yosys_script(files, { useSlang: true, top: d.top }) + '\njson -o out.json';
+        const script = build_yosys_script(files, { useSlang: true, top: d.top, ...opts }) + '\njson -o out.json';
         fs.writeFileSync(path.join(tmp, 'synth.ys'), script);
         execFileSync('yosys', ['-q', '-s', 'synth.ys'], { cwd: tmp, stdio: 'pipe' });
         return fs.readFileSync(path.join(tmp, 'out.json'));

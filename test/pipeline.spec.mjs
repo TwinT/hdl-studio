@@ -483,6 +483,26 @@ describe('time units', function () {
 
 // A project synthesizes what it lists, not its folder: a module used but not
 // listed fails only in the extension ("unknown module").
+describe('techmap on the multi-file designs', function () {
+    this.timeout(180000);
+    // the board once failed with "Invalid cell type: $fa": yosys left the
+    // adders' $alu/$fa/$lcu cells unmapped (not seen since yosys 0.68)
+    const cases = [['micro'], ['alu'], ['soc board'], ['soc board', { top: undefined }]];
+    for (const [name, override] of cases) {
+        it(`${name}${override ? ' (top found by yosys)' : ''}: maps the adders to gates and converts`, async function () {
+            const { slangAvailable, designs, synthesize, convert } = await import('./designs.mjs');
+            if (!slangAvailable()) this.skip();
+            const d = { ...designs.find((d) => d.name === name), ...override };
+            for (const optimize of [false, true]) {
+                const json = synthesize(d, { techmap: true, optimize });
+                const types = Object.values(JSON.parse(json).modules).flatMap((m) => Object.values(m.cells).map((c) => c.type));
+                assert.deepStrictEqual(types.filter((t) => ['$alu', '$fa', '$lcu', '$add', '$sub'].includes(t)), [], `optimize: ${optimize}`);
+                assert.ok(Object.keys(JSON.parse(convert(json)).devices).length > 0);
+            }
+        });
+    }
+});
+
 describe('Example projects (.hdls)', function () {
     this.timeout(120000);
     const walk = (d) => fs.readdirSync(d, { withFileTypes: true })
