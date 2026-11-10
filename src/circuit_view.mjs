@@ -90,7 +90,13 @@ export class CircuitView {
             this.post({ command: 'engine', ev: { ev: 'error', session: this.#engineSession, message } });
         };
         readline.createInterface({ input: proc.stdout }).on('line', (line) => {
-            const ev = JSON.parse(line);
+            let ev;
+            try {
+                ev = JSON.parse(line);
+            } catch {
+                console.error(`hdlstudio: not an event: ${line}`);
+                return;
+            }
             if (ev.ev === 'error')
                 vscode.window.showErrorMessage(`Simulation: ${ev.message}`);
             this.post({ command: 'engine', ev });

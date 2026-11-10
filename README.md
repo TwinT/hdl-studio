@@ -291,7 +291,9 @@ first: `sim.getvalue("core_i", "pc")`.
 
 Values given to `sim` can be vecs, booleans, integers or strings like `"8hff"`.
 `print` shows its arguments; in the Lua terminal it doesn't end the line, so add
-`"\n"` yourself.
+`"\n"` yourself. `io.write` prints too. Scripts run inside the simulation engine, so
+the rest of `io` isn't there, and `os` has only `os.time`, `os.clock`, `os.date` and
+`os.difftime`.
 
 ### `vec`: 4-valued vectors
 

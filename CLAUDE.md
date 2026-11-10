@@ -45,7 +45,8 @@ simulator), `hdlstudio` (the binary).
   the script after the step where it fires. `hdlstudio lua [--json] circuit.json
   script.lua [MAX_TICKS]` runs one headless. Differences: `tointeger` takes up to
   63 bits, a narrow string is zero-extended, the REPL prints expression values,
-  `sim.registerdisplay` isn't there.
+  `sim.registerdisplay` isn't there, `io` is only `write` (a print) and `os` only
+  `time/clock/date/difftime` (`new_runner`: stdin/stdout carry the protocol).
 - Waveforms: `watch`/`unwatch` record every end-of-tick change of an output
   (`crates/hdlstudio/src/wave.rs`, up to 1M changes per signal); `wave {from, to,
   bins}` returns a window with one entry per pixel column (several changes in one

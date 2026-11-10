@@ -5,14 +5,16 @@
 //! where it fires, with the circuit stopped at that tick.
 //! Since 1.0 (CHANGELOG): `tointeger` takes up to 63 bits, a string
 //! narrower than the input it is assigned to is zero-extended, the REPL
-//! prints the values of an expression, `sim.registerdisplay` isn't there.
+//! prints the values of an expression, `sim.registerdisplay` isn't there,
+//! `io` has only `write` and `os` only its clock and calendar (stdin and
+//! stdout carry the protocol).
 // Portions Copyright (c) 2018 Marek Materzok, BSD-2-Clause (see NOTICE).
 
 use hdlstudio_logic::{Bit, LogicVec};
 use hdlstudio_sim::{Event, Sim};
 use mlua::{
-    AnyUserData, Function, HookTriggers, Lua, MetaMethod, MultiValue, ThreadStatus, UserData, UserDataMethods, Value,
-    Variadic, VmState,
+    AnyUserData, Function, HookTriggers, Lua, MetaMethod, MultiValue, Table, ThreadStatus, UserData, UserDataMethods,
+    Value, Variadic, VmState,
 };
 use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
@@ -117,6 +119,12 @@ fn lerr_at(lua: &Lua, level: usize, msg: &str) -> mlua::Error {
         d.current_line().map(|l| format!("{src}:{l}: "))
     });
     err(format!("{}{msg}", at.flatten().unwrap_or_default()))
+}
+
+/// `tostring` of each value, as `print` shows them.
+fn tostrings<'a>(lua: &Lua, values: impl IntoIterator<Item = &'a Value>) -> mlua::Result<Vec<String>> {
+    let tostring: Function = lua.globals().get("tostring")?;
+    values.into_iter().map(|v| tostring.call::<String>(v.clone())).collect()
 }
 
 /// A four-valued vector in Lua.
@@ -321,13 +329,37 @@ impl LuaEngine {
         lua.globals().set(
             "print",
             lua.create_function(move |lua, args: Variadic<Value>| {
-                let tostring: Function = lua.globals().get("tostring")?;
-                let messages = args.iter().map(|v| tostring.call::<String>(v.clone())).collect::<mlua::Result<_>>()?;
+                let messages = tostrings(lua, args.iter())?;
                 let name = st.borrow().name.clone();
                 g.borrow_mut().events.push(LuaEvent::Print { name, messages });
                 Ok(())
             })?,
         )?;
+        // The engine talks to its client over stdin/stdout, which the
+        // standard `io` would write into and read from, and `os.exit` would
+        // end it: a script gets `io.write` (printed like `print`) and the
+        // clock and calendar of `os`, also through `require`.
+        let (g, st) = (self.globals.clone(), state.clone());
+        let io = lua.create_table()?;
+        io.set(
+            "write",
+            lua.create_function(move |lua, args: Variadic<Value>| {
+                let messages = vec![tostrings(lua, args.iter())?.concat()];
+                let name = st.borrow().name.clone();
+                g.borrow_mut().events.push(LuaEvent::Print { name, messages });
+                Ok(())
+            })?,
+        )?;
+        let std_os: Table = lua.globals().get("os")?;
+        let os = lua.create_table()?;
+        for f in ["clock", "date", "difftime", "time"] {
+            os.set(f, std_os.get::<Value>(f)?)?;
+        }
+        let loaded: Table = lua.globals().get::<Table>("package")?.get("loaded")?;
+        for (name, lib) in [("io", io), ("os", os)] {
+            loaded.set(name, &lib)?;
+            lua.globals().set(name, lib)?;
+        }
         let sim = lua.create_table()?;
         let g = self.globals.clone();
         // runs `f` on the circuit
@@ -644,11 +676,7 @@ impl LuaEngine {
             Ok(values) => {
                 let print = runner.state.borrow().print_result && !values.is_empty();
                 if print {
-                    let tostring: mlua::Result<Function> = runner.lua.globals().get("tostring");
-                    let messages = tostring.and_then(|f| {
-                        values.iter().map(|v| f.call::<String>(v.clone())).collect::<mlua::Result<Vec<_>>>()
-                    });
-                    match messages {
+                    match tostrings(&runner.lua, &values) {
                         Ok(messages) => self.event(LuaEvent::Print { name: name.clone(), messages }),
                         Err(e) => self.event(LuaEvent::Error { name: name.clone(), message: message(&e) }),
                     }
@@ -705,5 +733,38 @@ mod tests {
             "{events:?}"
         );
         assert!(!engine.active());
+    }
+
+    #[test]
+    fn io_and_os_leave_stdin_stdout_and_the_engine_alone() {
+        let mut engine = LuaEngine::new(Rc::new(RefCell::new(None)));
+        engine.run("w", "io.write('a', 1, '\\n'); require('io').write('b')", false, "w.lua");
+        let events = engine.take_events();
+        let printed: Vec<_> = events
+            .iter()
+            .filter_map(|e| match e {
+                LuaEvent::Print { messages, .. } => Some(messages.clone()),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(printed, [vec!["a1\n".to_string()], vec!["b".to_string()]], "{events:?}");
+        for (script, missing) in [
+            ("os.exit()", "field 'exit'"),
+            ("io.read()", "field 'read'"),
+            ("require('os').execute('true')", "field 'execute'"),
+        ] {
+            engine.run("x", script, false, "x.lua");
+            let events = engine.take_events();
+            assert!(
+                matches!(&events[..], [.., LuaEvent::Error { message, .. }] if message.contains(missing)),
+                "{script}: {events:?}"
+            );
+        }
+        engine.run("t", "print(os.time() > 0, type(os.clock()), os.date('%Y') ~= nil)", false, "t.lua");
+        let events = engine.take_events();
+        assert!(
+            matches!(&events[..], [LuaEvent::Print { messages, .. }, ..] if messages == &["true", "number", "true"]),
+            "{events:?}"
+        );
     }
 }
