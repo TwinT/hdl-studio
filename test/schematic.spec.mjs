@@ -310,6 +310,40 @@ describe('schematic webview on the engine', function () {
         await until(() => !document.querySelector('svg.schematic .cell.lit'));
     });
 
+    it("lights a flip-flop by its always line and ports by their declaration, and answers how many", async function () {
+        await post({ command: 'showcircuit', circuit: { devices: {}, connectors: [] }, opts: {} });
+        await show('04_counter');
+        const circuit = (await lastPosted('autolayout')).circuit;
+        const ids = (type) => Object.keys(circuit.devices).filter((id) => circuit.devices[id].type === type);
+        const ask = async (line, text, reveal = false) => {
+            const id = Math.floor(Math.random() * 1e9);
+            await post({ command: 'srcline', id, file: '04_counter.sv', line, text, reveal });
+            const answer = await until((id) => window.__posted.find((m) => m.command === 'shownline' && m.id === id), id);
+            return { lit: (await answer.jsonValue()).lit, cells: await page.evaluate(() => [...document.querySelectorAll('svg.schematic .cell.lit')].map((g) => g.dataset.id).sort()) };
+        };
+        // the always_ff: its flip-flop (a place, not a range, in yosys's src)
+        const lines = fs.readFileSync(path.join(root, 'test/verilog/04_counter/04_counter.sv'), 'utf8').split('\n');
+        const at = (re) => lines.findIndex((l) => re.test(l)) + 1;
+        assert.deepStrictEqual(await ask(at(/^\s+always_ff/), lines[at(/^\s+always_ff/) - 1]), { lit: 1, cells: ids('Dff') });
+        // a port's declaration: its widget
+        const clk = at(/^\s+input\s+logic clk/);
+        assert.deepStrictEqual(await ask(clk, lines[clk - 1]), { lit: 1, cells: ids('Clock') });
+        const count = at(/^\s+output\s+logic/);
+        assert.deepStrictEqual(await ask(count, lines[count - 1]), { lit: 1, cells: ids('NumDisplay') });
+        // nothing: an empty line
+        assert.deepStrictEqual(await ask(at(/^endmodule/) - 1, ''), { lit: 0, cells: [] });
+        // revealed while the view has no size (behind another tab): centred once it shows
+        const zoom = () => page.evaluate(() => document.querySelector('svg.schematic > g').getAttribute('transform'));
+        await page.evaluate(() => { document.getElementById('paper').style.display = 'none'; });
+        const before = await zoom();
+        await ask(at(/^\s+always_ff/), '', true);
+        assert.strictEqual(await zoom(), before);
+        await page.evaluate(() => { document.getElementById('paper').style.display = ''; });
+        await until((b) => document.querySelector('svg.schematic > g').getAttribute('transform') !== b, before);
+        const t = await zoom();
+        assert.ok(!/NaN|-?Infinity/.test(t) && !/scale\(0\.1\)/.test(t), t);
+    });
+
     it('says when the sources changed since the synthesis, with a button for another', async function () {
         await show('04_counter');
         const circuit = (await lastPosted('autolayout')).circuit;

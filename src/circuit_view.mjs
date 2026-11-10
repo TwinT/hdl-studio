@@ -27,6 +27,9 @@ export class CircuitView {
     #engine
     #engineSession
     #disposed = false
+    // `srcline` requests waiting for the view's `shownline`, by id
+    #lineReplies = new Map()
+    #lineId = 0
     constructor(studio, panel, document) {
         this.#studio = studio;
         this.#panel = panel;
@@ -134,18 +137,32 @@ export class CircuitView {
                 this.post({ command: 'engine', ev: { ev: 'exit', session: this.#engineSession } });
         });
     }
-    // Lights the cells the line under `editor`'s cursor made (`reveal`: and
-    // centres them). Nothing for a file that isn't a source of this circuit;
-    // none lit for one edited since the synthesis (its lines moved). False if
-    // nothing could be lit.
+    // Lights the cells the line under `editor`'s cursor made (`reveal`:
+    // brings the view to the front and centres them). Resolves to undefined
+    // for a file that isn't a source of this circuit, `{stale: true}` for one
+    // edited since the synthesis (its lines moved: none lit), else `{lit}`,
+    // how many the view lit (undefined if it didn't answer).
     showSourceLine(editor, reveal = false) {
         const info = this.#document.sources.findByURI(editor.document.uri);
         if (!info?.name)
-            return false;
-        const synced = info.findEditor()?.document === editor.document;
-        this.post({ command: 'srcline', reveal,
-                    ...(synced ? { file: info.name, line: editor.selection.active.line + 1 } : {}) });
-        return synced;
+            return Promise.resolve(undefined);
+        if (info.findEditor()?.document !== editor.document) {
+            this.post({ command: 'srcline' });
+            return Promise.resolve({ stale: true });
+        }
+        if (reveal)
+            this.#panel.reveal(this.#panel.viewColumn, true);
+        const line = editor.selection.active.line;
+        const id = ++this.#lineId;
+        this.post({ command: 'srcline', id, reveal, file: info.name, line: line + 1,
+                    text: editor.document.lineAt(line).text });
+        return new Promise((resolve) => {
+            this.#lineReplies.set(id, resolve);
+            setTimeout(() => {
+                if (this.#lineReplies.delete(id))
+                    resolve({ lit: undefined });
+            }, 5000);
+        });
     }
     #processCommand(studio, msg) {
         switch (msg.command) {
@@ -154,6 +171,10 @@ export class CircuitView {
                 return;
             case 'subcircuits':
                 this.#subcircuits = msg.subcircuits;
+                return;
+            case 'shownline':
+                this.#lineReplies.get(msg.id)?.({ lit: msg.lit });
+                this.#lineReplies.delete(msg.id);
                 return;
             case 'settheme':
                 return config().update('theme', msg.theme, vscode.ConfigurationTarget.Global);

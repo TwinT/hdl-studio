@@ -119,4 +119,42 @@ suite('Synthesis in VS Code', function () {
             'vuelve a 0 despues de 15': 'passed',
         });
     });
+
+    test('Show in Circuit: behind the editor, after an edit and a new synthesis, on a port', async function () {
+        const sv = vscode.Uri.file(path.join(dir, '04_counter.sv'));
+        if (!fs.existsSync(sv.fsPath))
+            fs.copyFileSync(path.join(__dirname, '..', 'verilog', '04_counter', '04_counter.sv'), sv.fsPath);
+        const project = vscode.Uri.file(path.join(dir, 'show.hdls'));
+        fs.writeFileSync(project.fsPath, JSON.stringify({ sources: [{ relpath: '04_counter.sv' }] }));
+        await vscode.commands.executeCommand('workbench.action.closeAllEditors');
+        await vscode.commands.executeCommand('vscode.openWith', project, 'hdl-studio.circuitView', vscode.ViewColumn.One);
+        const ext = vscode.extensions.getExtension('TwinT.hdl-studio');
+        const doc = await until(() => ext.exports?.document?.uri.toString() === project.toString() && ext.exports.document, 'the project');
+        await vscode.commands.executeCommand('hdl-studio.synthesize');
+        await until(() => Object.keys(doc.circuit.devices).length > 0, 'the circuit');
+        // the source in the same group: the circuit view is behind it
+        const editor = await vscode.window.showTextDocument(sv, { viewColumn: vscode.ViewColumn.One });
+        const lines = editor.document.getText().split('\n');
+        const at = (re) => lines.findIndex((l) => re.test(l));
+        const show = async (line) => {
+            await vscode.window.showTextDocument(editor.document, { viewColumn: vscode.ViewColumn.One });
+            vscode.window.activeTextEditor.selection = new vscode.Selection(line, 0, line, 0);
+            return vscode.commands.executeCommand('hdl-studio.showInCircuit');
+        };
+        assert.deepStrictEqual(await show(at(/^\s+always_ff/)), { lit: 1 });
+        // the circuit came to the front of its group
+        assert.strictEqual(vscode.window.tabGroups.all[0].activeTab.label, 'show.hdls');
+        assert.deepStrictEqual(await show(at(/^\s+input\s+logic clk/)), { lit: 1 });
+        assert.deepStrictEqual(await show(at(/^endmodule/) - 1), { lit: 0 });
+        // edited: its lines may have moved
+        const edit = new vscode.WorkspaceEdit();
+        edit.insert(sv, new vscode.Position(0, 0), '// moved\n');
+        assert.ok(await vscode.workspace.applyEdit(edit));
+        assert.deepStrictEqual(await show(at(/^\s+always_ff/) + 1), { stale: true });
+        // synthesized again from the edited text: found again (it used to stay "changed")
+        await vscode.commands.executeCommand('hdl-studio.synthesize');
+        await until(async () => !(await doc.sources.changedSinceSynthesis()), 'the new synthesis');
+        assert.deepStrictEqual(await show(at(/^\s+always_ff/) + 1), { lit: 1 });
+        await vscode.commands.executeCommand('undo');
+    });
 });

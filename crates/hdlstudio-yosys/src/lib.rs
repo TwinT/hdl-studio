@@ -184,16 +184,18 @@ fn parse_source_positions(s: &str) -> Vec<SourcePos> {
     let mut ret = Vec::new();
     for entry in s.split('|') {
         let (name, pos) = entry.rsplit_once(':').unwrap_or(("", entry));
-        let parts: Vec<&str> = pos.split('-').collect();
-        if parts.len() != 2 {
-            continue;
-        }
         // ponytail: JS gives NaN (null) for a malformed number; yosys never writes one
         let lc = |p: &str| {
             let mut it = p.split('.').map(|v| v.parse().unwrap_or(0));
             LineCol { line: it.next().unwrap_or(0), column: it.next() }
         };
-        ret.push(SourcePos { name: name.into(), from: lc(parts[0]), to: lc(parts[1]) });
+        let (from, to) = match pos.split('-').collect::<Vec<_>>()[..] {
+            [from, to] => (lc(from), lc(to)),
+            // a place, not a range (a flip-flop: its `always`): to the end of its line
+            [at] if at.contains('.') => (lc(at), LineCol { line: lc(at).line, column: None }),
+            _ => continue,
+        };
+        ret.push(SourcePos { name: name.into(), from, to });
     }
     ret
 }

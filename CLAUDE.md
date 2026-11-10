@@ -234,11 +234,17 @@ then loads with `plugin -i slang`; OSS CAD Suite ships it as a plugin); without 
 
 Source → schematic: `CircuitView#showSourceLine` (on every cursor move, 100 ms
 later, in an editor of one of its sources whose text still matches the synthesis,
-`SourceInfo#findEditor`) posts `srcline {file, line, reveal}`; `main.ts`
-`#showLine` lights (`Schematic#light`, class `lit`, kept across renders) the
-devices whose `source_positions` cover the line, and the Subcircuit cells whose
-type does, in every open graph; `reveal` (*Show in Circuit*,
-`hdl-studio.showInCircuit`) → `focusLit` centres the top level's.
+`SourceInfo#findEditor`, cached per sha512 and document version: a new synthesis
+of the same text matches again) posts `srcline {id, file, line, text, reveal}` and
+resolves with the view's `shownline {id, lit}`; `main.ts` `#showLine` lights
+(`Schematic#light`, class `lit`, kept across renders) the devices whose
+`source_positions` cover the line, the Subcircuit cells whose type does, and the
+I/O cells named in a line declaring ports (read_slang gives wires no `src`), in
+every open graph. `reveal` (*Show in Circuit*, `hdl-studio.showInCircuit`, which
+returns the result and says when nothing was lit) brings the panel to the front
+first; `#revealLit` centres once the svg has a size (a hidden panel has none). A
+yosys `src` that is a point (`file:19.3`, a flip-flop's `always`) converts to a
+position whose `to` has no column (`#marker`: to the end of the line).
 
 A stale circuit (`Document#checkStale`, 300 ms after an edit of a source, at once
 on a save, a source list change, a new circuit, the view coming to the front):

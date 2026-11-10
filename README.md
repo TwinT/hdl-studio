@@ -181,9 +181,12 @@ With a source open beside the schematic:
 
 - **Circuit → code:** hovering a cell or a wire highlights the code that produced it.
 - **Code → circuit:** the cells made by the line under the editor's cursor glow in the
-  schematic. A line inside a submodule lights its instances, and inside an open
-  subcircuit window the cells themselves. **Show in Circuit** (right-click in the editor,
-  or the command palette) also centres them.
+  schematic: the logic of an expression, a flip-flop or a memory on its `always` line,
+  the widgets of the ports a line declares. A line inside a submodule lights its
+  instances, and inside an open subcircuit window the cells themselves. **Show in
+  Circuit** (right-click in the editor, or the command palette) brings the circuit to
+  the front and centres them, or says that nothing came from that line (a comment,
+  an internal signal's declaration, or logic Yosys removed).
 
 Both work while the file is as it was synthesized: after an edit, synthesize again.
 

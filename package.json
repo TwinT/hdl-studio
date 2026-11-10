@@ -293,7 +293,7 @@
             "editor/context": [
                 {
                     "command": "hdl-studio.showInCircuit",
-                    "when": "hdl-studio.view_isactive && resourceExtname =~ /^\\.s?v$/",
+                    "when": "hdl-studio.view_isactive && resourceExtname =~ /^\\.s?vh?$/",
                     "group": "navigation@9"
                 }
             ],

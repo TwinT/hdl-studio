@@ -61,6 +61,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   8-input multiplexers now have 3 inputs each.
 
 ### Fixed
+- Source highlighting and *Show in Circuit* stopped working for a file after it
+  was edited and synthesized again ("the file changed since…" although it hadn't):
+  the check of the file against the synthesis kept its old answer.
+- A flip-flop, a latch or a memory had no place in the source (Yosys gives them a
+  point, not a range): hovering one highlighted no code, and its `always` line lit
+  nothing. Now it's their `always` line.
+- *Show in Circuit* with the circuit view behind the editor's tab centred on the
+  wrong place; it now brings it to the front first and centres once it shows. It
+  says when a line made nothing, and lights the widgets of the ports a line
+  declares (`input logic clk`).
 - *FSM as circuit element* (and *FSM transform*) found no state machine with an
   asynchronous reset (`always_ff @(posedge clk or posedge rst)`), like the `alu`
   example's: yosys-slang writes that reset as an asynchronous load, which Yosys's

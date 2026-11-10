@@ -12,6 +12,7 @@ class SourceInfo {
     // Keeps information about a source file both for input to synthesis
     // and for storing debug info from synthesis result.
     match = undefined
+    #matched // the synthesis (sha512) and text (version) `match` was checked for
     constructor(uri, name, sha512, deleted) {
         this.uri = uri;
         this.name = name; // display name
@@ -31,11 +32,13 @@ class SourceInfo {
         if (!editor)
             return;
         const doc = editor.document;
-        // Check the content against the hash and cache the result.
-        // The `onDidChangeTextDocument` event handler will clear this
-        // when the document changes.
-        if (this.match === undefined)
+        // Check the content against the hash, once per text and synthesis (a
+        // new synthesis of the same text matches again)
+        const key = `${this.sha512}@${doc.version}`;
+        if (this.match === undefined || this.#matched !== key) {
             this.match = this.sha512 == hash_sha512(doc.getText());
+            this.#matched = key;
+        }
         return this.match ? editor : undefined;
     }
     #toBaseJSON() {

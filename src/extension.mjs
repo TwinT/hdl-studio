@@ -353,18 +353,28 @@ class HdlStudio {
         }
     }
     // The cells the line under the cursor made, centred in the circuit
-    // (the active one if the file is one of its sources).
-    #showInCircuit() {
+    // (the active one if the file is one of its sources). Returns what
+    // CircuitView#showSourceLine found (the tests read it).
+    async #showInCircuit() {
         const editor = vscode.window.activeTextEditor;
         if (!editor)
             return;
+        const file = path.basename(editor.document.uri.path);
         const views = [this.#circuitView, ...this.#openCircuitViews].filter(Boolean);
         const view = views.find((v) => v.document.sources.findByURI(editor.document.uri)?.name);
-        if (!view)
-            return vscode.window.showInformationMessage(`${path.basename(editor.document.uri.path)} isn't a source of an open circuit.`);
-        if (!view.showSourceLine(editor, true))
-            return vscode.window.showInformationMessage('The file changed since the circuit was synthesized: synthesize it to find its cells.');
-        view.panel.reveal(view.panel.viewColumn, true);
+        if (!view) {
+            // a source of a circuit not synthesized yet, or of none open
+            const unsynthesized = views.some((v) => v.document.sources.findByURI(editor.document.uri));
+            vscode.window.showInformationMessage(unsynthesized ? `Synthesize the circuit first: ${file} has no cells yet.`
+                                                               : `${file} isn't a source of an open circuit.`);
+            return;
+        }
+        const shown = await view.showSourceLine(editor, true);
+        if (shown?.stale)
+            vscode.window.showInformationMessage(`${file} changed since the circuit was synthesized: synthesize it to find its cells.`);
+        else if (shown?.lit === 0)
+            vscode.window.showInformationMessage(`Nothing in the circuit comes from line ${editor.selection.active.line + 1} of ${file} (a comment, a declaration of an internal signal, or logic Yosys removed).`);
+        return shown;
     }
     set image_exts(exts) {
         this.#image_exts_set = true;

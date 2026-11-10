@@ -84,7 +84,7 @@ class App {
     #theme: { name?: string, waveColors?: any } = {};
     #labels = true; // the names of internal cells and of wires (setting hdl-studio.labels)
     #stale = false; // the sources changed since this circuit was synthesized
-    #srcLine?: { file: string, line: number }; // the line under the editor's cursor
+    #srcLine?: { file: string, line: number, text?: string }; // the line under the editor's cursor
     #names?: Map<string, { path: string, port: string }>; // watchable outputs by name
     // while the waveform cursor shows the circuit at an earlier tick: whether
     // to run again once it goes
@@ -165,7 +165,11 @@ class App {
             case 'stale':
                 this.#stale = !!m.value;
                 return this.#staleBanner();
-            case 'srcline': return this.#showLine(m.file ? { file: m.file, line: m.line } : undefined, !!m.reveal);
+            case 'srcline': {
+                const lit = this.#showLine(m.file ? { file: m.file, line: m.line, text: m.text } : undefined, !!m.reveal);
+                if (m.id) vscode.postMessage({ command: 'shownline', id: m.id, lit });
+                return;
+            }
             case 'setspeed':
                 this.#speed = m.speed;
                 if (this.#running) {
@@ -351,11 +355,18 @@ class App {
         if (next !== undefined) this.#inspect(next);
     }
     // The cells a source line made, in every open graph; inside a submodule,
-    // its instances. `reveal`: centre them in the top level.
-    #showLine(at: { file: string, line: number } | undefined, reveal = false) {
+    // its instances. A port's widget has no place in the source (read_slang
+    // gives wires none): a line declaring ports (`input logic clk,`, a
+    // one-line module header) lights those of a graph made from that file.
+    // `reveal`: centre them in the top level. Returns how many it lit.
+    #showLine(at: { file: string, line: number, text?: string } | undefined, reveal = false) {
         this.#srcLine = at;
-        if (!this.circuit) return;
+        if (!this.circuit) return 0;
         const subs = this.circuit.subcircuits ?? {};
+        const ports = at?.text && /\b(input|output|inout)\b/.test(at.text.replace(/\/\/.*/, ''))
+            ? new Set(at.text.replace(/\/\/.*/, '').match(/[A-Za-z_]\w*/g)) : undefined;
+        const isPort = (d: Device) => isInput(d) || isOutput(d) || d.type === 'Clock' || d.type === 'Input' || d.type === 'Output';
+        const fromFile = (g: GraphData) => !!at && Object.values(g.devices).some((d) => (d.source_positions ?? []).some((p: any) => p.name === at.file));
         const made = (d: Device) => !!at && (d.source_positions ?? []).some((p: any) =>
             p.name === at.file && p.from.line <= at.line && at.line <= (p.to ?? p.from).line);
         const within = new Map<string, boolean>();
@@ -366,11 +377,34 @@ class App {
             }
             return within.get(type)!;
         };
+        let lit = 0;
         for (const v of this.#views.values()) {
-            const devices = Object.entries(v.schematic.graph.devices);
-            v.schematic.light(new Set(devices.filter(([, d]) => made(d) || (d.type === 'Subcircuit' && inside(d.celltype!))).map(([id]) => id)));
+            const graph = v.schematic.graph;
+            const declared = ports && fromFile(graph);
+            const ids = new Set(Object.entries(graph.devices).filter(([, d]) => made(d) || (d.type === 'Subcircuit' && inside(d.celltype!))
+                || (declared && isPort(d) && ports!.has(d.net ?? d.label ?? ''))).map(([id]) => id));
+            v.schematic.light(ids);
+            lit += ids.size;
         }
-        if (reveal) this.#views.get('')?.schematic.focusLit();
+        if (reveal) this.#revealLit();
+        return lit;
+    }
+    // Centres the lit cells of the top level, once the view has a size (it
+    // has none behind another tab, where Show in Circuit finds it).
+    #revealLit() {
+        const s = this.#views.get('')?.schematic;
+        if (!s) return;
+        const sized = () => { const r = s.svg.getBoundingClientRect(); return r.width > 0 && r.height > 0; };
+        if (sized()) {
+            s.focusLit();
+            return;
+        }
+        const ro = new ResizeObserver(() => {
+            if (!sized()) return;
+            ro.disconnect();
+            s.focusLit();
+        });
+        ro.observe(s.svg);
     }
     // The circuit is older than its sources: say so, with a way to update it.
     #staleBanner() {
@@ -799,8 +833,9 @@ class App {
         const markers = [];
         for (const pos of item?.source_positions ?? []) {
             if (!pos.from || !pos.to) continue;
+            // a place without an end (a flip-flop's `always`): to the end of its line
             const m = { name: pos.name, from_line: pos.from.line - 1, from_col: pos.from.column - 1,
-                        to_line: pos.to.line - 1, to_col: pos.to.column - 1 };
+                        to_line: pos.to.line - 1, to_col: pos.to.column === undefined ? 10000 : pos.to.column - 1 };
             if (m.from_line >= 0 && m.to_line >= 0 && m.from_col >= 0 && m.to_col >= 0) markers.push(m);
         }
         vscode.postMessage(markers.length ? { command: 'showmarker', markers } : { command: 'clearmarker' });
