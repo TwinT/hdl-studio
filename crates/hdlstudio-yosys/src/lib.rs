@@ -1152,8 +1152,10 @@ impl Conv<'_> {
                 if bit_at(&rdensrst, k) {
                     port.enable_srst = Some(true);
                 }
+                // port k's value: the k-th `width` bits from the LSB end
+                // (the strings are MSB first)
                 let mk_init = |s: &str| {
-                    let v = str_sl(s, width * k, width * (k + 1));
+                    let v = str_sl(s, width * (rd - 1 - k), width * (rd - k));
                     (!v.chars().all(|c| c == 'x')).then(|| v.to_string())
                 };
                 port.init_value = mk_init(&rdinit);

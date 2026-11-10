@@ -14,6 +14,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   8-input multiplexers now have 3 inputs each.
 
 ### Fixed
+- A memory with two or more synchronous read ports with initial or reset values
+  (registers read from a memory, merged into it with the *opt* option) gave each
+  port the values of another: with two ports, each started at, and reset to, the
+  other's value.
 - Gate-level flip-flops without an asynchronous reset (`$_DFF_P_`, `$_DFFE_PP_`...)
   were "Invalid cell type".
 - A Lua script's `io.write` wrote into the channel between the simulation engine
