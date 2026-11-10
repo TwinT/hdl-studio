@@ -569,6 +569,67 @@ describe('schematic webview on the engine', function () {
         await post({ command: 'pausesim' });
     });
 
+    it('presses buttons with the keys given in their menu', async function () {
+        await post({ command: 'showcircuit', circuit: { devices: {}, connectors: [] }, opts: {} });
+        const view = await show('11_pushbutton');
+        const circuit = (await lastPosted('autolayout')).circuit;
+        const push = view.find((r) => r.label === 'pushbutton').id, rst = view.find((r) => r.label === 'rst').id;
+        await page.evaluate(() => {
+            // what the page sends the engine (once: an earlier test may have hooked it)
+            if (!window.__sent) {
+                const send = window.__engineSend;
+                window.__engineSend = (l) => { window.__sent.push(JSON.parse(l)); return send(l); };
+            }
+            window.__sent = [];
+        });
+        const sets = (id) => page.evaluate((id) => window.__sent.filter((r) => r.op === 'set_input' && r.path === id).map((r) => r.value), id);
+        const cap = (id) => page.evaluate((id) => document.querySelector(`.cell[data-id="${id}"] .key text`)?.textContent ?? null, id);
+        const menu = async (id, item) => {
+            // the cell's corner, off the button's face
+            const r = await page.evaluate((id) => document.querySelector(`.cell[data-id="${id}"] .body rect`).getBoundingClientRect().toJSON(), id);
+            await page.mouse.click(r.x + 2, r.y + 2, { button: 'right' });
+            await page.locator('.wavemenu button', { hasText: item }).click();
+        };
+        const keys = async () => (await lastPosted('viewstate')).state.keys;
+        await menu(push, 'Press it with a key');
+        await page.keyboard.press('KeyA');
+        assert.deepStrictEqual([await keys(), await cap(push)], [{ pushbutton: 'KeyA' }, 'A']);
+        // Space runs and pauses: it asks for another
+        await menu(rst, 'Press it with a key');
+        await page.keyboard.press('Space');
+        assert.ok(await page.evaluate(() => document.getElementById('keybanner')?.textContent.startsWith('Space')));
+        await page.keyboard.press('KeyR');
+        assert.deepStrictEqual([await keys(), await cap(rst)], [{ pushbutton: 'KeyA', rst: 'KeyR' }, 'R']);
+        assert.deepStrictEqual(await sets(push), []); // the right click didn't press it
+        // a PushButton is high while its key is down, a Button toggles
+        await page.keyboard.down('KeyA');
+        assert.deepStrictEqual(await sets(push), ['1']);
+        await page.keyboard.up('KeyA');
+        assert.deepStrictEqual(await sets(push), ['1', '0']);
+        await page.keyboard.press('KeyR');
+        await page.keyboard.press('KeyR');
+        assert.deepStrictEqual(await sets(rst), ['1', '0']);
+        // held when the view loses the focus: its keyup goes elsewhere
+        await page.keyboard.down('KeyA');
+        await page.evaluate(() => window.dispatchEvent(new window.Event('blur')));
+        assert.deepStrictEqual(await sets(push), ['1', '0', '1', '0']);
+        await page.keyboard.up('KeyA');
+        assert.deepStrictEqual(await sets(push), ['1', '0', '1', '0']);
+        // with Ctrl it is VS Code's
+        await page.keyboard.press('Control+KeyR');
+        assert.deepStrictEqual(await sets(rst), ['1', '0']);
+        // a key given to another button leaves the first one
+        await menu(rst, 'Key R: another');
+        await page.keyboard.press('KeyA');
+        assert.deepStrictEqual([await keys(), await cap(push), await cap(rst)], [{ rst: 'KeyA' }, null, 'A']);
+        // reopened, the project's keys are back; "No key" takes one away
+        await post({ command: 'showcircuit', circuit: { devices: {}, connectors: [] }, opts: {} });
+        await post({ command: 'showcircuit', circuit, opts: { view: { keys: { pushbutton: 'ArrowUp' } } } });
+        await until((id) => document.querySelector(`.cell[data-id="${id}"] .key text`)?.textContent === '↑', push);
+        await menu(push, 'No key');
+        assert.deepStrictEqual([await keys(), await cap(push)], [{}, null]);
+    });
+
     it('runs a Lua script in the engine', async function () {
         await show('04_counter');
         const script = fs.readFileSync(path.join(root, 'test/verilog/04_counter/counter_sim.lua'), 'utf8');

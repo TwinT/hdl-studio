@@ -19,7 +19,8 @@ body {
 }
 
 /* the circuit shown at the waveform cursor's tick, not the present */
-#pastbanner {
+#pastbanner,
+#keybanner {
     position: absolute;
     top: 8px;
     left: 50%;

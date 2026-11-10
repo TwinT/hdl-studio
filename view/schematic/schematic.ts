@@ -15,6 +15,7 @@ export interface SchematicHooks {
     edited(type: 'pos' | 'param'): void;
     watch(c: Connector): void;
     panned(t: { x: number, y: number, k: number }): void; // the view moved or zoomed
+    key(id: string): string | undefined; // the keyboard key of a button, as printed on it
 }
 
 interface Wire {
@@ -133,6 +134,7 @@ export class Schematic {
                 numbase: () => d.numbase ?? 'hex',
                 setNumbase: (b) => { d.numbase = b; this.#update(id); this.#hooks.edited('param'); },
                 open: () => this.#hooks.open(id),
+                key: () => this.#hooks.key(id),
             });
             view.g.setAttribute('transform', `translate(${d.position!.x},${d.position!.y})`);
             view.g.dataset.id = id;

@@ -108,8 +108,11 @@ SVG drawn by hand, laid out by `elkjs`, simulated by the engine through the host
   `#cursor` pauses (remembering whether it ran), sends `inspect` (one in flight,
   latest wins) and shows `#pastbanner`; follow clears it and runs again if it ran;
   `#leavePast` runs first in everything that changes the run. Space (`main.ts`) is
-  run/pause, from the past back to the present, running. Middle/Alt-drag
-  scrolls, Ctrl+wheel zooms. A row's menu (right-click or "…") picks the number
+  run/pause, from the past back to the present, running. Keys for top-level
+  Buttons/PushButtons (`#keydown`, the cell's right-click menu): `view.keys` by net
+  name (survives a new synthesis), `KeyboardEvent.code`; a PushButton is high
+  while held, released on `blur`; never Space, never with Ctrl/Alt/Meta.
+  Middle/Alt-drag scrolls, Ctrl+wheel zooms. A row's menu (right-click or "…") picks the number
   format, a pause condition (an engine `monitor` with `stop`, triggers null = any
   change; firing puts the cursor there and Space goes on) and its group.
 - Themes (`themes.ts`, setting `hdl-studio.theme`, Dracula by default, also in the

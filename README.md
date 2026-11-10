@@ -250,6 +250,12 @@ In an LED matrix, bit `r*C + c` is row `r`, column `c` (bit 0 is top-left). See
 [`10_led_matrix`](./test/verilog/10_led_matrix/) and
 [`09_bcd_to_7seg`](./test/verilog/09_bcd_to_7seg/).
 
+**Keys:** right-click a push button or a switch on the schematic → *Press it with a
+key…*, then press the key (not `Space`, which runs and pauses). With the circuit view
+focused, a push button is high while its key is down and a switch toggles at each
+press, so a design can be played from the keyboard. The key shows on the button and
+is saved with the project; *No key* in the same menu takes it away.
+
 ## Lua scripting
 
 Add a `.lua` file to the project and press its ▶ in the *Files* panel (it becomes ■ to

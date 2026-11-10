@@ -324,6 +324,7 @@ export interface CellHooks {
     numbase(): string;
     setNumbase(base: string): void;
     open(): void;
+    key(): string | undefined; // the keyboard key that presses this button, as printed on it
 }
 
 function foreign(g: Element, x: number, y: number, w: number, h: number, cls: string) {
@@ -462,11 +463,20 @@ export function draw(d: Device, s: Shape, top: boolean, hooks: CellHooks): CellV
             face.addEventListener('pointerdown', (e) => e.stopPropagation()); // not a drag
             if (t === 'PushButton') {
                 // high only while held
-                face.addEventListener('pointerdown', () => hooks.setInput('1'));
-                face.addEventListener('pointerup', () => hooks.setInput('0'));
+                // the left button (a right click opens its menu)
+                face.addEventListener('pointerdown', (e) => { if (e.button === 0) hooks.setInput('1'); });
+                face.addEventListener('pointerup', (e) => { if (e.button === 0) hooks.setInput('0'); });
                 face.addEventListener('pointerleave', () => { if (cur === '1') hooks.setInput('0'); });
             } else {
                 face.addEventListener('click', () => hooks.setInput(cur === '1' ? '0' : '1'));
+            }
+            const key = hooks.key();
+            if (key !== undefined) {
+                const w = Math.max(13, textWidth(key, `7pt ${FONT}`) + 8);
+                const cap = el('g', { class: 'key', transform: `translate(${(s.w - w) / 2},-17)` }, g);
+                el('rect', { width: w, height: 13, rx: 3, fill: C.fill, stroke: C.lead }, cap);
+                text(cap, w / 2, 7, key, { 'font-size': '7pt', 'text-anchor': 'middle', 'dominant-baseline': 'central' });
+                el('title', {}, cap).textContent = `Key ${key}`;
             }
         } else if (mode === 1) {
             const led = el('circle', { cx: 15, cy: 15, r: 10.5, fill: levelColor.undef }, body);

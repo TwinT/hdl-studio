@@ -39,6 +39,12 @@ const netlist = (c: CircuitData) =>
 
 const graphOf = (path: string) => path.slice(0, path.lastIndexOf('/') + 1);
 
+// The inputs a key can press: the top level's 1-bit buttons.
+const keyable = (d?: Device) => d?.type === 'Button' || d?.type === 'PushButton';
+// A KeyboardEvent.code as printed on the key (US layout).
+const arrows: Record<string, string> = { ArrowLeft: '←', ArrowRight: '→', ArrowUp: '↑', ArrowDown: '↓' };
+const keyName = (code: string) => arrows[code] ?? code.replace(/^(Key|Digit)/, '').replace(/^Numpad/, 'Num ');
+
 interface View {
     schematic: Schematic;
     dialog?: Dialog;
@@ -85,6 +91,11 @@ class App {
     #inspectNext?: number | null;
     #revivedAt = -Infinity; // when a dead engine's circuit was last loaded again
     #windows: Record<string, Geometry> = {}; // where each cell's window was left, by path (view.windows)
+    // the key (KeyboardEvent.code) that presses each top-level button, by its
+    // net, which a new synthesis keeps (view.keys)
+    #keys: Record<string, string> = {};
+    #held = new Set<string>(); // the PushButtons a key holds down, by id
+    #keyFor?: string; // the button waiting for its key
 
     constructor() {
         this.#lua = new LuaRunner(vscode, engineChannel, this);
@@ -112,16 +123,9 @@ class App {
         new MutationObserver(() => this.#applyTheme()).observe(document.body, { attributes: true, attributeFilter: ['class'] });
         engineChannel.listen((ev) => { if (ev.session === this.#session) this.#engineEvent(ev); });
         window.addEventListener('message', (e) => this.#message(e.data));
-        // Space: run or pause (from the past: back to the present, running)
-        window.addEventListener('keydown', (e) => {
-            if (e.code !== 'Space' || e.repeat || !this.circuit || this.#lua.active
-                || (e.target as Element).closest?.('input, textarea, select, [contenteditable]')) return;
-            e.preventDefault();
-            if (this.running) return this.pauseSim();
-            this.#leavePast();
-            this.#monitor.follow();
-            this.startSim();
-        });
+        window.addEventListener('keydown', (e) => this.#keydown(e));
+        window.addEventListener('keyup', (e) => this.#keyup(e));
+        window.addEventListener('blur', () => this.#releaseKeys()); // its keyups go elsewhere
         for (const t of ['touchstart', 'mousedown', 'click'])
             window.addEventListener(t, () => vscode.postMessage({ command: 'focus' }), { capture: true, passive: true });
         this.updateRunStates();
@@ -412,7 +416,11 @@ class App {
         // the waveforms of a new circuit start afresh, with the same signals
         // where they still exist; on opening a project, the ones it saved
         const watched: WaveConfig = old ? this.#monitor.config : { waves: opts.view?.waves ?? [], columns: opts.view?.waveColumns };
-        if (!old) this.#windows = { ...opts.view?.windows };
+        if (!old) {
+            this.#windows = { ...opts.view?.windows };
+            this.#keys = { ...opts.view?.keys };
+        }
+        this.#held.clear();
         this.#monitor.clear();
         this.#names = undefined;
         this.circuit = empty(data) ? undefined : data;
@@ -464,11 +472,24 @@ class App {
                     }
                 },
                 panned: (t) => { if (prefix === '') this.#panned(t); },
+                key: (id) => {
+                    const code = prefix === '' ? this.#keys[graph.devices[id].net ?? ''] : undefined;
+                    return code && keyName(code);
+                },
             },
         });
         s.svg.addEventListener('contextmenu', (e) => {
             e.preventDefault();
-            popupMenu(e.clientX, e.clientY, ({ item, head }) => {
+            const id = ((e.target as Element).closest('.cell') as SVGGElement | null)?.dataset.id;
+            const d = prefix === '' && id !== undefined ? graph.devices[id] : undefined;
+            popupMenu(e.clientX, e.clientY, ({ menu, item, head }) => {
+                if (keyable(d) && d!.net) {
+                    const net = d!.net, code = this.#keys[net];
+                    head(`Keyboard: ${net}`);
+                    item(code ? `Key ${keyName(code)}: another…` : 'Press it with a key…', false, () => this.#askKey(net));
+                    if (code) item('No key', false, () => this.#setKey(net, undefined));
+                    menu.append(document.createElement('hr'));
+                }
                 item('Reset layout', false, () => this.#resetLayout(prefix));
                 item('Names of cells and wires', this.#labels, () => vscode.postMessage({ command: 'setlabels', value: !this.#labels }));
                 item('Open a waveform layout…', false, () => vscode.postMessage({ command: 'loadwaves' }));
@@ -726,6 +747,80 @@ class App {
             if (m.from_line >= 0 && m.to_line >= 0 && m.from_col >= 0 && m.to_col >= 0) markers.push(m);
         }
         vscode.postMessage(markers.length ? { command: 'showmarker', markers } : { command: 'clearmarker' });
+    }
+
+    // ---- the keyboard: Space runs or pauses, a button's key presses it
+
+    #keydown(e: KeyboardEvent) {
+        if (this.#keyFor !== undefined) return this.#assignKey(e);
+        if (!this.circuit || (e.target as Element).closest?.('input, textarea, select, [contenteditable]')) return;
+        const id = e.ctrlKey || e.metaKey || e.altKey ? undefined : this.#keyed(e.code);
+        if (id !== undefined) {
+            e.preventDefault();
+            if (e.repeat) return;
+            if (this.circuit.devices[id].type === 'PushButton') {
+                // high while the key is down
+                this.#held.add(id);
+                this.#setInput(id, '1');
+            } else {
+                this.#setInput(id, this.#views.get('')!.schematic.value(id, 'out') === '1' ? '0' : '1');
+            }
+            return;
+        }
+        // Space: run or pause (from the past: back to the present, running)
+        if (e.code !== 'Space' || e.repeat || this.#lua.active) return;
+        e.preventDefault();
+        if (this.running) return this.pauseSim();
+        this.#leavePast();
+        this.#monitor.follow();
+        this.startSim();
+    }
+    #keyup(e: KeyboardEvent) {
+        const id = this.#keyed(e.code);
+        if (id !== undefined && this.#held.delete(id)) this.#setInput(id, '0');
+    }
+    #releaseKeys() {
+        for (const id of this.#held) this.#setInput(id, '0');
+        this.#held.clear();
+    }
+    // The top-level button the key presses.
+    #keyed(code: string) {
+        const net = Object.keys(this.#keys).find((n) => this.#keys[n] === code);
+        if (net === undefined) return;
+        return Object.entries(this.circuit?.devices ?? {}).find(([, d]) => d.net === net && keyable(d))?.[0];
+    }
+    #askKey(net: string) {
+        this.#keyFor = net;
+        this.#keyBanner(`Press the key for ${net}  ·  Esc: cancel`);
+        // a click elsewhere cancels it too
+        window.addEventListener('pointerdown', () => {
+            this.#keyFor = undefined;
+            this.#keyBanner(undefined);
+        }, { once: true, capture: true });
+    }
+    #assignKey(e: KeyboardEvent) {
+        if (!e.code || ['Shift', 'Control', 'Alt', 'Meta'].includes(e.key)) return; // a modifier alone: the key comes next
+        e.preventDefault();
+        e.stopPropagation();
+        const net = this.#keyFor!;
+        if (e.code === 'Space') return this.#keyBanner(`Space runs and pauses: another key for ${net}  ·  Esc: cancel`);
+        this.#keyFor = undefined;
+        this.#keyBanner(undefined);
+        if (e.code !== 'Escape') this.#setKey(net, e.code);
+    }
+    // One key per button and one button per key; saved with the project.
+    #setKey(net: string, code: string | undefined) {
+        for (const [n, c] of Object.entries(this.#keys))
+            if (n === net || c === code) delete this.#keys[n];
+        if (code) this.#keys[net] = code;
+        vscode.postMessage({ command: 'viewstate', state: { keys: this.#keys }, dirty: true });
+        this.#views.get('')?.schematic.render();
+    }
+    #keyBanner(text: string | undefined) {
+        let b = document.getElementById('keybanner');
+        if (text === undefined) return b?.remove();
+        if (!b) document.getElementById('paper')!.append(b = Object.assign(document.createElement('div'), { id: 'keybanner' }));
+        b.textContent = text;
     }
 
     // ---- the control panel's inputs and outputs (top level only)

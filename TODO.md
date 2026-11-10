@@ -76,9 +76,6 @@ Done items leave this list; git history keeps them.
         circuit view), adding a wire's waveform from the schematic (its
         button), the pause dot (`#triggers`).
       - One panel per circuit view (titled with the document), closed with it.
-- [ ] Keyboard → inputs: map keys to PushButtons/Buttons (held while the key
-      is down), for playing anything on the circuit. Per project, saved in
-      `view`.
 - [ ] A framebuffer display: a `Memory` shown as an image (width, height,
       bits per pixel, palette), drawn on a canvas from the memory writes
       `update` already carries (carpinchoV's `vram`/`pixel` examples). The

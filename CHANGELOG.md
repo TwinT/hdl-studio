@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Keys for the push buttons and switches: right-click one on the schematic → *Press it
+  with a key…*. A push button is high while its key is down, a switch toggles; the
+  key shows on the button and is saved with the project.
 - *Names of cells and wires* in the schematic's right-click menu (setting
   `hdl-studio.labels`): off, the internal cells (often named by yosys, like
   `$procmux$2`) and the wires show no names; inputs, outputs and port labels stay.
@@ -40,6 +43,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and a click, drag or wheel there did nothing.
 - If the simulation engine stops (a crash, or killed), the circuit view loads the
   circuit into a new one, back at tick 0, instead of answering "no circuit loaded".
+- A right click on a push button no longer presses it.
 - Subcircuit, FSM and memory windows open over the schematic, not over the
   waveforms, and open again where they were left, at the size they were given
   (saved with the project).
