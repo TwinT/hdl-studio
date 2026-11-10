@@ -122,6 +122,7 @@ jobs:
           awk -v h="## [${GITHUB_REF_NAME#v}]" 'index($0, h) == 1 { on = 1; next } on && /^## \[/ { exit } on' CHANGELOG.md > notes.md
           test -s notes.md
       - name: GitHub Release
+        id: github
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh release create "$GITHUB_REF_NAME" vsix/*.vsix --title "$GITHUB_REF_NAME" --notes-file notes.md --verify-tag
@@ -131,6 +132,7 @@ jobs:
       - name: Visual Studio Marketplace (token)
         if: vars.MARKETPLACE_OIDC != 'true' && env.VSCE_PAT != ''
         run: npx --yes @vscode/vsce@4 publish --packagePath vsix/*.vsix
+      # even if the Marketplace failed (not if the GitHub Release did)
       - name: Open VSX
-        if: env.OVSX_PAT != ''
+        if: ${{ !cancelled() && steps.github.outcome == 'success' && env.OVSX_PAT != '' }}
         run: for f in vsix/*.vsix; do npx --yes ovsx@1 publish "$f"; done
