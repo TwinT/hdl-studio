@@ -212,6 +212,14 @@ latches the last bus value (`test/verilog/12_inout_bus/`,
 `test/golden/inout_bus.lua`). `build_yosys_script` also runs `bwmuxmap` after `proc`
 (`$bwmux`, e.g. a part-select write into a wide register, has no cell).
 
+### A top without outputs
+`opt_clean` keeps what reaches an output, so a module without outputs (`micro`'s
+`datapath`: its effect is its registers and memory) loses every cell.
+`build_yosys_script` sets `keep` on the requested top's contents, else on those of
+the tops without outputs (`select A:top o:* %m %d`; read_slang marks every
+elaborated top). Keeping every top's would leave dead cells and hold back *opt*
+in most examples.
+
 ### techmap gotcha
 Bare `techmap` also lowers flip-flops/latches/memories to gate-level primitives
 (`$_DFF_P_`...) the converter can't convert → `Invalid cell type`.

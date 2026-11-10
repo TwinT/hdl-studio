@@ -56,17 +56,17 @@ export function build_yosys_script(files, opts = {}) {
         cmds.push(opts.top ? `hierarchy -top ${opts.top}` : 'hierarchy -auto-top');
     }
 
-    if (opts.top) {
-        // A module with no output ports (e.g. a CPU datapath whose only effect
-        // is internal register/memory state) has nothing to anchor opt_clean's
-        // reachable-from-outputs sweep below, so it silently loses all its
-        // instantiated cells (without a requested top, the converter shows it
-        // empty: see TODO.md). Keep the requested top's own contents alive
-        // across the opt passes.
-        cmds.push(`select ${opts.top}/*`);
-        cmds.push('setattr -set keep 1');
-        cmds.push('select -clear');
-    }
+    // A module with no output ports (e.g. a CPU datapath whose only effect is
+    // internal register/memory state) has nothing to anchor opt_clean's
+    // reachable-from-outputs sweep below, so it silently loses all its
+    // instantiated cells. Keep the top's own contents alive across the opt
+    // passes: the requested top's, else those of the tops (every module
+    // read_slang elaborated as one) without outputs (`o:` also matches
+    // inouts). Keeping the tops that have outputs too would leave dead cells
+    // in most designs and hold back opt.
+    cmds.push(opts.top ? `select ${opts.top}/*` : 'select A:top o:* %m %d');
+    cmds.push('setattr -set keep 1');
+    cmds.push('select -clear');
 
     cmds.push('proc');
     // Lowers $bwmux (per-bit select, e.g. a part-select write into a wide

@@ -17,6 +17,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   8-input multiplexers now have 3 inputs each.
 
 ### Fixed
+- Without the *Top* option, a top-level module with no outputs (like the `micro`
+  example's `datapath`, whose effect is its registers and memory) was shown
+  empty: yosys removed every cell as unused.
 - A memory with two or more synchronous read ports with initial or reset values
   (registers read from a memory, merged into it with the *opt* option) gave each
   port the values of another: with two ports, each started at, and reset to, the

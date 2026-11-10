@@ -481,11 +481,9 @@ describe('time units', function () {
     });
 });
 
-// A project synthesizes what it lists, not its folder: a module used but not
-// listed fails only in the extension ("unknown module").
-describe('several top-level modules', function () {
+describe('the top found by yosys (no Top option)', function () {
     // read_slang without --top marks every module nobody instantiates `top`
-    it('shows the biggest, says which, and drops the other', async function () {
+    it('several: shows the biggest, says which, and drops the other', async function () {
         const { slangAvailable } = await import('./designs.mjs');
         if (!slangAvailable()) this.skip();
         const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'hdl-test-'));
@@ -506,6 +504,19 @@ describe('several top-level modules', function () {
             assert.deepStrictEqual(warnings, ['several top-level modules (counter, helper): counter is shown']);
         } finally {
             fs.rmSync(tmp, { recursive: true, force: true });
+        }
+    });
+    // opt_clean sweeps from the outputs: a top without any (micro's
+    // datapath, whose effect is its registers and memory) lost every cell
+    it('keeps the cells of a top without outputs', async function () {
+        this.timeout(120000);
+        const { slangAvailable, designs, synthesize, convert } = await import('./designs.mjs');
+        if (!slangAvailable()) this.skip();
+        const d = designs.find((d) => d.name === 'micro');
+        for (const optimize of [false, true]) {
+            const found = convert(synthesize(d, { optimize, top: undefined })).toString();
+            assert.ok(Object.keys(JSON.parse(found).devices).length > 20, `optimize: ${optimize}`);
+            assert.strictEqual(found, convert(synthesize(d, { optimize })).toString(), `optimize: ${optimize}`);
         }
     });
 });
@@ -530,6 +541,8 @@ describe('techmap on the multi-file designs', function () {
     }
 });
 
+// A project synthesizes what it lists, not its folder: a module used but not
+// listed fails only in the extension ("unknown module").
 describe('Example projects (.hdls)', function () {
     this.timeout(120000);
     const walk = (d) => fs.readdirSync(d, { withFileTypes: true })
