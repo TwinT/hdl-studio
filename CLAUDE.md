@@ -298,8 +298,8 @@ only see ticks.
   `"control_unit.hex"` (the `soc`/`micro` convention) only resolves through the alias.
 - Examples worth knowing: `test/verilog/micro/` (RV32I datapath, `memory.hex` sums
   5..1 into x2, stores and loads it into x3); `test/verilog/soc/rtl/` (the `inout`-bus
-  version; `cpu_ram.sv` = CPU + RAM; `board` = soc + `led_panel`, a capybara walking
-  on a 16x32 LED matrix, ~1500 clock cycles after reset before the first LED lights:
-  use max speed).
+  version; `soc` = CPU (`core/`) + RAM + I/O ports on the bus; `board` = soc +
+  `led_panel`, a capybara walking on a 16x32 LED matrix, ~1500 clock cycles after
+  reset before the first LED lights: use max speed).
 - Yosys errors: the script and yosys's output go to the "HDL Studio (Yosys)" output
   channel (`src/requests.mjs`).
