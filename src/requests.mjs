@@ -10,6 +10,8 @@ import { build_yosys_script, isHdlFile, data_file_paths } from './yosys_script.m
 import { convert_yosys_json } from './hdlstudio_bin.mjs';
 
 const execFile = promisify(child_process.execFile);
+// yosys's log (the board's is 300-400 KB) can outgrow execFile's default 1 MiB
+const maxBuffer = 1 << 30;
 
 let _outputChannel;
 function yosysLog() {
@@ -20,7 +22,7 @@ function yosysLog() {
 
 async function slang_available(yosysBin) {
     try {
-        const { stdout } = await execFile(yosysBin, ['-p', 'help read_slang']);
+        const { stdout } = await execFile(yosysBin, ['-p', 'help read_slang'], { maxBuffer });
         return !stdout.includes('No such command');
     } catch {
         return false;
@@ -100,7 +102,7 @@ export async function run_yosys(files, options) {
         log.appendLine('\n--- yosys output ---');
 
         try {
-            const { stdout, stderr } = await execFile(yosysBin, ['-s', scriptPath], { cwd: tmpDir });
+            const { stdout, stderr } = await execFile(yosysBin, ['-s', scriptPath], { cwd: tmpDir, maxBuffer });
             log.append(file_map.unmap_string((stdout || '') + (stderr || '')));
         } catch (e) {
             if (e.code === 'ENOENT') {

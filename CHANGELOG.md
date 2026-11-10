@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A Lua script's `io.write` wrote into the channel between the simulation engine
   and VS Code, and `io.read` read from it; `os.exit` ended the engine. Scripts now
   have `io.write`, which prints like `print`, and the clock and calendar of `os`.
+- Synthesis no longer fails when yosys writes more than 1 MiB of log (a big design).
 
 ## [1.3.0] - 2026-11-05
 
