@@ -21,9 +21,12 @@ simulator), `hdlstudio` (the binary).
 - `hdlstudio yosys2hdlstudio [--transform] [--no-io-ui] < yosys.json` prints the
   circuit. `crates/hdlstudio-yosys/tests/golden.json` freezes its output for the
   small examples plus cell-coverage netlists (`BLESS=1 cargo test` rewrites it after
-  an intended change). It reproduces the original converter's quirks on purpose (device
-  numbering, a Map typo that makes `$_DFF_P_` invalid...); semantic changes go in
-  their own commits (`TODO.md` lists them).
+  an intended change). It keeps the original converter's device numbering; its
+  quirks were fixed one commit each after the port (each blessed with its diff
+  reviewed). The top: among the modules nobody instantiates, those yosys marked
+  `top`, the biggest; several → a `warning:` line on stderr, which
+  `convert_yosys_json` collects and `doSynth` shows. Modules not under the top
+  aren't kept as subcircuits.
 - `hdlstudio-sim`: per-cell `propagation`
   delays, a per-tick event queue, end-of-tick values. It flattens the hierarchy
   (subcircuits add neither delay nor events) and copies a queued cell's inputs

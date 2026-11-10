@@ -20,24 +20,27 @@ export function hdlstudio_bin() {
 }
 
 // yosys JSON netlist -> circuit (split inout ports, convert,
-// io_ui unless `ui` is false, then transform if asked).
-export function convert_yosys_json(raw, options = {}, ui = true) {
-    if (!child_process.execFileSync)
+// io_ui unless `ui` is false, then transform if asked). The converter's
+// warnings (e.g. which of several top modules it shows) go to `warnings`.
+export function convert_yosys_json(raw, options = {}, ui = true, warnings = []) {
+    if (!child_process.spawnSync)
         throw new Error('Converting a yosys netlist needs the desktop version of the extension.');
     const args = ['yosys2hdlstudio'];
     if (options.transform) args.push('--transform');
     if (!ui) args.push('--no-io-ui');
-    try {
-        const out = child_process.execFileSync(hdlstudio_bin(), args, {
-            input: typeof raw === 'string' ? raw : JSON.stringify(raw),
-            maxBuffer: 1 << 30,
-            stdio: ['pipe', 'pipe', 'pipe'],
-        });
-        return JSON.parse(out);
-    } catch (e) {
-        if (e.code === 'ENOENT')
-            throw new Error(`The HDL Studio engine is missing (${hdlstudio_bin()}). Run "npm run compile".`);
-        // the converter's own message (e.g. "Invalid cell type: $foo")
-        throw new Error(e.stderr?.toString().trim().split('\n').pop() || e.message);
-    }
+    const r = child_process.spawnSync(hdlstudio_bin(), args, {
+        input: typeof raw === 'string' ? raw : JSON.stringify(raw),
+        maxBuffer: 1 << 30,
+    });
+    if (r.error?.code === 'ENOENT')
+        throw new Error(`The HDL Studio engine is missing (${hdlstudio_bin()}). Run "npm run compile".`);
+    if (r.error)
+        throw r.error;
+    const lines = r.stderr.toString().split('\n').filter((l) => l.trim());
+    // the converter's own message (e.g. "Invalid cell type: $foo")
+    if (r.status !== 0)
+        throw new Error(lines.pop() || `the converter stopped (${r.signal || r.status})`);
+    for (const l of lines)
+        if (l.startsWith('warning: ')) warnings.push(l.slice('warning: '.length));
+    return JSON.parse(r.stdout);
 }

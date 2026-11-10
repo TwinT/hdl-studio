@@ -325,6 +325,8 @@ export class Document {
         // The side panel should receive focus when we do synthesis
         // but it should already have focus so we don't need to do anything.
         this.#circuitEdit(keep_layout(this.#circuit, res.output), 'Synthesis', true);
+        for (const w of res.warnings ?? [])
+            vscode.window.showWarningMessage(`Synthesis: ${w}. Set "Top" in the Synthesis panel to show another one.`);
         this.tick = 0;
         this.#circuitUpdated.fire({ run: true, keep: false }); // force a run
         return true;

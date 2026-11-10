@@ -6,7 +6,7 @@ use std::io::{Read, Write};
 use std::process::ExitCode;
 
 const USAGE: &str = "usage: hdlstudio --version
-       hdlstudio yosys2hdlstudio [--transform] [--no-io-ui] < yosys.json > circuit.json
+       hdlstudio yosys2hdlstudio [--transform] [--no-io-ui] < yosys.json > circuit.json   (warnings on stderr)
        hdlstudio simtrace [--defaultcomb] circuit.json stimulus.json TICKS   (test/simdiff's trace)
        hdlstudio serve   (the engine, JSON lines on stdin/stdout: see serve.rs)
        hdlstudio lua [--json] circuit.json script.lua [MAX_TICKS]   (runs a sim.lua headless)";
@@ -49,6 +49,12 @@ fn yosys2hdlstudio(args: &[String]) -> Result<(), String> {
         serde_json::from_str(&input).map_err(|e| format!("not a yosys JSON netlist: {e}"))?;
     hdlstudio_yosys::split_inout_ports(&mut design);
     let mut circuit = hdlstudio_yosys::convert(&design)?;
+    // (the extension shows "warning: " lines)
+    if let [shown, others @ ..] = &hdlstudio_yosys::top_modules(&design)[..]
+        && !others.is_empty()
+    {
+        eprintln!("warning: several top-level modules ({shown}, {}): {shown} is shown", others.join(", "));
+    }
     if io_ui {
         hdlstudio_yosys::io_ui(&mut circuit);
     }

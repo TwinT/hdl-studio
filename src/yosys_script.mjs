@@ -60,10 +60,9 @@ export function build_yosys_script(files, opts = {}) {
         // A module with no output ports (e.g. a CPU datapath whose only effect
         // is internal register/memory state) has nothing to anchor opt_clean's
         // reachable-from-outputs sweep below, so it silently loses all its
-        // instantiated cells - and the converter's top-module detection (a
-        // topsort over instantiation edges, not yosys's own `top` attribute)
-        // then renders an arbitrary other now-orphaned module instead. Keep
-        // the requested top's own contents alive across the opt passes.
+        // instantiated cells (without a requested top, the converter shows it
+        // empty: see TODO.md). Keep the requested top's own contents alive
+        // across the opt passes.
         cmds.push(`select ${opts.top}/*`);
         cmds.push('setattr -set keep 1');
         cmds.push('select -clear');

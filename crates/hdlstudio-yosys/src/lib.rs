@@ -18,7 +18,7 @@ use hdlstudio_netlist::*;
 use indexmap::IndexMap;
 use serde::Deserialize;
 use serde_json::Value;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 #[derive(Debug, Deserialize)]
 pub struct Design {
@@ -33,6 +33,8 @@ pub struct Module {
     pub cells: IndexMap<String, YCell>,
     #[serde(default)]
     pub netnames: IndexMap<String, NetName>,
+    #[serde(default)]
+    pub attributes: IndexMap<String, Value>,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -1336,12 +1338,13 @@ pub fn convert(design: &Design) -> R<Circuit> {
         };
         out.insert(name.clone(), conv.convert(module, &design.modules)?);
     }
-    let mut order = module_order(&design.modules);
-    let top = order.pop().ok_or("no modules in the yosys netlist")?;
+    let top = top_modules(design).into_iter().next().ok_or("no modules in the yosys netlist")?;
     let mut circuit = out.shift_remove(&top).unwrap();
+    let used = reachable(&top, &design.modules);
     circuit.subcircuits = Some(
-        order
+        module_order(&design.modules)
             .into_iter()
+            .filter(|m| *m != top && used.contains(m))
             .map(|m| {
                 let c = out.shift_remove(&m).unwrap();
                 (m, c)
@@ -1349,6 +1352,67 @@ pub fn convert(design: &Design) -> R<Circuit> {
             .collect(),
     );
     Ok(circuit)
+}
+
+/// The candidates for the top level, the one `convert` shows first: the
+/// modules no other one instantiates, only those yosys marked `top` if any
+/// is (a submodule whose instances were optimized away isn't one); the
+/// biggest first (the most cells, its submodules' included), then the last
+/// in `module_order`. read_slang without `--top` marks every top it found.
+pub fn top_modules(design: &Design) -> Vec<String> {
+    let modules = &design.modules;
+    let instantiated: HashSet<&str> = modules
+        .values()
+        .flat_map(|m| m.cells.values())
+        .map(|c| c.ty.as_str())
+        .filter(|t| modules.contains_key(*t))
+        .collect();
+    let mut sizes = HashMap::new();
+    let order = module_order(modules);
+    let marked = |m: &str| match modules[m].attributes.get("top") {
+        Some(Value::String(s)) => s.contains('1'),
+        Some(v) => truthy(v),
+        None => false,
+    };
+    let mut tops: Vec<(u64, usize, String)> = order
+        .iter()
+        .enumerate()
+        .filter(|(_, m)| !instantiated.contains(m.as_str()))
+        .map(|(i, m)| (hierarchy_size(m, modules, &mut sizes), i, m.clone()))
+        .collect();
+    if tops.iter().any(|t| marked(&t.2)) {
+        tops.retain(|t| marked(&t.2));
+    }
+    tops.sort_by_key(|t| std::cmp::Reverse((t.0, t.1)));
+    tops.into_iter().map(|(.., m)| m).collect()
+}
+
+/// A module's cells, each submodule instance counting as its own cells.
+fn hierarchy_size(m: &str, modules: &IndexMap<String, Module>, sizes: &mut HashMap<String, u64>) -> u64 {
+    if let Some(&n) = sizes.get(m) {
+        return n;
+    }
+    sizes.insert(m.into(), 0); // a module instantiating itself counts once
+    let n = modules[m]
+        .cells
+        .values()
+        .map(|c| if modules.contains_key(&c.ty) { hierarchy_size(&c.ty, modules, sizes).max(1) } else { 1 })
+        .fold(0u64, u64::saturating_add);
+    sizes.insert(m.into(), n);
+    n
+}
+
+/// The modules `top`'s hierarchy instantiates.
+fn reachable(top: &str, modules: &IndexMap<String, Module>) -> HashSet<String> {
+    let (mut seen, mut stack) = (HashSet::new(), vec![top.to_string()]);
+    while let Some(m) = stack.pop() {
+        for c in modules[&m].cells.values() {
+            if modules.contains_key(&c.ty) && seen.insert(c.ty.clone()) {
+                stack.push(c.ty.clone());
+            }
+        }
+    }
+    seen
 }
 
 /// `io_ui`: the top level's ports become widgets, by name and width.

@@ -116,7 +116,11 @@ export async function run_yosys(files, options) {
 
         try {
             const raw = file_map.unmap_string(fs.readFileSync(outputJson, 'utf8'));
-            return { output: convert_yosys_json(raw, options) };
+            const warnings = [];
+            const output = convert_yosys_json(raw, options, true, warnings);
+            for (const w of warnings)
+                log.appendLine(`\nWarning: ${w}`);
+            return { output, warnings };
         } catch (e) {
             // Yosys ran fine but the netlist couldn't be converted (e.g. a testbench
             // with no synthesizable top, $display, delays, etc.). Surface the real error.

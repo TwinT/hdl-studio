@@ -483,6 +483,33 @@ describe('time units', function () {
 
 // A project synthesizes what it lists, not its folder: a module used but not
 // listed fails only in the extension ("unknown module").
+describe('several top-level modules', function () {
+    // read_slang without --top marks every module nobody instantiates `top`
+    it('shows the biggest, says which, and drops the other', async function () {
+        const { slangAvailable } = await import('./designs.mjs');
+        if (!slangAvailable()) this.skip();
+        const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'hdl-test-'));
+        try {
+            fs.writeFileSync(path.join(tmp, 'two_tops.sv'), `
+                module helper (input logic a, output logic y);
+                    assign y = ~a;
+                endmodule
+                module counter (input logic clk, rst, output logic [3:0] q);
+                    always_ff @(posedge clk) q <= rst ? 4'd0 : q + 4'd1;
+                endmodule`);
+            fs.writeFileSync(path.join(tmp, 'synth.ys'), build_yosys_script({ 'two_tops.sv': '' }, { useSlang: true }) + '\njson -o out.json');
+            execFileSync('yosys', ['-q', '-s', 'synth.ys'], { cwd: tmp, stdio: 'pipe' });
+            const warnings = [];
+            const c = convert_yosys_json(fs.readFileSync(path.join(tmp, 'out.json'), 'utf8'), {}, true, warnings);
+            assert.deepStrictEqual(Object.values(c.devices).filter((d) => d.net).map((d) => d.label).sort(), ['clk', 'q', 'rst']);
+            assert.deepStrictEqual(Object.keys(c.subcircuits), []);
+            assert.deepStrictEqual(warnings, ['several top-level modules (counter, helper): counter is shown']);
+        } finally {
+            fs.rmSync(tmp, { recursive: true, force: true });
+        }
+    });
+});
+
 describe('techmap on the multi-file designs', function () {
     this.timeout(180000);
     // the board once failed with "Invalid cell type: $fa": yosys left the

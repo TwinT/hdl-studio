@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- With several top-level modules and no *Top* option, the biggest one is shown
+  (it was chosen by name) and a warning names the others; modules that aren't part
+  of the circuit shown are no longer kept in the project as subcircuits.
 - A `case` that uses fewer than half the values of its selector becomes a sparse
   multiplexer (an input per value used, plus the default) instead of one with an
   input for every value. In the `micro` and `soc` examples, `store_unit`'s two

@@ -102,9 +102,16 @@ Done items leave this list; git history keeps them.
       fold the zero-delay bus cells (BusSlice/BusGroup, a third of all
       evaluations) into their readers, and a narrow-value fast path for nets
       of up to 64 bits.
-- [ ] Converter quirks kept on purpose when it was ported (output identical
-      to the previous converter's); fix each in its own commit:
-      - with several top-level modules the top is picked by name order.
+- [ ] A top module with no output ports (a CPU datapath whose only effect is
+      its registers and memory) loses all its cells to `opt_clean` unless it is
+      the Top option: `build_yosys_script` keeps the requested top's cells
+      (`setattr -set keep 1`), and without one the converter shows that top
+      empty (e.g. `micro` without `top`: `datapath` with only clk and rst).
+      Keeping the cells of every module yosys marks `top` (`select A:top`)
+      fixes `micro` but changes most other examples (measured 2026-11-10: more
+      cells left over, and with *opt* fewer optimizations, e.g. `11_pushbutton`
+      10 → 17 devices); a narrower choice is to keep only the tops without
+      outputs, or to warn and suggest the Top option.
 - [ ] The schematic, what it doesn't do or does differently:
       - a moved cell's wires are routed around the cells near both ends
         (`route.ts`, within 200px; farther detours fall back to an L/Z through
