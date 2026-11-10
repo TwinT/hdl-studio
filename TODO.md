@@ -124,8 +124,9 @@ None known.
 
 ## Release
 - [ ] CI (`.github/workflows/ci.yml`, 2026-11-10) hasn't run yet: the first
-      push will tell whether OSS CAD Suite's slang plugin, the Windows/macOS
-      engine tests and the three vsixes work as on this machine.
+      push will tell whether the Windows/macOS engine tests and the three
+      vsixes work as on this machine. (`test:pipeline` passes with the pinned
+      OSS CAD Suite's yosys and its slang plugin, run here by hand.)
 - [ ] Publishing from CI needs, once: a trusted publishing policy for this
       repository and `ci.yml` on the Marketplace publisher page, plus the
       repository variable `MARKETPLACE_OIDC=true` (or a `VSCE_PAT` secret),
