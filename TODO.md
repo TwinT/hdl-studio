@@ -104,8 +104,6 @@ Done items leave this list; git history keeps them.
       of up to 64 bits.
 - [ ] Converter quirks kept on purpose when it was ported (output identical
       to the previous converter's); fix each in its own commit:
-      - the sparse-mux pass checks `groups` on the OrReduce instead of its
-        BusGroup, so that check always passes;
       - a `$mem_v2` with 2+ read ports gets the read ports' init/arst/srst
         values in reverse port order (sliced from the MSB end);
       - a ROM (`$mem_v2` with no write ports) gets `transparent`/`collision`

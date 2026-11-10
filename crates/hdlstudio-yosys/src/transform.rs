@@ -380,12 +380,12 @@ impl MuxWalk {
                 let conns = m.input_port(group_id, "in");
                 let [c] = &conns[..] else { return false };
                 let prev = c.from.id.clone();
-                if !matches!(m.dev(&prev), Some(Cell::BusGroup { .. })) {
+                // one bit per value of the item (`3, 5: ...`), all for one input
+                let Some(Cell::BusGroup { groups }) = m.dev(&prev) else { return false };
+                if groups.iter().any(|&g| g != 1) {
                     return false;
                 }
                 self.group_ids.push(prev.clone());
-                // the original checks `groups` of the OrReduce here (meaning
-                // the BusGroup's?), which it doesn't have, so it passes.
                 m.inputs(&prev).iter().all(|c| self.traverse(m, &c.from.id, base))
             }
             _ => false,
