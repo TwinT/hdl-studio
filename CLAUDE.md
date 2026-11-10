@@ -39,6 +39,10 @@ simulator), `hdlstudio` (the binary).
   alarms after each step. Interval mode works out the ticks owed since the last
   slice, processes only the events before the target tick and jumps there, so empty
   ticks cost nothing; the backlog is dropped.
+- An engine that dies: the host (`circuit_view.mjs` `#startEngine`) posts `{ev:
+  'exit'}` and starts another on the next request; the view (`main.ts`) answers
+  with `#reset()` (a load at tick 0), but not if the last such reload was under
+  10 s ago (a circuit that kills the engine would loop).
 - Lua runs inside the engine (`crates/hdlstudio/src/lua.rs`, mlua + Lua 5.4): the
   `vec`/`sim` API (documented in the README), scripts as coroutines;
   `sim.sleep`/`sim.wait` register an alarm/monitor and yield, and the engine resumes

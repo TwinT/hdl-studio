@@ -82,6 +82,7 @@ class App {
     #resume?: boolean;
     #inspecting = false;
     #inspectNext?: number | null;
+    #revivedAt = -Infinity; // when a dead engine's circuit was last loaded again
 
     constructor() {
         this.#lua = new LuaRunner(vscode, engineChannel, this);
@@ -255,6 +256,20 @@ class App {
                 fn?.();
                 return;
             }
+            case 'exit':
+                // the engine died, and the run with it: load the circuit into the
+                // next one (the host starts it), unless the last time didn't last
+                if (!this.circuit) return;
+                if (performance.now() - this.#revivedAt < 10_000) {
+                    if (this.#running) {
+                        this.#running = false;
+                        this.updateRunStates();
+                    }
+                    return;
+                }
+                this.#revivedAt = performance.now();
+                this.#reset();
+                return;
             case 'error':
                 console.error('hdlstudio engine:', ev.message);
                 if (this.#running) {

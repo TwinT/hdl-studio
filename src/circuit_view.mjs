@@ -105,7 +105,13 @@ export class CircuitView {
         proc.stdin.on('error', () => {}); // a dead engine is reported by 'exit'
         proc.on('error', (e) => fail(e.code === 'ENOENT' ?
             `the engine is missing (${hdlstudio_bin()}). Run "npm run compile".` : e.message));
-        proc.on('exit', (code, signal) => fail(`the engine stopped (${signal || code})`));
+        proc.on('exit', (code, signal) => {
+            const live = this.#engine === proc; // not one that failed to start
+            fail(`the engine stopped (${signal || code})`);
+            // the view loads the circuit again, which starts another engine
+            if (live && !this.#disposed)
+                this.post({ command: 'engine', ev: { ev: 'exit', session: this.#engineSession } });
+        });
     }
     #processCommand(studio, msg) {
         switch (msg.command) {

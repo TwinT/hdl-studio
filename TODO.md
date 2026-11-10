@@ -143,9 +143,6 @@ Done items leave this list; git history keeps them.
 ## Known Bugs 🐛
 - [ ] The techmap option fails on `soc`'s `board`: yosys leaves `$fa`/`$alu`
       cells the converter has no cell for ("Invalid cell type: $fa").
-- [ ] If the engine process dies, the host starts a new one on the next
-      request, but the view doesn't load the circuit into it again ("no
-      circuit loaded" until the circuit is shown again).
 - [ ] A subcircuit's window covers the waveforms, and it has to be moved and
       resized again every time it opens.
       - Cause: the waveform monitor is docked at the bottom of the circuit view

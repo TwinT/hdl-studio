@@ -14,6 +14,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Synthesis no longer fails when yosys writes more than 1 MiB of log (a big design).
 - The waveform time cursor and the hover line stopped at each group's header,
   and a click, drag or wheel there did nothing.
+- If the simulation engine stops (a crash, or killed), the circuit view loads the
+  circuit into a new one, back at tick 0, instead of answering "no circuit loaded".
 
 ## [1.3.0] - 2026-11-05
 

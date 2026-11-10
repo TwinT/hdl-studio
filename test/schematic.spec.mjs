@@ -111,6 +111,14 @@ describe('schematic webview on the engine', function () {
     this.timeout(120000);
     let browser, page, engine;
     const errors = [];
+    // an engine whose events go to the page (a test kills one and starts another)
+    const startEngine = () => {
+        engine = spawn(hdlstudio_bin(), ['serve'], { stdio: ['pipe', 'pipe', 'inherit'] });
+        engine.stdin.on('error', () => {}); // a write to a killed one
+        readline.createInterface({ input: engine.stdout }).on('line', (line) => {
+            page.evaluate((ev) => window.postMessage({ command: 'engine', ev }, '*'), JSON.parse(line)).catch(() => {});
+        });
+    };
 
     before(async function () {
         if (!slangAvailable() || !fs.existsSync(path.join(root, 'dist/schematic.js'))) {
@@ -124,14 +132,11 @@ describe('schematic webview on the engine', function () {
             console.warn(`  no Chromium for Playwright (npx playwright install chromium) - skipping the webview test\n  ${e.message.split('\n')[0]}`);
             this.skip();
         }
-        engine = spawn(hdlstudio_bin(), ['serve'], { stdio: ['pipe', 'pipe', 'inherit'] });
         page = await browser.newPage({ viewport: { width: 1200, height: 800 } });
         page.on('pageerror', (e) => errors.push(e.stack));
         page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
         await page.exposeFunction('__engineSend', (line) => engine.stdin.write(line + '\n'));
-        readline.createInterface({ input: engine.stdout }).on('line', (line) => {
-            page.evaluate((ev) => window.postMessage({ command: 'engine', ev }, '*'), JSON.parse(line)).catch(() => {});
-        });
+        startEngine();
         const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><script>
             window.__posted = [];
             window.acquireVsCodeApi = () => ({ postMessage: (m) => m.command === 'engine' ? window.__engineSend(JSON.stringify(m.req)) : window.__posted.push(m) });
@@ -533,5 +538,37 @@ describe('schematic webview on the engine', function () {
         await until(() => window.__posted.some((m) => m.command === 'luastop'));
         const out = (await posted('luaprint')).map((m) => m.messages.join('\t')).join('');
         assert.match(out, /ciclo 20: count=3/);
+    });
+
+    it('loads the circuit again when the engine dies', async function () {
+        await page.evaluate(() => {
+            if (!window.__sent) {
+                const send = window.__engineSend;
+                window.__engineSend = (l) => { window.__sent.push(JSON.parse(l)); return send(l); };
+            }
+            window.__sent = [];
+        });
+        await show('04_counter');
+        const loads = () => page.evaluate(() => window.__sent.filter((r) => r.op === 'load'));
+        const { session } = (await loads()).at(-1);
+        const ticked = (n) => until((n) => window.__posted.slice(n).some((m) => m.command === 'tick' && m.tick > 0), n);
+        await post({ command: 'startsim' });
+        await ticked(0);
+        // what the host does when its engine exits: another one, and the event
+        const died = new Promise((resolve) => engine.once('exit', resolve));
+        engine.kill('SIGKILL');
+        await died;
+        startEngine();
+        const n = await page.evaluate(() => window.__posted.length);
+        await post({ command: 'engine', ev: { ev: 'exit', session } });
+        await until((n) => window.__posted.slice(n).some((m) => m.command === 'tick' && m.tick === 0), n);
+        assert.strictEqual((await loads()).length, 2);
+        await post({ command: 'startsim' });
+        await ticked(await page.evaluate(() => window.__posted.length));
+        // dying again at once: no third load (the circuit may be what kills it)
+        const { session: again } = (await loads()).at(-1);
+        await post({ command: 'engine', ev: { ev: 'exit', session: again } });
+        await until(() => window.__posted.filter((m) => m.command === 'runstate').at(-1)?.running === false);
+        assert.strictEqual((await loads()).length, 2);
     });
 });
