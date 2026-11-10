@@ -48,3 +48,15 @@ export function formatTimeAt(sec, resolution) {
     const decimals = Math.max(0, Math.min(9, Math.ceil(-Math.log10(resolution / scale) - 1e-9)));
     return `${(sec / scale).toFixed(decimals)} ${unit}`;
 }
+
+// A tick (`tick` seconds) in a VCD file: the coarsest VCD timescale (1, 10 or
+// 100 of s, ms, us, ns, ps, fs) it is a whole number of, and that number.
+export function vcdTimescale(tick) {
+    for (const [unit, sec] of [['s', 1], ['ms', 1e-3], ['us', 1e-6], ['ns', 1e-9], ['ps', 1e-12], ['fs', 1e-15]])
+        for (const m of [100, 10, 1]) {
+            const scale = tick / (m * sec);
+            if (scale >= 1 && Math.abs(scale - Math.round(scale)) < 1e-6 * scale)
+                return { unit: `${m} ${unit}`, scale: Math.round(scale) };
+        }
+    return { unit: '1 fs', scale: Math.max(1, Math.round(tick / 1e-15)) };
+}

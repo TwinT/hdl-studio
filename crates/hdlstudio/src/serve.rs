@@ -16,6 +16,9 @@
 //!   watch {id, path, port}   unwatch {id}   (record an output's changes)
 //!   wave {id, watches: [id], from, to, bins}   (acked with their windows,
 //!   see wave.rs, by watch id, and the tick)
+//!   vcd {id, file, unit, scale, signals: [{watch, name, bits, scope: [..]}]}
+//!   (writes the watches' histories to `file` as VCD, a tick being `scale`
+//!   `unit`s; acked with {signals, tick} or {error})
 //!   inspect {id, tick}   (the values sent are the run's at `tick`, replayed
 //!   from a checkpoint, until `tick` null or anything that changes the run;
 //!   acked with the tick shown, null for the present)
@@ -29,7 +32,7 @@
 //! Values are binary strings, most significant bit first.
 
 use crate::lua::{LuaEngine, LuaEvent, SharedSim};
-use crate::wave::Wave;
+use crate::wave::{VcdSignal, Wave, write_vcd};
 use hdlstudio_logic::LogicVec;
 use hdlstudio_netlist::Circuit;
 use hdlstudio_sim::{Event, Sim};
@@ -474,6 +477,31 @@ impl Server {
                 }
                 let tick = self.with(|s| Ok(s.tick()))?;
                 ack(self, json!({"tick": tick, "waves": waves}));
+            }
+            "vcd" => {
+                let (file, unit, scale) = (str_("file")?, str_("unit")?, u64_("scale")?);
+                let mut signals = vec![];
+                for s in req["signals"].as_array().ok_or("signals missing")? {
+                    let Some(wave) = s["watch"].as_u64().and_then(|id| self.watches.get(&id)) else { continue };
+                    let scope = s["scope"].as_array().into_iter().flatten().filter_map(Value::as_str).map(String::from);
+                    signals.push(VcdSignal {
+                        scope: scope.collect(),
+                        name: s["name"].as_str().unwrap_or("?").into(),
+                        bits: s["bits"].as_u64().unwrap_or(1).max(1) as usize,
+                        wave,
+                    });
+                }
+                let tick = self.with(|s| Ok(s.tick()))?;
+                let written = std::fs::File::create(file).and_then(|f| {
+                    let mut out = std::io::BufWriter::new(f);
+                    write_vcd(&mut out, &signals, unit, scale.max(1), tick)?;
+                    out.flush()
+                });
+                let result = match written {
+                    Ok(()) => json!({"signals": signals.len(), "tick": tick}),
+                    Err(e) => json!({"error": format!("{file}: {e}")}),
+                };
+                ack(self, result);
             }
             "inspect" => {
                 let shown = self.inspect(req["tick"].as_u64())?;

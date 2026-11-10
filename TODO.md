@@ -10,8 +10,6 @@ Done items leave this list; git history keeps them.
       (unassigned, unused, inferred latch) doesn't run inside yosys, and yosys's
       `check` flags every tri-state bus; wires have no `src` through
       read_slang, so these need a place found another way (the declaration).
-- [ ] Export the waveforms as VCD (GTKWave, Surfer; to hand in, or to compare
-      with iverilog/Verilator): `wave.rs` has every recorded change.
 - [ ] Grading a class: a CLI that synthesizes each student's project from its
       sources (yosys, `build_yosys_script`) and runs the course's `*_test.lua`
       on it with `hdlstudio lua --tests`, a table of results. The Testing view

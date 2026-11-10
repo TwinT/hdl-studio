@@ -16,7 +16,7 @@ import { fileURLToPath } from 'url';
 import { execFileSync } from 'child_process';
 import { build_yosys_script, isHdlFile, data_file_paths } from '../src/yosys_script.mjs';
 import { convert_yosys_json, set_hdlstudio_root } from '../src/hdlstudio_bin.mjs';
-import { parseTime, formatTime, formatFreq } from '../src/time_units.mjs';
+import { parseTime, formatTime, formatFreq, vcdTimescale } from '../src/time_units.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const verilogDir = path.resolve(__dirname, 'verilog');
@@ -482,6 +482,12 @@ describe('time units', function () {
     it('round-trips through format and parse', function () {
         for (const t of [1e-15, 3e-12, 1e-9, 7.5e-6, 2e-3, 42])
             assert.ok(close(parseTime(formatTime(t)), t), formatTime(t));
+    });
+    it('writes a tick as a VCD timescale: the coarsest it is a whole number of', function () {
+        assert.deepStrictEqual(['1ns', '20ns', '1.5ns', '250ns', '1ms', '100us'].map((t) => vcdTimescale(parseTime(t))), [
+            { unit: '1 ns', scale: 1 }, { unit: '10 ns', scale: 2 }, { unit: '100 ps', scale: 15 },
+            { unit: '10 ns', scale: 25 }, { unit: '1 ms', scale: 1 }, { unit: '100 us', scale: 1 },
+        ]);
     });
 });
 

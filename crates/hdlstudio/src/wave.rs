@@ -4,6 +4,7 @@
 
 use hdlstudio_logic::LogicVec;
 use serde_json::{Value, json};
+use std::io::{self, Write};
 
 /// Changes kept per signal; past it the oldest quarter goes.
 // ponytail: a cap, not a smarter store; at flat-out speed a clock fills it
@@ -63,6 +64,89 @@ impl Wave {
     }
 }
 
+/// A watched signal in a VCD file: its scopes (outermost first) and name.
+pub struct VcdSignal<'a> {
+    pub scope: Vec<String>,
+    pub name: String,
+    pub bits: usize,
+    pub wave: &'a Wave,
+}
+
+/// The signals' recorded changes as a VCD file (GTKWave, Surfer): a tick is
+/// `scale` times `unit` (a VCD timescale: 1, 10 or 100 s, ms, us, ns, ps or
+/// fs), up to tick `end`. A signal is x before its history begins (the cap
+/// drops the oldest changes of a long run).
+pub fn write_vcd(out: &mut impl Write, signals: &[VcdSignal], unit: &str, scale: u64, end: u64) -> io::Result<()> {
+    let ident = |s: &str| s.split_whitespace().collect::<Vec<_>>().join("_");
+    // short codes made of the printable characters `!`..`~`
+    let code = |mut i: usize| {
+        let mut c = String::new();
+        loop {
+            c.push((b'!' + (i % 94) as u8) as char);
+            i /= 94;
+            if i == 0 {
+                return c;
+            }
+            i -= 1;
+        }
+    };
+    writeln!(out, "$version HDL Studio {} $end", env!("CARGO_PKG_VERSION"))?;
+    writeln!(out, "$timescale {unit} $end")?;
+    // the signals of a scope together, in their order
+    let mut order: Vec<usize> = (0..signals.len()).collect();
+    order.sort_by(|&a, &b| signals[a].scope.cmp(&signals[b].scope));
+    let mut open: Vec<String> = vec![];
+    for &i in &order {
+        let s = &signals[i];
+        let scope: Vec<String> = s.scope.iter().map(|x| ident(x)).collect();
+        let common = open.iter().zip(&scope).take_while(|(a, b)| a == b).count();
+        for _ in common..open.len() {
+            writeln!(out, "$upscope $end")?;
+        }
+        open.truncate(common);
+        for name in &scope[common..] {
+            writeln!(out, "$scope module {name} $end")?;
+            open.push(name.clone());
+        }
+        let range = if s.bits > 1 { format!(" [{}:0]", s.bits - 1) } else { String::new() };
+        writeln!(out, "$var wire {} {} {}{range} $end", s.bits, code(i), ident(&s.name))?;
+    }
+    for _ in &open {
+        writeln!(out, "$upscope $end")?;
+    }
+    writeln!(out, "$enddefinitions $end")?;
+    let value = |out: &mut dyn Write, i: usize, v: &str| match signals[i].bits {
+        1 => writeln!(out, "{v}{}", code(i)),
+        _ => writeln!(out, "b{v} {}", code(i)),
+    };
+    writeln!(out, "#0\n$dumpvars")?;
+    for (i, s) in signals.iter().enumerate() {
+        let at0 = (s.wave.ticks.first() == Some(&0)).then(|| s.wave.values[0].to_bin());
+        value(out, i, &at0.unwrap_or_else(|| "x".repeat(s.bits)))?;
+    }
+    writeln!(out, "$end")?;
+    let mut changes: Vec<(u64, usize, &LogicVec)> = signals
+        .iter()
+        .enumerate()
+        .flat_map(|(i, s)| {
+            s.wave.ticks.iter().zip(&s.wave.values).filter(|(t, _)| **t > 0).map(move |(&t, v)| (t, i, v))
+        })
+        .collect();
+    changes.sort_by_key(|&(t, i, _)| (t, i));
+    let mut last = 0;
+    for (t, i, v) in changes {
+        if t != last {
+            writeln!(out, "#{}", t * scale)?;
+            last = t;
+        }
+        value(out, i, &v.to_bin())?;
+    }
+    if end > last {
+        writeln!(out, "#{}", end * scale)?;
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -87,5 +171,32 @@ mod tests {
         assert_eq!(w.window(11, 20, 10)["changes"], json!([[12, "1"], [14, "0"], [16, "1"], [18, "0"]]));
         assert_eq!(w.window(11, 20, 10)["start"], json!("0"));
         assert_eq!(w.window(100, 200, 10)["start"], json!("x"));
+    }
+
+    #[test]
+    fn writes_a_vcd_with_scopes_codes_and_merged_changes() {
+        let (mut clk, mut count, mut late) = (Wave::default(), Wave::default(), Wave::default());
+        for t in 0..4 {
+            clk.push(t * 50, v(if t % 2 == 0 { "0" } else { "1" }));
+        }
+        count.push(0, v("0000"));
+        count.push(50, v("0001"));
+        late.push(120, v("z")); // its history begins later
+        let signals = [
+            VcdSignal { scope: vec![], name: "clk".into(), bits: 1, wave: &clk },
+            VcdSignal { scope: vec!["my group".into(), "u_cnt".into()], name: "count".into(), bits: 4, wave: &count },
+            VcdSignal { scope: vec![], name: "late".into(), bits: 1, wave: &late },
+        ];
+        let mut out = vec![];
+        write_vcd(&mut out, &signals, "10 ns", 2, 200).unwrap();
+        let text = String::from_utf8(out).unwrap();
+        let body = text.split_once("$timescale").unwrap().1;
+        assert_eq!(
+            body,
+            " 10 ns $end\n$var wire 1 ! clk $end\n$var wire 1 # late $end\n$scope module my_group $end\n\
+             $scope module u_cnt $end\n$var wire 4 \" count [3:0] $end\n$upscope $end\n$upscope $end\n\
+             $enddefinitions $end\n#0\n$dumpvars\n0!\nb0000 \"\nx#\n$end\n#100\n1!\nb0001 \"\n#200\n0!\n\
+             #240\nz#\n#300\n1!\n#400\n"
+        );
     }
 }

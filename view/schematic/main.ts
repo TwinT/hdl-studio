@@ -117,6 +117,11 @@ class App {
             },
             changed: () => this.#wavesChanged(),
             exportLayout: () => vscode.postMessage({ command: 'savewaves', config: this.#monitor.config }),
+            exportVcd: () => {
+                const signals = this.#monitor.vcdSignals;
+                if (!signals.length) return this.#monitor.say('No waveforms to export: add a wire first');
+                vscode.postMessage({ command: 'savevcd', signals });
+            },
             importLayout: () => vscode.postMessage({ command: 'loadwaves' }),
             cursor: (tick) => this.#cursor(tick),
         });
@@ -178,6 +183,12 @@ class App {
             case 'runlua': return this.#lua.run(m.name, m.script, m.isrepl, m.label);
             case 'stoplua': return this.#lua.stop(m.name, m.isrepl, m.quit);
             case 'exportimage': return this.#exportImage(m);
+            case 'vcd': {
+                // the file the host asked for: the engine writes it
+                const { file, unit, scale, signals } = m;
+                return this.#request({ op: 'vcd', file, unit, scale, signals })
+                    .then((result) => vscode.postMessage({ command: 'vcddone', file, result }));
+            }
             case 'wavesconfig': {
                 // a layout file
                 if (!this.circuit) return;

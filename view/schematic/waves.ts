@@ -72,9 +72,11 @@ export interface MonitorHooks {
     untrigger(id: number): void;
     // the user changed a row (format, pause, order, group, removed it) or a column
     changed(): void;
-    // the toolbar's buttons: the layout to a file, or from one
+    // the toolbar's buttons: the layout to a file, or from one; the
+    // waveforms as a VCD file
     exportLayout(): void;
     importLayout(): void;
+    exportVcd(): void;
     // the time cursor moved to `tick`, or went (back to the present)
     cursor(tick: number | undefined): void;
 }
@@ -132,6 +134,7 @@ export class Monitor {
             <button name="follow" class="codicon codicon-debug-continue" title=""></button>
             <button name="badge" class="badge"></button>
             <span class="range"></span><span class="status"></span>
+            <button name="vcd" class="codicon codicon-export" title="Export the waveforms as VCD (GTKWave, Surfer)…"></button>
             <button name="export" class="codicon codicon-save" title="Save the waveform layout to a file…"></button>
             <button name="import" class="codicon codicon-folder-opened" title="Open a waveform layout file…"></button></div>
             <div class="grid"><div class="head">Signal<div class="colsize"></div></div><div class="head">Value<div class="colsize"></div></div>
@@ -150,6 +153,7 @@ export class Monitor {
         this.#badge = $('[name=badge]');
         this.#badge.addEventListener('click', () => this.#setFollow(!this.#follow));
         $('[name=export]').addEventListener('click', () => this.#hooks.exportLayout());
+        $('[name=vcd]').addEventListener('click', () => this.#hooks.exportVcd());
         $('[name=import]').addEventListener('click', () => this.#hooks.importLayout());
         this.#dropLine = $('.dropline');
         this.root.querySelectorAll<HTMLElement>('.colsize').forEach((h, i) => h.addEventListener('pointerdown', (e) => {
@@ -187,6 +191,16 @@ export class Monitor {
             waves: this.#items.map((i) => isGroup(i) ? { group: i.group, color: i.color, collapsed: i.collapsed, items: i.items.map(spec) } : spec(i)),
             columns: [...this.#cols],
         };
+    }
+
+    // The signals for a VCD file, in order: a group is a scope, and so is
+    // each subcircuit in a name ("u_cnt.count").
+    get vcdSignals() {
+        const signal = (w: Watch, group?: string) => {
+            const parts = w.name.split('.');
+            return { watch: w.id, name: parts.pop()!, bits: w.bits, scope: [...(group ? [group] : []), ...parts] };
+        };
+        return this.#items.flatMap((i) => isGroup(i) ? i.items.map((w) => signal(w, i.group)) : [signal(i)]);
     }
 
     // Replaces what the monitor shows with `config`; `resolve` finds each

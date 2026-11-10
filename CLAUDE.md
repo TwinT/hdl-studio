@@ -126,6 +126,11 @@ SVG drawn by hand, laid out by `elkjs`, simulated by the engine through the host
   Middle/Alt-drag scrolls, Ctrl+wheel zooms. A row's menu (right-click or "…") picks the number
   format, a pause condition (an engine `monitor` with `stop`, triggers null = any
   change; firing puts the cursor there and Space goes on) and its group.
+- VCD export: the monitor's button → `savevcd {signals}` (`vcdSignals`: a group and
+  each subcircuit in a name are scopes) → the host's save dialog and `vcdTimescale`
+  (time_units.mjs: the coarsest 1/10/100 unit a tick is a whole number of) → `vcd
+  {file, unit, scale}` back to the view, which asks the engine (`vcd` op, `wave.rs`
+  `write_vcd`: the whole history, x before it begins) → `vcddone`.
 - Themes (`themes.ts`, setting `hdl-studio.theme`, Dracula by default, also in the
   schematic's right-click menu → `settheme`): wires green 1, grey 0, blue bus, orange
   z, red x (a collision is an x). A palette per theme set as `--sch-*` variables on

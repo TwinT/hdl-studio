@@ -24,6 +24,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `test/verilog/04_counter/counter_test.lua` is an example. Run from the Lua
   terminal or the scripts panel, the tests run in turn on the same simulation.
   `hdlstudio lua --tests` runs them headless.
+- The waveforms as a VCD file (GTKWave, Surfer): the monitor's *Export* button
+  writes every signal in it, with all their recorded history, groups and
+  subcircuits as scopes, in the project's time unit.
 - Source → schematic: the cells the line under the editor's cursor made light up
   (in a submodule, its instances; inside an open subcircuit window, the cells
   themselves). *Show in Circuit* (the editor's right-click menu) also centres them.

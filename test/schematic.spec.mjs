@@ -8,6 +8,7 @@
 
 import assert from 'assert';
 import fs from 'fs';
+import os from 'os';
 import path from 'path';
 import readline from 'readline';
 import { spawn } from 'child_process';
@@ -679,6 +680,31 @@ describe('schematic webview on the engine', function () {
         await until((id) => document.querySelector(`.cell[data-id="${id}"] .key text`)?.textContent === '↑', push);
         await menu(push, 'No key');
         assert.deepStrictEqual([await keys(), await cap(push)], [{}, null]);
+    });
+
+    it('exports the waveforms as a VCD file, written by the engine', async function () {
+        await post({ command: 'showcircuit', circuit: { devices: {}, connectors: [] }, opts: {} });
+        await show('04_counter');
+        await post({ command: 'startsim' });
+        await page.evaluate(() => { for (const h of document.querySelectorAll('.wirehit')) h.dispatchEvent(new window.MouseEvent('dblclick', { bubbles: true })); });
+        await page.waitForTimeout(300);
+        await page.locator('#monitor button[name=vcd]').click();
+        const { signals } = await lastPosted('savevcd');
+        assert.ok(signals.some((s) => s.name === 'count' && s.bits === 4 && s.scope.length === 0), JSON.stringify(signals));
+        // the host picked a file: the engine writes it
+        const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'hdl-vcd-')), 'counter.vcd');
+        await post({ command: 'vcd', file, unit: '10 ns', scale: 2, signals });
+        const done = await until(() => window.__posted.find((m) => m.command === 'vcddone'));
+        const { result } = await done.jsonValue();
+        assert.strictEqual(result.signals, signals.length);
+        const vcd = fs.readFileSync(file, 'utf8');
+        assert.match(vcd, /\$timescale 10 ns \$end/);
+        assert.match(vcd, /\$var wire 4 \S+ count \[3:0\] \$end/);
+        // the count changed while it ran: binary values, at even times (2 per tick)
+        const times = [...vcd.matchAll(/^#(\d+)$/gm)].map((m) => Number(m[1]));
+        assert.ok(times.length > 3 && times.every((t) => t % 2 === 0), times.slice(0, 5).join());
+        assert.match(vcd, /^b[01]{4} \S+$/m);
+        await post({ command: 'pausesim' });
     });
 
     it('runs a Lua script in the engine', async function () {

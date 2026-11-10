@@ -9,6 +9,8 @@ import * as base64 from 'base64-arraybuffer';
 import { hdlstudio_bin } from './hdlstudio_bin.mjs';
 import { WebviewMsgQueue } from './webview_msg_queue.mjs';
 import { get_dirname_uri, read_txt_file, write_txt_file } from './utils.mjs';
+import { parseTime, vcdTimescale } from './time_units.mjs';
+import * as path from 'path';
 
 const config = () => vscode.workspace.getConfiguration('hdl-studio');
 const waveColors = () => config().get('waveform.colors');
@@ -159,6 +161,14 @@ export class CircuitView {
                 return config().update('labels', msg.value, vscode.ConfigurationTarget.Global);
             case 'savewaves':
                 return this.#saveWaves(msg.config);
+            case 'savevcd':
+                return this.#saveVcd(msg.signals);
+            case 'vcddone':
+                if (msg.result?.error)
+                    return vscode.window.showErrorMessage(`Unable to write ${msg.file}: ${msg.result.error}`);
+                if (msg.result)
+                    vscode.window.showInformationMessage(`${msg.result.signals} signals written to ${path.basename(msg.file)}.`);
+                return;
             case 'loadwaves':
                 return this.#loadWaves();
             case 'saveimg-error':
@@ -193,6 +203,20 @@ export class CircuitView {
         });
         if (uri)
             await write_txt_file(uri, JSON.stringify({ hdlstudio: 'waves', ...config }, null, 2) + '\n');
+    }
+    // The waveforms as a VCD file: the user picks it, the engine writes it
+    // (through the view, which holds the session).
+    async #saveVcd(signals) {
+        const name = this.#document.uri.path.split('/').pop().replace(/\.[^.]*$/, '');
+        const dir = get_dirname_uri(this.#document.uri);
+        const uri = await vscode.window.showSaveDialog({
+            defaultUri: dir && vscode.Uri.joinPath(dir, `${name}.vcd`),
+            filters: { 'Value Change Dump': ['vcd'] },
+        });
+        if (!uri)
+            return;
+        const tick = parseTime(this.#document.synth_options.timescale) ?? 1e-9;
+        this.post({ command: 'vcd', file: uri.fsPath, signals, ...vcdTimescale(tick) });
     }
     async #loadWaves() {
         const [uri] = await vscode.window.showOpenDialog({
