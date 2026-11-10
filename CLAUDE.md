@@ -198,6 +198,11 @@ build: the engine is a native process.
   mouse events), Lua. Needs yosys with read_slang and Playwright's Chromium (`npx
   playwright install chromium`; skips without). The same harness shape is handy for
   looking at the view by hand.
+- `test/screenshots.mjs` (not a test, run by hand): the README's circuit view
+  screenshots in the schematic harness (a subcircuit window with a line lit, the
+  memory editor, alu's FSM diagram, the board's LED matrix, the waveforms). The
+  README is the user guide: a feature goes there (and in its "Features at a
+  glance" table) when it lands.
 - `test:vscode` (`node test/runTest.js`) — `@vscode/test-electron` mocha suite
   (`test/suite/*.test.js`, tdd UI) on the built extension (`dist/`: `npm run compile`
   first). `synthesis.test.js` opens a real project and synthesizes it (needs yosys):

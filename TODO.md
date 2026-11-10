@@ -101,7 +101,10 @@ Done items leave this list; git history keeps them.
 - [ ] The time cursor (`inspect`): a first jump back on a long flat-out run
       replays up to a checkpoint's spacing (~1 s of running at first, more
       once they're thinned); the stimulus log grows for the whole run.
-- [ ] The README's screenshots other than the first show the pre-1.0 UI.
+- [ ] The README's screenshots of VS Code itself (`code-highlight`,
+      `create-circuit-src`, `files-sidepanel`, `lua-repl`, 1.1) are taken by
+      hand and don't show the Problems panel, the Testing view or the stale
+      banner; the circuit view's come from `test/screenshots.mjs`.
 - [ ] Windows (subcircuits, FSMs, memories): collapse one to its title bar
       (double-click on it), a button to tile the open ones over the
       schematic's area.
