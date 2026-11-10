@@ -79,6 +79,7 @@ export class Schematic {
     #frame = 0;
     #hover?: { wire: Wire, x: number, y: number };
     #t = { x: 0, y: 0, k: 1 };
+    #lit = new Set<string>(); // the cells the editor's line made (kept across renders)
 
     constructor(container: HTMLElement, graph: GraphData, opts: { top: boolean, subcircuits: Record<string, GraphData>, hooks: SchematicHooks }) {
         this.graph = graph;
@@ -138,6 +139,7 @@ export class Schematic {
             });
             view.g.setAttribute('transform', `translate(${d.position!.x},${d.position!.y})`);
             view.g.dataset.id = id;
+            if (this.#lit.has(id)) view.g.classList.add('lit');
             view.g.addEventListener('pointerenter', () => this.#hooks.marker(d));
             view.g.addEventListener('pointerleave', () => this.#hooks.marker(null));
             if (s.open) view.g.addEventListener('dblclick', (e) => { e.stopPropagation(); this.#hooks.open(id); });
@@ -330,6 +332,26 @@ export class Schematic {
     // The drawing's extent, in its own coordinates.
     bbox() {
         return this.#viewport.getBBox();
+    }
+    // Points out cells (those a source line made).
+    light(ids: Set<string>) {
+        this.#lit = ids;
+        for (const [id, view] of this.#cells) view.g.classList.toggle('lit', ids.has(id));
+    }
+    // Centres the lit cells, zoomed out if they don't fit; false if none.
+    focusLit() {
+        const ids = [...this.#lit].filter((id) => this.#cells.has(id));
+        if (!ids.length) return false;
+        let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+        for (const id of ids) {
+            const p = this.graph.devices[id].position!, s = this.#shapes.get(id)!;
+            x0 = Math.min(x0, p.x); y0 = Math.min(y0, p.y - 20);
+            x1 = Math.max(x1, p.x + s.w); y1 = Math.max(y1, p.y + s.h + 20);
+        }
+        const r = this.svg.getBoundingClientRect();
+        const k = Math.max(0.1, Math.min(this.#t.k, (r.width - 80) / (x1 - x0), (r.height - 80) / (y1 - y0)));
+        this.transform = { x: r.width / 2 - (x0 + x1) / 2 * k, y: r.height / 2 - (y0 + y1) / 2 * k, k };
+        return true;
     }
     // Content at the top left, at zoom 1, or
     // smaller if it doesn't fit in `fit` (a window's size).

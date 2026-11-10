@@ -369,6 +369,11 @@ svg.schematic .cell {
     cursor: move;
 }
 
+/* made by the source line under the editor's cursor */
+svg.schematic .cell.lit {
+    filter: drop-shadow(0 0 3px var(--sch-hl)) drop-shadow(0 0 6px var(--sch-hl));
+}
+
 /* setting hdl-studio.labels off: no names of internal cells or wires */
 .nolabels svg.schematic .name {
     display: none;

@@ -205,6 +205,9 @@ class HdlStudio {
             vscode.commands.registerCommand('hdl-studio.synthesize',
                                             () => this.doSynth()));
         context.subscriptions.push(
+            vscode.commands.registerCommand('hdl-studio.showInCircuit',
+                                            () => this.#showInCircuit()));
+        context.subscriptions.push(
             vscode.commands.registerCommand('hdl-studio.newJSON',
                                             () => this.#newJSON(this.doc_uri, false)));
         context.subscriptions.push(
@@ -345,6 +348,20 @@ class HdlStudio {
             vscode.window.showErrorMessage(
                 'No active circuit to synthesize. Click into the circuit editor tab and try again.');
         }
+    }
+    // The cells the line under the cursor made, centred in the circuit
+    // (the active one if the file is one of its sources).
+    #showInCircuit() {
+        const editor = vscode.window.activeTextEditor;
+        if (!editor)
+            return;
+        const views = [this.#circuitView, ...this.#openCircuitViews].filter(Boolean);
+        const view = views.find((v) => v.document.sources.findByURI(editor.document.uri)?.name);
+        if (!view)
+            return vscode.window.showInformationMessage(`${path.basename(editor.document.uri.path)} isn't a source of an open circuit.`);
+        if (!view.showSourceLine(editor, true))
+            return vscode.window.showInformationMessage('The file changed since the circuit was synthesized: synthesize it to find its cells.');
+        view.panel.reveal(view.panel.viewColumn, true);
     }
     set image_exts(exts) {
         this.#image_exts_set = true;

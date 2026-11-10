@@ -18,6 +18,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   synthesized (edited, added or removed), with a button to synthesize again.
 - `hdl-studio.synthesizeOnSave`: saving a source that changed synthesizes again.
 - *HDL Studio: Synthesize* in the command palette.
+- Source → schematic: the cells the line under the editor's cursor made light up
+  (in a submodule, its instances; inside an open subcircuit window, the cells
+  themselves). *Show in Circuit* (the editor's right-click menu) also centres them.
 
 ### Fixed
 - Undoing a synthesis now also brings back what the sources were synthesized

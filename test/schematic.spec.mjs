@@ -279,6 +279,36 @@ describe('schematic webview on the engine', function () {
         assert.deepStrictEqual(await shown(), [names, true]);
     });
 
+    it("lights the cells a source line made, and centres them", async function () {
+        await post({ command: 'showcircuit', circuit: { devices: {}, connectors: [] }, opts: {} });
+        await show('08_contador_decadas');
+        const circuit = (await lastPosted('autolayout')).circuit;
+        const lit = () => page.evaluate(() => [...document.querySelectorAll('svg.schematic .cell.lit')].map((g) => g.dataset.id).sort());
+        // a line inside the submodule: both its instances
+        const decadas = Object.keys(circuit.devices).filter((id) => circuit.devices[id].type === 'Subcircuit').sort();
+        const inner = Object.values(circuit.subcircuits[circuit.devices[decadas[0]].celltype].devices)
+            .find((d) => d.source_positions?.length).source_positions[0];
+        await post({ command: 'srcline', file: inner.name, line: inner.from.line });
+        await until((n) => document.querySelectorAll('svg.schematic .cell.lit').length === n, decadas.length);
+        assert.deepStrictEqual(await lit(), decadas);
+        // and inside an open instance, the cell itself
+        await page.evaluate((id) => document.querySelector(`.cell[data-id="${id}"]`).dispatchEvent(new window.MouseEvent('dblclick', { bubbles: true })), decadas[0]);
+        await until(() => document.querySelectorAll('.dialog svg .cell.lit').length > 0);
+        await page.evaluate(() => document.querySelector('.dialog button.codicon-close').click());
+        // reveal: the view moves to them
+        const zoom = () => page.evaluate(() => document.querySelector('svg.schematic > g').getAttribute('transform'));
+        const before = await zoom();
+        await post({ command: 'srcline', file: inner.name, line: inner.from.line, reveal: true });
+        await until((b) => document.querySelector('svg.schematic > g').getAttribute('transform') !== b, before);
+        // another file, or none (edited since the synthesis): nothing lit
+        await post({ command: 'srcline', file: 'other.sv', line: inner.from.line });
+        await until(() => !document.querySelector('svg.schematic .cell.lit'));
+        await post({ command: 'srcline', file: inner.name, line: inner.from.line });
+        await until(() => document.querySelector('svg.schematic .cell.lit'));
+        await post({ command: 'srcline' });
+        await until(() => !document.querySelector('svg.schematic .cell.lit'));
+    });
+
     it('says when the sources changed since the synthesis, with a button for another', async function () {
         await show('04_counter');
         const circuit = (await lastPosted('autolayout')).circuit;

@@ -212,6 +212,14 @@ has `read_slang` (`SLANG_PROBES`: built in, or the `slang` plugin, which the scr
 then loads with `plugin -i slang`; OSS CAD Suite ships it as a plugin); without it,
 `read_verilog -sv`. The tests (`test/designs.mjs` `slangSupport`) ask the same way.
 
+Source → schematic: `CircuitView#showSourceLine` (on every cursor move, 100 ms
+later, in an editor of one of its sources whose text still matches the synthesis,
+`SourceInfo#findEditor`) posts `srcline {file, line, reveal}`; `main.ts`
+`#showLine` lights (`Schematic#light`, class `lit`, kept across renders) the
+devices whose `source_positions` cover the line, and the Subcircuit cells whose
+type does, in every open graph; `reveal` (*Show in Circuit*,
+`hdl-studio.showInCircuit`) → `focusLit` centres the top level's.
+
 A stale circuit (`Document#checkStale`, 300 ms after an edit of a source, at once
 on a save, a source list change, a new circuit, the view coming to the front):
 `Sources#changedSinceSynthesis` compares each source's text (the open editor's,

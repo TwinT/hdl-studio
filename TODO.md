@@ -10,9 +10,6 @@ Done items leave this list; git history keeps them.
       (unassigned, unused, inferred latch) doesn't run inside yosys, and yosys's
       `check` flags every tri-state bus; wires have no `src` through
       read_slang, so these need a place found another way (the declaration).
-- [ ] Source → schematic: a click (or the cursor) in a source highlights the
-      cells whose `source_positions` cover that line; today only the other
-      way (`#marker` → `showmarker`).
 - [ ] Export the waveforms as VCD (GTKWave, Surfer; to hand in, or to compare
       with iverilog/Verilator): `wave.rs` has every recorded change.
 - [ ] Lua tests in VS Code's Test Explorer: `*_test.lua` scripts that

@@ -51,6 +51,12 @@ export class CircuitView {
             if (this.#panel.active)
                 this.#document.checkStale(0);
         });
+        // the editor's cursor in one of this circuit's sources: its line's cells
+        let line_timer;
+        const cursor_listener = vscode.window.onDidChangeTextEditorSelection((e) => {
+            clearTimeout(line_timer);
+            line_timer = setTimeout(() => this.showSourceLine(e.textEditor), 100);
+        });
         const colors_listener = vscode.workspace.onDidChangeConfiguration((e) => {
             if (e.affectsConfiguration('hdl-studio.theme') || e.affectsConfiguration('hdl-studio.waveform'))
                 this.post({ command: 'theme', theme: config().get('theme'), waveColors: waveColors() });
@@ -62,6 +68,8 @@ export class CircuitView {
             timescale_listener.dispose();
             stale_listener.dispose();
             front_listener.dispose();
+            cursor_listener.dispose();
+            clearTimeout(line_timer);
             colors_listener.dispose();
             this.#disposed = true;
             this.#engine?.kill();
@@ -123,6 +131,19 @@ export class CircuitView {
             if (live && !this.#disposed)
                 this.post({ command: 'engine', ev: { ev: 'exit', session: this.#engineSession } });
         });
+    }
+    // Lights the cells the line under `editor`'s cursor made (`reveal`: and
+    // centres them). Nothing for a file that isn't a source of this circuit;
+    // none lit for one edited since the synthesis (its lines moved). False if
+    // nothing could be lit.
+    showSourceLine(editor, reveal = false) {
+        const info = this.#document.sources.findByURI(editor.document.uri);
+        if (!info?.name)
+            return false;
+        const synced = info.findEditor()?.document === editor.document;
+        this.post({ command: 'srcline', reveal,
+                    ...(synced ? { file: info.name, line: editor.selection.active.line + 1 } : {}) });
+        return synced;
     }
     #processCommand(studio, msg) {
         switch (msg.command) {

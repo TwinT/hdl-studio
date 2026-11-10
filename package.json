@@ -120,6 +120,12 @@
                 "category": "HDL Studio"
             },
             {
+                "command": "hdl-studio.showInCircuit",
+                "title": "Show in Circuit",
+                "icon": "$(circuit-board)",
+                "category": "HDL Studio"
+            },
+            {
                 "command": "hdl-studio.newJSON",
                 "title": "New Circuit",
                 "icon": "$(new-file)",
@@ -234,6 +240,10 @@
                     "when": "hdl-studio.view_isactive"
                 },
                 {
+                    "command": "hdl-studio.showInCircuit",
+                    "when": "hdl-studio.view_isactive && editorTextFocus"
+                },
+                {
                     "command": "hdl-studio.addFiles",
                     "when": "false"
                 },
@@ -278,6 +288,13 @@
                     "command": "hdl-studio.showLuaTerminal",
                     "when": "view == hdl-studio-proj-files",
                     "group": "navigation@3"
+                }
+            ],
+            "editor/context": [
+                {
+                    "command": "hdl-studio.showInCircuit",
+                    "when": "hdl-studio.view_isactive && resourceExtname =~ /^\\.s?v$/",
+                    "group": "navigation@9"
                 }
             ],
             "editor/title": [

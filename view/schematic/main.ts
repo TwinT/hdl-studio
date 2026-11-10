@@ -84,6 +84,7 @@ class App {
     #theme: { name?: string, waveColors?: any } = {};
     #labels = true; // the names of internal cells and of wires (setting hdl-studio.labels)
     #stale = false; // the sources changed since this circuit was synthesized
+    #srcLine?: { file: string, line: number }; // the line under the editor's cursor
     #names?: Map<string, { path: string, port: string }>; // watchable outputs by name
     // while the waveform cursor shows the circuit at an earlier tick: whether
     // to run again once it goes
@@ -159,6 +160,7 @@ class App {
             case 'stale':
                 this.#stale = !!m.value;
                 return this.#staleBanner();
+            case 'srcline': return this.#showLine(m.file ? { file: m.file, line: m.line } : undefined, !!m.reveal);
             case 'setspeed':
                 this.#speed = m.speed;
                 if (this.#running) {
@@ -337,6 +339,28 @@ class App {
         this.#inspectNext = undefined;
         if (next !== undefined) this.#inspect(next);
     }
+    // The cells a source line made, in every open graph; inside a submodule,
+    // its instances. `reveal`: centre them in the top level.
+    #showLine(at: { file: string, line: number } | undefined, reveal = false) {
+        this.#srcLine = at;
+        if (!this.circuit) return;
+        const subs = this.circuit.subcircuits ?? {};
+        const made = (d: Device) => !!at && (d.source_positions ?? []).some((p: any) =>
+            p.name === at.file && p.from.line <= at.line && at.line <= (p.to ?? p.from).line);
+        const within = new Map<string, boolean>();
+        const inside = (type: string): boolean => {
+            if (!within.has(type)) {
+                within.set(type, false);
+                within.set(type, Object.values(subs[type]?.devices ?? {}).some((d) => made(d) || (d.type === 'Subcircuit' && inside(d.celltype!))));
+            }
+            return within.get(type)!;
+        };
+        for (const v of this.#views.values()) {
+            const devices = Object.entries(v.schematic.graph.devices);
+            v.schematic.light(new Set(devices.filter(([, d]) => made(d) || (d.type === 'Subcircuit' && inside(d.celltype!))).map(([id]) => id)));
+        }
+        if (reveal) this.#views.get('')?.schematic.focusLit();
+    }
     // The circuit is older than its sources: say so, with a way to update it.
     #staleBanner() {
         let b = document.getElementById('stalebanner');
@@ -426,6 +450,7 @@ class App {
             for (const [g, v] of this.#views) this.#rebuild(g, v);
             this.#ioView();
             this.#staleBanner();
+            this.#showLine(this.#srcLine);
             return;
         }
         this.#closeAll();
@@ -464,6 +489,7 @@ class App {
         else top.home();
         this.#ioView();
         this.#staleBanner();
+        this.#showLine(this.#srcLine);
         if (run) this.startSim();
         this.updateRunStates();
     }
@@ -529,6 +555,7 @@ class App {
         for (const c of v.schematic.graph.connectors) delete c.vertices;
         await this.#layout(v.schematic);
         for (const [g2, v2] of this.#views) this.#rebuild(g2, v2);
+        this.#showLine(this.#srcLine);
         const fit = v.dialog && { w: v.dialog.body.clientWidth, h: v.dialog.body.clientHeight };
         this.#views.get(g)!.schematic.home(fit);
         this.#edited('pos');
@@ -643,6 +670,7 @@ class App {
             else dialog.fit(b.width + 60, b.height + 60);
             s.home({ w: dialog.body.clientWidth, h: dialog.body.clientHeight });
             this.#subcircuitList();
+            this.#showLine(this.#srcLine);
             return;
         }
         if (this.#extras.has(path)) return;
