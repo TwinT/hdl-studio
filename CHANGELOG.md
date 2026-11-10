@@ -5,11 +5,12 @@ All notable changes to HDL Studio will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.4.0] - 2026-11-10
 
 ### Added
-- Packages for Windows x64 and for macOS on Apple silicon, besides Linux x64. Each
-  release is also on GitHub, with its packages.
+- Packages for Windows x64 and for macOS on Apple silicon, besides Linux x64. They
+  are new: please report anything that doesn't work there. Each release is also on
+  GitHub, with its packages.
 - Keys for the push buttons and switches: right-click one on the schematic → *Press it
   with a key…*. A push button is high while its key is down, a switch toggles; the
   key shows on the button and is saved with the project.
