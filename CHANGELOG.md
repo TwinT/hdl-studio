@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- *Names of cells and wires* in the schematic's right-click menu (setting
+  `hdl-studio.labels`): off, the internal cells (often named by yosys, like
+  `$procmux$2`) and the wires show no names; inputs, outputs and port labels stay.
+  An exported image leaves them out too.
+
 ### Changed
 - With several top-level modules and no *Top* option, the biggest one is shown
   (it was chosen by name) and a warning names the others; modules that aren't part

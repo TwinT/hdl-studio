@@ -343,6 +343,11 @@ svg.schematic .cell {
     cursor: move;
 }
 
+/* setting hdl-studio.labels off: no names of internal cells or wires */
+.nolabels svg.schematic .name {
+    display: none;
+}
+
 svg.schematic .button,
 svg.schematic .open,
 svg.schematic .wiretool {

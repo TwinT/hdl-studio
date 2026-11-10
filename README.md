@@ -157,6 +157,9 @@ that produced it:
 - **Theme:** right-click the background and pick one — *Dracula* (the default),
   *Classic* (white paper), *VS Code* (its colours), *Solarized Light*, *Solarized Dark*,
   *Nord*, *Night Owl*, *Gruvbox Dark*. The waveforms take its colours too.
+- **Names:** *Names of cells and wires* in the same menu hides the names of the
+  internal cells (often yosys's own, like `$procmux$2`) and of the wires; inputs and
+  outputs keep theirs, and the ports their labels.
 
 ### Simulation
 
@@ -312,6 +315,7 @@ the rest of `io` isn't there, and `os` has only `os.time`, `os.clock`, `os.date`
 |---|---|---|
 | `hdl-studio.yosysPath` | `""` (use `PATH`) | Path to the `yosys` executable. |
 | `hdl-studio.theme` | `dracula` | Colours of the circuit view: `dracula`, `classic`, `vscode`, `solarized-light`, `solarized-dark`, `nord`, `night-owl`, `gruvbox-dark`. |
+| `hdl-studio.labels` | `true` | Names of the cells and wires in the circuit view (inputs, outputs and port labels always show). |
 | `hdl-studio.waveform.colors` | `{}` (the theme's) | Waveform colours as CSS colours, over the theme's: `background`, `altBackground`, `foreground`, `grid`, `signal`, `undefined`, `highImpedance`, `cursor`, `fillOpacity`. Any key can be left out. |
 
 The simulation speed is global and remembered between sessions.

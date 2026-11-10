@@ -76,6 +76,7 @@ class App {
     #exportIds = 0;
     #monitor: Monitor;
     #theme: { name?: string, waveColors?: any } = {};
+    #labels = true; // the names of internal cells and of wires (setting hdl-studio.labels)
     #names?: Map<string, { path: string, port: string }>; // watchable outputs by name
     // while the waveform cursor shows the circuit at an earlier tick: whether
     // to run again once it goes
@@ -142,11 +143,13 @@ class App {
                 this.#monitor.setTimescale(m.opts.timescale, parseTime);
                 this.#theme = { name: m.opts.theme, waveColors: m.opts.waveColors };
                 this.#applyTheme();
+                if ('labels' in m.opts) this.#showLabels(m.opts.labels);
                 return this.#show(m.circuit, m.opts);
             case 'timescale': return this.#monitor.setTimescale(m.value, parseTime);
             case 'theme':
                 this.#theme = { name: m.theme, waveColors: m.waveColors };
                 return this.#applyTheme();
+            case 'labels': return this.#showLabels(m.value);
             case 'setspeed':
                 this.#speed = m.speed;
                 if (this.#running) {
@@ -177,6 +180,11 @@ class App {
 
     #applyTheme() {
         this.#monitor.setColors(applyTheme(this.#theme.name, this.#theme.waveColors));
+    }
+    // CSS hides them (`.nolabels`), so an exported image leaves them out too
+    #showLabels(on: boolean) {
+        this.#labels = on !== false;
+        document.documentElement.classList.toggle('nolabels', !this.#labels);
     }
 
     // ---- the engine
@@ -462,6 +470,7 @@ class App {
             e.preventDefault();
             popupMenu(e.clientX, e.clientY, ({ item, head }) => {
                 item('Reset layout', false, () => this.#resetLayout(prefix));
+                item('Names of cells and wires', this.#labels, () => vscode.postMessage({ command: 'setlabels', value: !this.#labels }));
                 item('Open a waveform layout…', false, () => vscode.postMessage({ command: 'loadwaves' }));
                 head('Theme');
                 for (const [name, t] of Object.entries(themes))

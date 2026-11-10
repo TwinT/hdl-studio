@@ -119,6 +119,8 @@ SVG drawn by hand, laid out by `elkjs`, simulated by the engine through the host
   `levelColor`), which `el()`/`paint()` put in the style, not in presentation
   attributes. The waveforms get concrete colours (the theme's, `var()`s resolved,
   under `hdl-studio.waveform.colors`), sent with `showcircuit` and as `theme`.
+  `hdl-studio.labels` the same way (`labels`, `setlabels`): off, `.nolabels` on
+  `<html>` hides every `text.name` (internal cells' labels, wire names).
 - Pan captures the pointer only once it drags: capturing on pointerdown sends the
   click/dblclick to the svg instead of the wire under it.
 - TypeScript: `tsc` only type-checks (`tsconfig.json`, part of `npm run lint`);

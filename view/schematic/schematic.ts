@@ -161,7 +161,7 @@ export class Schematic {
                 hit: el('path', { fill: 'none', stroke: 'transparent', 'stroke-width': 10, class: 'wirehit' }, this.#wireLayer),
             };
             // one name per net, not one per connector (they overlap)
-            if (c.name && !this.#readers.get(src)?.wires.length) w.label = text(this.#wireLayer, 0, 0, c.name, { 'text-anchor': 'middle', 'dominant-baseline': 'central', 'pointer-events': 'none' });
+            if (c.name && !this.#readers.get(src)?.wires.length) w.label = text(this.#wireLayer, 0, 0, c.name, { class: 'name', 'text-anchor': 'middle', 'dominant-baseline': 'central', 'pointer-events': 'none' });
             w.hit.addEventListener('pointerenter', (e) => { this.#hooks.marker(c); this.#hoverWire(w, e); this.#showTool(w, e); });
             w.hit.addEventListener('pointermove', (e) => { this.#hoverWire(w, e); this.#showTool(w, e); });
             w.hit.addEventListener('pointerleave', () => { this.#hooks.marker(null); this.#hover = undefined; tooltip.hide(); this.#hideTool(); });

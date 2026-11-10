@@ -521,7 +521,9 @@ export function draw(d: Device, s: Shape, top: boolean, hooks: CellHooks): CellV
                  { 'text-anchor': left ? 'start' : 'end', 'dominant-baseline': 'central', ...(p.overline ? { 'text-decoration': 'overline' } : {}) });
         }
     }
-    if (d.label !== undefined) text(g, s.w / 2, s.labelY, d.label, { 'text-anchor': 'middle', 'dominant-baseline': 'hanging' });
+    // an internal cell's name (often yosys's, `$procmux$2`) can be hidden; an I/O's is what it is
+    if (d.label !== undefined) text(g, s.w / 2, s.labelY, d.label, { 'text-anchor': 'middle', 'dominant-baseline': 'hanging',
+                                                                    ...(isInput(d) || isOutput(d) || t === 'Clock' ? {} : { class: 'name' }) });
     if (s.top !== undefined) text(g, s.w / 2, -10, s.top, { 'text-anchor': 'middle', 'dominant-baseline': 'central' });
     if (s.open) {
         const icon = el('g', { class: 'open', transform: `translate(${s.w - 14},${s.top !== undefined ? -34 : -20})` }, g);

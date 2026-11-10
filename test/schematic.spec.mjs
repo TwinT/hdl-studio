@@ -250,6 +250,35 @@ describe('schematic webview on the engine', function () {
         assert.deepStrictEqual(await colours(), ['rgb(255, 255, 255)', 'rgb(255, 255, 255)', 'rgb(0, 0, 0)']);
     });
 
+    it('hides the names of internal cells and wires, from its menu', async function () {
+        await show('04_counter');
+        // the names shown, and whether the clock (an input) still shows its own
+        const shown = () => page.evaluate(() => {
+            const on = (t) => window.getComputedStyle(t).display !== 'none';
+            const clk = [...document.querySelectorAll('svg.schematic .cell text')].find((t) => t.textContent === 'clk');
+            return [[...document.querySelectorAll('svg.schematic text.name')].filter(on).map((t) => t.textContent).sort(), on(clk)];
+        });
+        const [names] = await shown();
+        assert.ok(names.some((n) => n.startsWith('$')) && names.includes('count'), names.join()); // a cell's, a wire's
+        const menu = async () => {
+            const svg = await page.evaluate(() => document.querySelector('svg.schematic').getBoundingClientRect().toJSON());
+            await page.mouse.click(svg.x + svg.width - 20, svg.y + 20, { button: 'right' });
+            return page.locator('.wavemenu button', { hasText: 'Names of cells and wires' });
+        };
+        assert.match(await (await menu()).textContent(), /^✓/);
+        await (await menu()).click();
+        assert.strictEqual((await lastPosted('setlabels')).value, false);
+        // the host writes the setting, which comes back
+        await post({ command: 'labels', value: false });
+        await until(() => document.documentElement.classList.contains('nolabels'));
+        assert.deepStrictEqual(await shown(), [[], true]);
+        assert.doesNotMatch(await (await menu()).textContent(), /^✓/);
+        await page.keyboard.press('Escape');
+        await post({ command: 'labels', value: true });
+        await until(() => !document.documentElement.classList.contains('nolabels'));
+        assert.deepStrictEqual(await shown(), [names, true]);
+    });
+
     it('records waveforms, and a trigger stops the simulation', async function () {
         await post({ command: 'pausesim' }); // a run from tick 0, watched from the start
         const view = await show('04_counter');
@@ -372,7 +401,7 @@ describe('schematic webview on the engine', function () {
         await page.evaluate((id) => {
             const sel = document.querySelector(`.cell[data-id="${id}"] select`);
             sel.value = 'dec';
-            sel.dispatchEvent(new Event('change'));
+            sel.dispatchEvent(new window.Event('change'));
         }, display);
         const base = await lastPosted('updatecircuit');
         assert.deepStrictEqual([base.type, base.circuit.devices[display].numbase, base.circuit.devices[clk].propagation], ['param', 'dec', 7]);

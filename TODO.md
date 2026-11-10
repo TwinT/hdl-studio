@@ -3,7 +3,6 @@
 Done items leave this list; git history keeps them.
 
 ## Next Features 🚀
-- [ ] Option for disabling labels on the circuit view.
 - [ ] Synthesis errors and warnings in the Problems panel, underlined in the
       sources: today they go to the "HDL Studio (Yosys)" output channel and a
       notification. A `DiagnosticCollection` fed from yosys-slang's

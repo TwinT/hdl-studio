@@ -413,6 +413,11 @@
                     ],
                     "markdownDescription": "Colours of the circuit view: the schematic and the waveform monitor (also in the schematic's right-click menu)."
                 },
+                "hdl-studio.labels": {
+                    "type": "boolean",
+                    "default": true,
+                    "markdownDescription": "Show the names of the cells and wires in the circuit view (also in the schematic's right-click menu). Off, only the inputs and outputs keep theirs, and the ports their labels (`D`, `Q`, `clk`...)."
+                },
                 "hdl-studio.waveform.colors": {
                     "type": "object",
                     "markdownDescription": "Colours of the waveform monitor, as CSS colours, over the theme's (`#hdl-studio.theme#`); any key can be left out.",

@@ -47,6 +47,8 @@ export class CircuitView {
         const colors_listener = vscode.workspace.onDidChangeConfiguration((e) => {
             if (e.affectsConfiguration('hdl-studio.theme') || e.affectsConfiguration('hdl-studio.waveform'))
                 this.post({ command: 'theme', theme: config().get('theme'), waveColors: waveColors() });
+            if (e.affectsConfiguration('hdl-studio.labels'))
+                this.post({ command: 'labels', value: config().get('labels') });
         });
         this.onDidDispose(() => {
             circuit_listener.dispose();
@@ -123,6 +125,8 @@ export class CircuitView {
                 return;
             case 'settheme':
                 return config().update('theme', msg.theme, vscode.ConfigurationTarget.Global);
+            case 'setlabels':
+                return config().update('labels', msg.value, vscode.ConfigurationTarget.Global);
             case 'savewaves':
                 return this.#saveWaves(msg.config);
             case 'loadwaves':
@@ -188,6 +192,7 @@ export class CircuitView {
                     defaultcomb: this.#document.synth_options.defaultcomb,
                     timescale: this.#document.synth_options.timescale,
                     theme: config().get('theme'),
+                    labels: config().get('labels'),
                     waveColors: waveColors(),
                     view: this.#document.viewState,
                     speed: this.#studio.speedOf(this.#document) }
